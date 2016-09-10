@@ -195,10 +195,12 @@ procedure TAqDBORMManager.Delete(const pObject: TObject; const pFreeObject: Bool
 begin
   Delete(BuildDeletes(pObject.ClassType), pObject);
 
+{$IFNDEF AUTOREFCOUNT}
   if pFreeObject then
   begin
     pObject.Free;
   end;
+{$ENDIF}
 end;
 
 procedure TAqDBORMManager.FillParametersWithObjectValues(pParameters: IAqDBParameters; const pObject: TObject);
@@ -278,10 +280,12 @@ procedure TAqDBORMManager.Add(const pObject: TObject; const pFreeObject: Boolean
 begin
   Add(BuildInserts(pObject.ClassType), pObject);
 
+{$IFNDEF AUTOREFCOUNT}
   if pFreeObject then
   begin
     pObject.Free;
   end;
+{$ENDIF}
 end;
 
 procedure TAqDBORMManager.Post(const pObject: TObject; const pFreeObject: Boolean = False);
@@ -292,7 +296,9 @@ var
   lSelect: IAqDBSQLSelect;
   lReader: IAqDBReader;
 begin
+{$IFNDEF AUTOREFCOUNT}
   try
+{$ENDIF}
     lInserts := BuildInserts(pObject.ClassType);
     lUpdates := BuildUpdates(pObject.ClassType);
 
@@ -330,12 +336,14 @@ begin
       FConnection.RollbackTransaction;
       raise;
     end;
+{$IFNDEF AUTOREFCOUNT}
   finally
     if pFreeObject then
     begin
       pObject.Free;
     end;
   end;
+{$ENDIF}
 end;
 
 procedure TAqDBORMManager.Update(const pUpdates: IAqReadList<IAqDBSQLUpdate>; const pObject: TObject);
@@ -386,10 +394,12 @@ procedure TAqDBORMManager.Update(const pObject: TObject; const pFreeObject: Bool
 begin
   Update(BuildUpdates(pObject.ClassType), pObject);
 
+{$IFNDEF AUTOREFCOUNT}
   if pFreeObject then
   begin
     pObject.Free;
   end;
+{$ENDIF}
 end;
 
 procedure TAqDBORMManager.Add(const pInsert: IAqDBSQLInsert; const pObject: TObject);
@@ -790,7 +800,7 @@ end;
 function TAqDBORMManager.BuildSelect(const pClass: TClass): IAqDBSQLSelect;
 var
   lORM: TAqDBORM;
-  lI: Integer;
+  lI: Int32;
 
   procedure AddColumns(const pORMTable: TAqDBORMTable; const pSource: IAqDBSQLSource);
   var

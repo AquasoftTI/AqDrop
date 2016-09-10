@@ -4,7 +4,8 @@ interface
 
 uses
   System.Rtti,
-  AqDrop.Core.Collections;
+  System.SyncObjs,
+  System.Generics.Collections;
 
 type
   TAqFieldMapping = class
@@ -22,9 +23,11 @@ type
   strict private
     FFrom: TRttiType;
     FTo: TRttiType;
-    FFieldMappings: TAqList<TAqFieldMapping>;
 
-    class var FMappings: TAqDictionary<string, TAqObjectMapping>;
+    FFieldMappings: TObjectList<TAqFieldMapping>;
+
+    class var FLocker: TCriticalSection;
+    class var FMappings: TObjectDictionary<string, TAqObjectMapping>;
   public
     class constructor Create;
     class destructor Destroy;
@@ -78,7 +81,7 @@ var
 begin
   lMappingName := pFrom.QualifiedClassName + ' X ' + pTo.QualifiedClassName;
 
-  FMappings.Lock;
+  FLocker.Enter;
 
   try
     if not FMappings.TryGetValue(lMappingName, lMapping) then
@@ -87,7 +90,7 @@ begin
       FMappings.Add(lMappingName, lMapping);
     end;
   finally
-    FMappings.Release;
+    FLocker.Leave;
   end;
 
   lMapping.Execute(pFrom, pTo);
@@ -95,12 +98,14 @@ end;
 
 class constructor TAqObjectMapping.Create;
 begin
-  FMappings := TAqDictionary<string, TAqObjectMapping>.Create([TAqDictionaryContent.adcValue], True);
+  FLocker := TCriticalSection.Create;
+  FMappings := TObjectDictionary<string, TAqObjectMapping>.Create([doOwnsValues]);
 end;
 
 class destructor TAqObjectMapping.Destroy;
 begin
   FMappings.Free;
+  FLocker.Free;
 end;
 
 constructor TAqObjectMapping.Create(const pFrom, pTo: TClass);
@@ -109,7 +114,7 @@ var
   lFieldFrom: TRttiField;
   lFieldTo: TRttiField;
 begin
-  FFieldMappings := TAqList<TAqFieldMapping>.Create(True);
+  FFieldMappings := TObjectList<TAqFieldMapping>.Create;
 
   lContext := TRttiContext.Create;
 

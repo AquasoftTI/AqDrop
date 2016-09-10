@@ -1,13 +1,16 @@
 unit AqDrop.DB.FD.MSSQL;
 
 interface
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
 
 uses
+{$IFNDEF AQMOBILE}
 {$if CompilerVersion >= 26}
   FireDAC.Phys.MSSQL,
 {$else}
   uADPhysMSSQL,
 {$endif}
+{$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.FD;
 
@@ -19,8 +22,8 @@ type
 
   TAqFDMSSQLConnection = class(TAqFDCustomConnection)
   strict protected
-    function GetParameterValueByIndex(const pIndex: Integer): string; override;
-    procedure SetParameterValueByIndex(const pIndex: Integer; const pValue: string); override;
+    function GetParameterValueByIndex(const pIndex: Int32): string; override;
+    procedure SetParameterValueByIndex(const pIndex: Int32; const pValue: string); override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
@@ -60,7 +63,7 @@ begin
   Result := TAqFDMSSQLAdapter;
 end;
 
-function TAqFDMSSQLConnection.GetParameterValueByIndex(const pIndex: Integer): string;
+function TAqFDMSSQLConnection.GetParameterValueByIndex(const pIndex: Int32): string;
 begin
   case pIndex of
     $80:
@@ -76,7 +79,7 @@ begin
   end;
 end;
 
-procedure TAqFDMSSQLConnection.SetParameterValueByIndex(const pIndex: Integer; const pValue: string);
+procedure TAqFDMSSQLConnection.SetParameterValueByIndex(const pIndex: Int32; const pValue: string);
 begin
   case pIndex of
     $80:

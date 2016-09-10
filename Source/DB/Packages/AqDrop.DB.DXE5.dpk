@@ -49,6 +49,7 @@ contains
   AqDrop.DB.SQL.Intf in '..\AqDrop.DB.SQL.Intf.pas',
   AqDrop.DB.SQL in '..\AqDrop.DB.SQL.pas',
   AqDrop.DB.Tokenizer in '..\AqDrop.DB.Tokenizer.pas',
-  AqDrop.DB.Types in '..\AqDrop.DB.Types.pas';
+  AqDrop.DB.Types in '..\AqDrop.DB.Types.pas',
+  AqDrop.DB.SQLite in '..\AqDrop.DB.SQLite.pas';
 
 end.

@@ -14,18 +14,17 @@ pattenrs, between other classes;
   - Register: Design time package to register the Drop in the IDE.
 
 To install the DROP:
-  - Open the project group designed for your Delphi version (e.g. AqDrop.DXE5.groupproj is the group for Delphi XE5);
   - Add the folders containing the runtime units to your Library Path (Folders Core and DB);
+  - Open the project group designed for your Delphi version (e.g. AqDrop.DXE5.groupproj is the group for Delphi XE5);
   - Execute a 'Build All' command;
   - Install the Register package.
 
 IMPORTANT NOTES:
   - The Drop is provided 'As Is', it means that Aquasoft is not responsible for any problems arising from the use of Drop, and has no obligations to implement / modify the tool to adapt it to any user scenario;
   - In theory, the source code is compatible with Delphi XE3, but we give official support (by unit tests) only to Delphi XE4 and newer versions; 
-  - The Drop offers specialized classes for connections to MSSQL, MySQL, Firebird, Oracle and Postgres (the last one only by FireDAC). Our roadmap includes tasks to provide support to Interbase and SQLite;
+  - The Drop offers specialized classes for connections to MSSQL, MySQL, Firebird, Oracle, SQLite and Postgres (the last one only by FireDAC). Our roadmap includes tasks to provide support to Interbase, fell free to suggest any other type of Database;
   - Packages for using DROP in Delphi XE8 were included in version 1.2, but, we're having problems while compiling the packages (we have a QC opened to verify it). If you don't use BPLs to modularize your applications, this problem will not cause any effect, because the inclusion of the source code (in your project or library path) will provide the normal behavior of the framework (guaranteed by unit tests performed in XE8);
-  - Stay up to date about the DROP checking our twitter and
-facebook: AquasoftTI.
+  - Stay up to date about the DROP checking our twitter and facebook: AquasoftTI.
 
 And, thank you for using DROP!
 
@@ -43,14 +42,19 @@ Phone: +55 (51) 3022-3188
 
 VERSION HISTORY:
 ----------------------------------------
-2015.07.14: Drop 1.2.0:
+2015.12.28: Drop 1.2.1:
+- Support to Delphi 10 Seattle;
+- Support to iOS and Android;
+----------------------------------------
+2015.08.03: Drop 1.2.0:
 - Support to Delphi XE7 and XE8;
 - Creation of specialized classes to comunicate trough FireDAC components;
 - Support to Oracle (by DBX and FD);
+- Support to SQLite (by DBX and FD);
 - Support to Postgres (only by FD);
 - Creation of basic structure to inherit and automatize ORM tasks (including object cache);
 - Attributes to better handle of nullable fields;
-- Hundresd of improvments and small bug fixes;
+- Lots of improvments and small bug fixes;
 ----------------------------------------
 2014.04.16: Drop 1.0.1:
 - Binding support for result lists;

@@ -1,5 +1,7 @@
 unit AqDrop.DB.FD;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
@@ -53,7 +55,9 @@ type
   TAqFDDataConverter = class
   public
     function ParamToString(const pParameter: TAqFDMappedParam): string; virtual;
+{$IFNDEF AQMOBILE}
     function ParamToAnsiString(const pParameter: TAqFDMappedParam): AnsiString; virtual;
+{$ENDIF}
     function ParamToBoolean(const pParameter: TAqFDMappedParam): Boolean; virtual;
     function ParamToBCD(const pParameter: TAqFDMappedParam): TBcd; virtual;
     function ParamToDate(const pParameter: TAqFDMappedParam): TDate; virtual;
@@ -72,7 +76,9 @@ type
     function ParamToCurrency(const pParameter: TAqFDMappedParam): Currency; virtual;
 
     function FieldToString(const pField: TField): string; virtual;
+{$IFNDEF AQMOBILE}
     function FieldToAnsiString(const pField: TField): AnsiString; virtual;
+{$ENDIF}
     function FieldToBoolean(const pField: TField): Boolean; virtual;
     function FieldToBCD(const pField: TField): TBcd; virtual;
     function FieldToDate(const pField: TField): TDate; virtual;
@@ -91,7 +97,9 @@ type
     function FieldToCurrency(const pField: TField): Currency; virtual;
 
     procedure StringToParam(const pParameter: TAqFDMappedParam; const pValue: string); virtual;
+{$IFNDEF AQMOBILE}
     procedure AnsiStringToParam(const pParameter: TAqFDMappedParam; const pValue: AnsiString); virtual;
+{$ENDIF}
     procedure BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean); virtual;
     procedure BCDToParam(const pParameter: TAqFDMappedParam; const pValue: TBcd); virtual;
     procedure DateToParam(const pParameter: TAqFDMappedParam; const pValue: TDate); virtual;
@@ -151,7 +159,9 @@ type
     procedure SetDataType(const pDataType: TAqDataType);
 
     function GetAsString: string;
+{$IFNDEF AQMOBILE}
     function GetAsAnsiString: AnsiString;
+{$ENDIF}
     function GetAsBoolean: Boolean;
     function GetAsTimeStamp: TSQLTimeStamp;
     function GetAsTimeStampOffset: TSQLTimeStampOffset;
@@ -172,7 +182,9 @@ type
     function GetAsCurrency: Currency;
 
     procedure SetAsString(const pValue: string);
+{$IFNDEF AQMOBILE}
     procedure SetAsAnsiString(const pValue: AnsiString);
+{$ENDIF}
     procedure SetAsBoolean(const pValue: Boolean);
     procedure SetAsTimeStamp(const pValue: TSQLTimeStamp);
     procedure SetAsTimeStampOffset(const pValue: TSQLTimeStampOffset);
@@ -225,7 +237,9 @@ type
     function GetIsNull: Boolean;
 
     function GetAsString: string;
+{$IFNDEF AQMOBILE}
     function GetAsAnsiString: AnsiString;
+{$ENDIF}
     function GetAsBoolean: Boolean;
     function GetAsTimeStamp: TSQLTimeStamp;
     function GetAsTimeStampOffset: TSQLTimeStampOffset;
@@ -301,8 +315,8 @@ type
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
 
-    function GetParameterValueByIndex(const pIndex: Integer): string; virtual;
-    procedure SetParameterValueByIndex(const pIndex: Integer; const pValue: string); virtual;
+    function GetParameterValueByIndex(const pIndex: Int32): string; virtual;
+    procedure SetParameterValueByIndex(const pIndex: Int32; const pValue: string); virtual;
 
     procedure DoStartTransaction; override;
     procedure DoCommitTransaction; override;
@@ -453,12 +467,12 @@ begin
     begin
       pParametersHandler(TAqFDParameters.Create(Self, lQuery));
     end;
-
-    Result := TAqFDReader.Create(Self, lQuery);
   except
     lQuery.Free;
     raise;
   end;
+
+  Result := TAqFDReader.Create(Self, lQuery);
 end;
 
 function TAqFDCustomConnection.DoOpenQuery(const pCommandID: TAqID;
@@ -546,7 +560,7 @@ begin
   Result := TAqFDAdapter(Adapter);
 end;
 
-function TAqFDCustomConnection.GetParameterValueByIndex(const pIndex: Integer): string;
+function TAqFDCustomConnection.GetParameterValueByIndex(const pIndex: Int32): string;
 begin
   raise EAqInternal.Create('Index not defined to get a parameter connection.');
 end;
@@ -576,7 +590,7 @@ begin
   inherited;
 end;
 
-procedure TAqFDCustomConnection.SetParameterValueByIndex(const pIndex: Integer; const pValue: string);
+procedure TAqFDCustomConnection.SetParameterValueByIndex(const pIndex: Int32; const pValue: string);
 begin
   raise EAqInternal.Create('Index not defined to set a parameter connection.');
 end;
@@ -612,10 +626,12 @@ begin
   FParameter := pParameter;
 end;
 
+{$IFNDEF AQMOBILE}
 function TAqFDParameter.GetAsAnsiString: AnsiString;
 begin
   Result := FParameters.Connection.FDAdapter.FDDataConverter.ParamToAnsiString(FParameter);
 end;
+{$ENDIF}
 
 function TAqFDParameter.GetAsBCD: TBcd;
 begin
@@ -722,10 +738,12 @@ begin
   Result := FParameter.Name;
 end;
 
+{$IFNDEF AQMOBILE}
 procedure TAqFDParameter.SetAsAnsiString(const pValue: AnsiString);
 begin
   FParameters.Connection.FDAdapter.FDDataConverter.AnsiStringToParam(FParameter, pValue);
 end;
+{$ENDIF}
 
 procedure TAqFDParameter.SetAsBCD(const pValue: TBcd);
 begin
@@ -840,10 +858,12 @@ end;
 
 { TAqFDDataConverter }
 
+{$IFNDEF AQMOBILE}
 procedure TAqFDDataConverter.AnsiStringToParam(const pParameter: TAqFDMappedParam; const pValue: AnsiString);
 begin
   pParameter.AsAnsiString := pValue;
 end;
+{$ENDIF}
 
 procedure TAqFDDataConverter.BCDToParam(const pParameter: TAqFDMappedParam; const pValue: TBcd);
 begin
@@ -875,10 +895,12 @@ begin
   pParameter.AsFloat := pValue;
 end;
 
+{$IFNDEF AQMOBILE}
 function TAqFDDataConverter.FieldToAnsiString(const pField: TField): AnsiString;
 begin
   Result := AnsiString(FieldToString(pField));
 end;
+{$ENDIF}
 
 function TAqFDDataConverter.FieldToBCD(const pField: TField): TBcd;
 begin
@@ -1085,10 +1107,12 @@ begin
   pParameter.AsShortInt := pValue;
 end;
 
+{$IFNDEF AQMOBILE}
 function TAqFDDataConverter.ParamToAnsiString(const pParameter: TAqFDMappedParam): AnsiString;
 begin
   Result := AnsiString(ParamToString(pParameter));
 end;
+{$ENDIF}
 
 function TAqFDDataConverter.ParamToBCD(const pParameter: TAqFDMappedParam): TBcd;
 begin
@@ -1328,10 +1352,12 @@ begin
   FField := pField;
 end;
 
+{$IFNDEF AQMOBILE}
 function TAqFDField.GetAsAnsiString: AnsiString;
 begin
   Result := FReader.Connection.FDAdapter.FDDataConverter.FieldToAnsiString(FField);
 end;
+{$ENDIF}
 
 function TAqFDField.GetAsBCD: TBcd;
 begin
@@ -1448,10 +1474,10 @@ end;
 constructor TAqFDReader.Create(const pConnection: TAqFDCustomConnection; const pQuery: TAqFDMappedQuery;
   const pOwnsQuery: Boolean);
 begin
-  FConnection := pConnection;
-  FConnection.IncreaseReaderes;
   FQuery := pQuery;
   FOwnsQuery := pOwnsQuery;
+  FConnection := pConnection;
+  FConnection.IncreaseReaderes;
   FQuery.Close;
   FQuery.Open;
 end;

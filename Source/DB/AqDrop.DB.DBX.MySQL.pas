@@ -1,10 +1,14 @@
 unit AqDrop.DB.DBX.MySQL;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
   Data.DBXCommon,
+{$IFNDEF AQMOBILE}
   Data.DBXMySQL,
+{$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
   AqDrop.DB.DBX,
@@ -26,8 +30,8 @@ type
 
   TAqDBXMySQLConnection = class(TAqDBXCustomConnection)
   strict protected
-    function GetPropertyValueAsString(const pIndex: Integer): string; override;
-    procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
+    function GetPropertyValueAsString(const pIndex: Int32): string; override;
+    procedure SetPropertyValueAsString(const pIndex: Int32; const pValue: string); override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
@@ -83,7 +87,7 @@ begin
   Result := TAqDBXMySQLAdapter;
 end;
 
-function TAqDBXMySQLConnection.GetPropertyValueAsString(const pIndex: Integer): string;
+function TAqDBXMySQLConnection.GetPropertyValueAsString(const pIndex: Int32): string;
 begin
   case pIndex of
     $80:
@@ -99,7 +103,7 @@ begin
   end;
 end;
 
-procedure TAqDBXMySQLConnection.SetPropertyValueAsString(const pIndex: Integer; const pValue: string);
+procedure TAqDBXMySQLConnection.SetPropertyValueAsString(const pIndex: Int32; const pValue: string);
 begin
   case pIndex of
     $80:

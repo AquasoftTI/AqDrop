@@ -99,8 +99,9 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
+        <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.2.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.2.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.2.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.2.1.0;Comments=</VerInfo_Keys>
         <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
@@ -109,7 +110,6 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -123,11 +123,13 @@
         <DCCReference Include="DBXFirebirdDriver.dcp"/>
         <DCCReference Include="DBXOracleDriver.dcp"/>
         <DCCReference Include="DBXMSSQLDriver.dcp"/>
+        <DCCReference Include="DBXSqliteDriver.dcp"/>
         <DCCReference Include="..\AqDrop.DB.DBX.FB.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.MSSQL.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.MySQL.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.Ora.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.pas"/>
+        <DCCReference Include="..\AqDrop.DB.DBX.SQLite.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

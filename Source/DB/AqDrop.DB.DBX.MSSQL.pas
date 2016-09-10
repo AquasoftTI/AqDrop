@@ -1,9 +1,13 @@
 unit AqDrop.DB.DBX.MSSQL;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
+{$IFNDEF AQMOBILE}
   Data.DBXMSSQL,
+{$ENDIF}
   AqDrop.DB.SQL.Intf,
   AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
@@ -17,8 +21,8 @@ type
 
   TAqDBXMSSQLConnection = class(TAqDBXCustomConnection)
   strict protected
-    function GetPropertyValueAsString(const pIndex: Integer): string; override;
-    procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
+    function GetPropertyValueAsString(const pIndex: Int32): string; override;
+    procedure SetPropertyValueAsString(const pIndex: Int32; const pValue: string); override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
@@ -56,7 +60,7 @@ begin
   Result := TAqDBXMSSQLAdapter;
 end;
 
-function TAqDBXMSSQLConnection.GetPropertyValueAsString(const pIndex: Integer): string;
+function TAqDBXMSSQLConnection.GetPropertyValueAsString(const pIndex: Int32): string;
 begin
   case pIndex of
     $80:
@@ -72,7 +76,7 @@ begin
   end;
 end;
 
-procedure TAqDBXMSSQLConnection.SetPropertyValueAsString(const pIndex: Integer; const pValue: string);
+procedure TAqDBXMSSQLConnection.SetPropertyValueAsString(const pIndex: Int32; const pValue: string);
 begin
   case pIndex of
     $80:

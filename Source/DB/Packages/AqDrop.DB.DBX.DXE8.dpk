@@ -39,6 +39,7 @@ contains
   AqDrop.DB.DBX.MSSQL in '..\AqDrop.DB.DBX.MSSQL.pas',
   AqDrop.DB.DBX.MySQL in '..\AqDrop.DB.DBX.MySQL.pas',
   AqDrop.DB.DBX.Ora in '..\AqDrop.DB.DBX.Ora.pas',
-  AqDrop.DB.DBX in '..\AqDrop.DB.DBX.pas';
+  AqDrop.DB.DBX in '..\AqDrop.DB.DBX.pas',
+  AqDrop.DB.DBX.SQLite in '..\AqDrop.DB.DBX.SQLite.pas';
 
 end.

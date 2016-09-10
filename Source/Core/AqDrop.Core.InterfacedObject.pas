@@ -13,6 +13,7 @@ type
   /// ------------------------------------------------------------------------------------------------------------------
 {$IFDEF AUTOREFCOUNT}
   TAqInterfacedObject = class(TInterfacedObject)
+  strict protected
 {$ELSE}
   TAqInterfacedObject = class(TObject, IInterface)
   strict private
@@ -21,9 +22,9 @@ type
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Int32; stdcall;
     function _Release: Int32; stdcall;
-
+{$ENDIF}
     class function MustCountReferences: Boolean; virtual;
-
+{$IFNDEF AUTOREFCOUNT}
     property References: Int32 read FReferences;
   public
     procedure AfterConstruction; override;
@@ -61,12 +62,14 @@ begin
 
   inherited;
 end;
+{$ENDIF}
 
 class function TAqInterfacedObject.MustCountReferences: Boolean;
 begin
   Result := False;
 end;
 
+{$IFNDEF AUTOREFCOUNT}
 class function TAqInterfacedObject.NewInstance: TObject;
 var
   lInterfacedObject: TAqInterfacedObject;

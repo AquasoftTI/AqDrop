@@ -1,10 +1,14 @@
 unit AqDrop.DB.DBX.Ora;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
   Data.DBXCommon,
+{$IFNDEF AQMOBILE}
   Data.DBXOracle,
+{$ENDIF}
   AqDrop.DB.Ora,
   AqDrop.DB.DBX,
   AqDrop.DB.Adapter;
@@ -26,8 +30,8 @@ type
 
   TAqDBXOraConnection = class(TAqDBXCustomConnection)
   strict protected
-    function GetPropertyValueAsString(const pIndex: Integer): string; override;
-    procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
+    function GetPropertyValueAsString(const pIndex: Int32): string; override;
+    procedure SetPropertyValueAsString(const pIndex: Int32; const pValue: string); override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
@@ -52,9 +56,9 @@ begin
 
   if pValue then
   begin
-    pParameter.Value.SetAnsiString('1');
+    pParameter.Value.SetString('1');
   end else begin
-    pParameter.Value.SetAnsiString('0');
+    pParameter.Value.SetString('0');
   end;
 end;
 
@@ -102,7 +106,7 @@ begin
   Result := TAqDBXOraAdapter;
 end;
 
-function TAqDBXOraConnection.GetPropertyValueAsString(const pIndex: Integer): string;
+function TAqDBXOraConnection.GetPropertyValueAsString(const pIndex: Int32): string;
 begin
   case pIndex of
     $80:
@@ -116,7 +120,7 @@ begin
   end;
 end;
 
-procedure TAqDBXOraConnection.SetPropertyValueAsString(const pIndex: Integer; const pValue: string);
+procedure TAqDBXOraConnection.SetPropertyValueAsString(const pIndex: Int32; const pValue: string);
 begin
   case pIndex of
     $80:

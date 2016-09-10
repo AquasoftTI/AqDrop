@@ -112,7 +112,9 @@ procedure TAqDBObject.Delete;
 begin
   if not FManager.Delete(Self) then
   begin
+{$IFNDEF AUTOREFCOUNT}
     Free;
+{$ENDIF}
   end;
 end;
 

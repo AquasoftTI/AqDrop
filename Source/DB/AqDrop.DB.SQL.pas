@@ -993,7 +993,7 @@ end;
 
 function TAqDBSQLSelect.GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
 var
-  lI: Integer;
+  lI: Int32;
 begin
   lI := 0;
   Result := nil;

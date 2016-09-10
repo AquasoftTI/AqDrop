@@ -2,6 +2,8 @@ unit AqDrop.DB.Types;
 
 interface
 
+{$I '..\Core\AqDrop.Core.Defines.inc'}
+
 uses
   System.Rtti,
   Data.SqlTimSt,
@@ -18,7 +20,9 @@ type
     function GetIsNull: Boolean;
 
     function GetAsString: string;
+{$IFNDEF AQMOBILE}
     function GetAsAnsiString: AnsiString;
+{$ENDIF}
     function GetAsBoolean: Boolean;
     function GetAsTimeStamp: TSQLTimeStamp;
     function GetAsTimeStampOffset: TSQLTimeStampOffset;
@@ -41,7 +45,9 @@ type
     property Name: string read GetName write SetName;
 
     property AsString: string read GetAsString;
+{$IFNDEF AQMOBILE}
     property AsAnsiString: AnsiString read GetAsAnsiString;
+{$ENDIF}
     property AsBoolean: Boolean read GetAsBoolean;
     property AsTimeStamp: TSQLTimeStamp read GetAsTimeStamp;
     property AsTimeStampOffset: TSQLTimeStampOffset read GetAsTimeStampOffset;
@@ -68,7 +74,9 @@ type
     procedure SetDataType(const pDataType: TAqDataType);
 
     procedure SetAsString(const pValue: string);
+{$IFNDEF AQMOBILE}
     procedure SetAsAnsiString(const pValue: AnsiString);
+{$ENDIF}
     procedure SetAsBoolean(const pValue: Boolean);
     procedure SetAsTimeStamp(const pValue: TSQLTimeStamp);
     procedure SetAsTimeStampOffset(const pValue: TSQLTimeStampOffset);
@@ -91,7 +99,9 @@ type
     procedure SetNull(const pDataType: TAqDataType = TAqDataType.adtUnknown);
 
     property AsString: string read GetAsString write SetAsString;
+{$IFNDEF AQMOBILE}
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
+{$ENDIF}
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsTimeStamp: TSQLTimeStamp read GetAsTimeStamp write SetAsTimeStamp;
     property AsTimeStampOffset: TSQLTimeStampOffset read GetAsTimeStampOffset write SetAsTimeStampOffset;

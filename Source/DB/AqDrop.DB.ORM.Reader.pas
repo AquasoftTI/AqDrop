@@ -2,6 +2,8 @@ unit AqDrop.DB.ORM.Reader;
 
 interface
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 uses
   System.Rtti,
   System.TypInfo,
@@ -371,7 +373,7 @@ var
     begin
       Dec(lIColumn);
 
-      Result := lColumnName.CompareTo(pColumns[lIColumn].Name, False) = 0;
+      Result := string.SameText(lColumnName, pColumns[lIColumn].Name);
 
       if Result then
       begin
@@ -388,7 +390,7 @@ begin
     lTableName := pName.LeftFromPosition(lSeparatorPosition);
     lColumnName := pName.RightFromPosition(lSeparatorPosition);
 
-    if lTableName.CompareTo(FMainTable.Name, False) = 0 then
+    if string.SameText(lTableName, FMainTable.Name) then
     begin
       Result := FindColumn(FMainTable.Columns, pColumn);
     end else if HasSpecializations then
@@ -399,7 +401,7 @@ begin
       begin
         Dec(lITable);
 
-        Result := lTableName.CompareTo(FSpecializations[lITable].Attribute.Name, False) = 0;
+        Result := string.SameText(lTableName, FSpecializations[lITable].Attribute.Name);
 
         if Result then
         begin
@@ -434,7 +436,7 @@ function TAqDBORM.GetTable(const pName: string; out pTable: TAqDBORMTable): Bool
 var
   lI: Int32;
 begin
-  Result := FMainTable.Name.CompareTo(pName, False) = 0;
+  Result := string.SameText(FMainTable.Name, pName);
 
   if Result then
   begin
@@ -546,8 +548,6 @@ procedure TAqDBORMColumn.SetDBValue(const pInstance: TObject; pValue: IAqDBValue
 var
   lValue: TValue;
 begin
-{TODO: implementar aqui o if null}
-
   lValue := GetValue(pInstance);
 
   case GetType of
@@ -671,6 +671,7 @@ begin
       end else begin
         pValue.AsTime := lValue.AsExtended;
       end;
+{$IFNDEF AQMOBILE}
     TAqDataType.adtAnsiChar:
       if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
       begin
@@ -678,6 +679,7 @@ begin
       end else begin
         pValue.AsAnsiString := AnsiString(lValue.AsString);
       end;
+{$ENDIF}
     TAqDataType.adtChar:
       if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
       begin
@@ -685,6 +687,7 @@ begin
       end else begin
         pValue.AsString := lValue.AsString;
       end;
+{$IFNDEF AQMOBILE}
     TAqDataType.adtAnsiString:
       if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
       begin
@@ -692,6 +695,7 @@ begin
       end else begin
         pValue.AsAnsiString := AnsiString(lValue.AsString);
       end;
+{$ENDIF}
     TAqDataType.adtString, TAqDataType.adtWideString:
       if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
       begin
@@ -746,12 +750,16 @@ begin
       lValue := TValue.From<TDate>(pValue.AsDate);
     TAqDataType.adtTime:
       lValue := TValue.From<TTime>(pValue.AsTime);
+{$IFNDEF AQMOBILE}
     TAqDataType.adtAnsiChar:
       lValue := TValue.From<AnsiChar>(AnsiChar(pValue.AsString.Chars[0]));
+{$ENDIF}
     TAqDataType.adtChar:
       lValue := TValue.From<Char>(pValue.AsString.Chars[0]);
+{$IFNDEF AQMOBILE}
     TAqDataType.adtAnsiString:
       lValue := TValue.From<AnsiString>(pValue.AsAnsiString);
+{$ENDIF}
     TAqDataType.adtString, TAqDataType.adtWideString:
       lValue := TValue.From<string>(pValue.AsString);
   else

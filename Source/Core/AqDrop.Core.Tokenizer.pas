@@ -220,7 +220,7 @@ function TAqTokenizer<TIdentifier, TOutput>.FinalizeToken(
 begin
   if pCurrentState.IsFinal then
   begin
-    Result := TAqTokenizerToken.Create(pToken, pCurrentState.Saida);
+    Result := TAqTokenizerToken.Create(pToken, pCurrentState.Output);
     pToken := '';
     pCurrentState := Automaton.InitialState;
     Dec(pCurrentPosition);

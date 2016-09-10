@@ -80,66 +80,6 @@ type
     function GetEnumerator: TEnumerator<T>;
   end;
 
-  TAqFromToList<TFrom, TTo> = class(TAqInterfacedObject, IAqReadList<TTo>)
-  strict private
-    FFromList: IAqReadList<TFrom>;
-    FConversionFunction: TAqConversionFunction<TFrom, TTo>;
-    function GetFirst: TTo;
-    function GetLast: TTo;
-    function GetCount: Int32;
-    function GetItem(pIndice: Int32): TTo;
-  strict private
-    type
-      TFromToEnumerator = class(TEnumerator<TTo>)
-      strict private
-        FFromList: IAqReadList<TFrom>;
-        FIndex: Int32;
-        FConversionFunction: TAqConversionFunction<TFrom, TTo>;
-        function GetCurrent: TTo;
-      protected
-        function DoGetCurrent: TTo; override;
-        function DoMoveNext: Boolean; override;
-      public
-        constructor Create(const pFromList: IAqReadList<TFrom>;
-          const pConversionFunction: TAqConversionFunction<TFrom, TTo>);
-        property Current: TTo read DoGetCurrent;
-        function MoveNext: Boolean;
-      end;
-  public
-    constructor Create(const pFromList: IAqReadList<TFrom>;
-      const pConversionFunction: TAqConversionFunction<TFrom, TTo>);
-
-    /// <summary>
-    ///   EN-US:
-    ///     Finds the index of an item in the list.
-    ///   PT-BR:
-    ///     Localiza o índice de um item na lista.
-    /// </summary>
-    /// <param name="pValue">
-    ///   EN-US:
-    ///     Value that should be found.
-    ///   PT-BR:
-    ///     Valor que deve ser encontrado.
-    /// </param>
-    /// <returns>
-    ///   EN-US:
-    ///     Returns the index fo the searched value. If the value is not found, the function returns -1.
-    ///   PT-BR:
-    ///     Retorna o índice do valor procurado na lista. Caso o valor não seja encontrado, a função retornará -1.
-    /// </returns>
-    function IndexOf(const pValue: TTo): Int32; overload;
-
-    function Find(const pMatchFunction: TFunc<TTo, Boolean>; out pValor: TTo): Boolean; overload;
-
-    property Count: Int32 read GetCount;
-    property Items[Index: Int32]: TTo read GetItem; default;
-
-    property First: TTo read GetFirst;
-    property Last: TTo read GetLast;
-
-    function GetEnumerator: TEnumerator<TTo>;
-  end;
-
   /// ------------------------------------------------------------------------------------------------------------------
   /// <summary>
   ///   EN-US:
@@ -753,7 +693,7 @@ type
     FComparerFunction: TFunc<T, T, Int32>;
   public
     constructor Create(const pComparerFunction: TFunc<T, T, Int32>);
-    function Compare(const Left, Right: T): Integer; override;
+    function Compare(const Left, Right: T): Int32; override;
   end;
 
 
@@ -1647,101 +1587,6 @@ begin
   Result := Find(pValue, lNode);
 end;
 
-{ TAqListaLeituraDePara<TDe, TPara>.TFromToEnumerator }
-
-constructor TAqFromToList<TFrom, TTo>.TFromToEnumerator.Create(const pFromList: IAqReadList<TFrom>;
-  const pConversionFunction: TAqConversionFunction<TFrom, TTo>);
-begin
-  inherited Create;
-  FIndex := -1;
-  FFromList := pFromList;
-  FConversionFunction := pConversionFunction;
-end;
-
-function TAqFromToList<TFrom, TTo>.TFromToEnumerator.DoGetCurrent: TTo;
-begin
-  Result := GetCurrent;
-end;
-
-function TAqFromToList<TFrom, TTo>.TFromToEnumerator.DoMoveNext: Boolean;
-begin
-  Result := MoveNext;
-end;
-
-function TAqFromToList<TFrom, TTo>.TFromToEnumerator.GetCurrent: TTo;
-begin
-  Result := FConversionFunction(FFromList[FIndex]);
-end;
-
-function TAqFromToList<TFrom, TTo>.TFromToEnumerator.MoveNext: Boolean;
-begin
-  Result := FIndex < FFromList.Count - 1;
-
-  if Result then
-  begin
-    Inc(FIndex);
-  end;
-end;
-
-{ TAqFromToList<TFrom, TTo> }
-
-constructor TAqFromToList<TFrom, TTo>.Create(const pFromList: IAqReadList<TFrom>;
-  const pConversionFunction: TAqConversionFunction<TFrom, TTo>);
-begin
-  FConversionFunction := pConversionFunction;
-  FFromList := pFromList;
-end;
-
-function TAqFromToList<TFrom, TTo>.GetEnumerator: TEnumerator<TTo>;
-begin
-  Result := TFromToEnumerator.Create(FFromList, FConversionFunction);
-end;
-
-function TAqFromToList<TFrom, TTo>.GetItem(pIndice: Int32): TTo;
-begin
-  Result := FConversionFunction(FFromList[pIndice]);
-end;
-
-function TAqFromToList<TFrom, TTo>.GetCount: Int32;
-begin
-  Result := FFromList.Count;
-end;
-
-function TAqFromToList<TFrom, TTo>.IndexOf(const pValue: TTo): Int32;
-begin
-  raise EAqInternal.Create(StrFunctionNotAvailableInTAqFromToList);
-end;
-
-function TAqFromToList<TFrom, TTo>.Find(const pMatchFunction: TFunc<TTo, Boolean>; out pValor: TTo): Boolean;
-var
-  lI: Int32;
-begin
-  Result := False;
-  lI := 0;
-
-  while not Result and (lI < Count) do
-  begin
-    Result := pMatchFunction(FConversionFunction(FFromList[lI]));
-
-    if Result then
-    begin
-      pValor := Items[lI];
-    end;
-
-    Inc(lI);
-  end;
-end;
-
-function TAqFromToList<TFrom, TTo>.GetFirst: TTo;
-begin
-  Result := FConversionFunction(FFromList.First);
-end;
-
-function TAqFromToList<TFrom, TTo>.GetLast: TTo;
-begin
-  Result := FConversionFunction(FFromList.Last);
-end;
-
 { TAqIDGenerator }
 
 class constructor TAqIDGenerator.Create;
@@ -1950,7 +1795,7 @@ end;
 
 { TAqComparer<T> }
 
-function TAqComparer<T>.Compare(const Left, Right: T): Integer;
+function TAqComparer<T>.Compare(const Left, Right: T): Int32;
 begin
   Result := FComparerFunction(Left, Right);
 end;

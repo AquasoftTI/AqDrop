@@ -61,7 +61,26 @@ type
     ///   PT-BR:
     ///     Valores que irão compor o dicionário.
     /// </param>
-    constructor Create(const pIdentifier: TIdentifier; const pValues: TArray<TValue>);
+    constructor Create(const pIdentifier: TIdentifier; const pValues: TAqList<TValue>); overload;
+    /// <summary>
+    ///   EN-US:
+    ///     Class constructor.
+    ///   PT-BR:
+    ///     Construtor da classe.
+    /// </summary>
+    /// <param name="pIdentifier">
+    ///   EN-US:
+    ///     Dictionary identifier.
+    ///   PT-BR:
+    ///     Identificador do dicionário.
+    /// </param>
+    /// <param name="pValues">
+    ///   EN-US:
+    ///     Values that will compose the dictionary.
+    ///   PT-BR:
+    ///     Valores que irão compor o dicionário.
+    /// </param>
+    constructor Create(const pIdentifier: TIdentifier; const pValues: array of TValue); overload;
     /// <summary>
     ///   EN-US:
     ///     Class destructor.
@@ -212,7 +231,7 @@ type
     ///   PT-BR:
     ///     Destino da transição.
     /// </summary>
-    property Target:  TAqAutomatonState<TIdentifier, TValue, TOutput> read FTarget;
+    property Target: TAqAutomatonState<TIdentifier, TValue, TOutput> read FTarget;
   end;
 
   /// ------------------------------------------------------------------------------------------------------------------
@@ -377,7 +396,7 @@ type
     ///   PT-BR:
     ///     Saída do estado (no caso de um estado final).
     /// </summary>
-    property Saida: TOutput read FOutput;
+    property Output: TOutput read FOutput;
     /// <summary>
     ///   EN-US:
     ///     State ID in the automaton.
@@ -391,7 +410,7 @@ type
     ///   PT-BR:
     ///     Transições do estado.
     /// </summary>
-    property Transicoes: TAqReadList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>> read GetTransitions;
+    property Transitions: TAqReadList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>> read GetTransitions;
     /// <summary>
     ///   EN-US:
     ///     Identifies if the state is final or not.
@@ -458,7 +477,33 @@ type
     ///     Retorna o dicionário adicionado ao autômato.
     /// </returns>
     function AddDictionary(const pDictionaryID: TIdentifier;
-      const pValues: TArray<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>;
+      const pValues: array of TValue): TAqAutomatonDictionary<TIdentifier, TValue>; overload;
+    /// <summary>
+    ///   EN-US:
+    ///     Allows to add a dictionary to the automaton.
+    ///   PT-BR:
+    ///     Permite adicionar um dicionário para o autômato.
+    /// </summary>
+    /// <param name="pDictionaryID">
+    ///   EN-US:
+    ///     Dictionary ID.
+    ///   PT-BR:
+    ///     Identificador do dicionário.
+    /// </param>
+    /// <param name="pValues">
+    ///   EN-US:
+    ///     Values contained by the dictionary.
+    ///   PT-BR:
+    ///     Valores contidos no dicionário.
+    /// </param>
+    /// <returns>
+    ///   EN-US:
+    ///     Returns the dictionary added to the automaton.
+    ///   PT-BR:
+    ///     Retorna o dicionário adicionado ao autômato.
+    /// </returns>
+    function AddDictionary(const pDictionaryID: TIdentifier;
+      const pValues: TAqList<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>; overload;
 
     /// <summary>
     ///   EN-US:
@@ -679,13 +724,13 @@ begin
     end;
   end;
 
-  for lI := 0 to FSource.Transicoes.Count - 1 do
+  for lI := 0 to FSource.Transitions.Count - 1 do
   begin
-    if FSource.Transicoes[lI] <> Self then
+    if FSource.Transitions[lI] <> Self then
     begin
       for lIValue := 0 to pDictionary.Values.Count - 1 do
       begin
-        if FSource.Transicoes[lI].SupportsValue(pDictionary.Values[lIValue]) then
+        if FSource.Transitions[lI].SupportsValue(pDictionary.Values[lIValue]) then
         begin
           raise EAqInternal.Create
             (StrTheInclusionOfThisDictionaryWouldCauseTheAutomatonToBecomeNondeterministic);
@@ -735,7 +780,27 @@ end;
 { TAqAutomatonDictionary<TIdentifier, TValue> }
 
 constructor TAqAutomatonDictionary<TIdentifier, TValue>.Create(const pIdentifier: TIdentifier;
-  const pValues: TArray<TValue>);
+  const pValues: array of TValue);
+var
+  lList: TAqList<TValue>;
+  lValue: TValue;
+begin
+  lList := TAqList<TValue>.Create;
+
+  try
+    for lValue in pValues do
+    begin
+      lList.Add(lValue);
+    end;
+
+    Create(pIdentifier, lList);
+  finally
+    lList.Free;
+  end;
+end;
+
+constructor TAqAutomatonDictionary<TIdentifier, TValue>.Create(const pIdentifier: TIdentifier;
+  const pValues: TAqList<TValue>);
 var
   lValue: TValue;
 begin
@@ -781,7 +846,27 @@ end;
 { TAqAutomaton<TIdentifier, TValue, TOutput> }
 
 function TAqAutomaton<TIdentifier, TValue, TOutput>.AddDictionary(const pDictionaryID: TIdentifier;
-  const pValues: TArray<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>;
+  const pValues: array of TValue): TAqAutomatonDictionary<TIdentifier, TValue>;
+var
+  lList: TAqList<TValue>;
+  lValue: TValue;
+begin
+  lList := TAqList<TValue>.Create;
+
+  try
+    for lValue in pValues do
+    begin
+      lList.Add(lValue);
+    end;
+
+    AddDictionary(pDictionaryID, lList);
+  finally
+    lList.Free;
+  end;
+end;
+
+function TAqAutomaton<TIdentifier, TValue, TOutput>.AddDictionary(const pDictionaryID: TIdentifier;
+  const pValues: TAqList<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>;
 begin
   if FDictionaries.ContainsKey(pDictionaryID) then
   begin

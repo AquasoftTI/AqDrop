@@ -1,13 +1,17 @@
 unit AqDrop.DB.FD.MySQL;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
+{$IFNDEF AQMOBILE}
 {$if CompilerVersion >= 26}
   FireDAC.Phys.MySQL,
 {$else}
   uADPhysMySQL,
 {$endif}
+{$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.FD,
   AqDrop.DB.FD.TypeMapping;
@@ -26,8 +30,8 @@ type
 
   TAqFDMySQLConnection = class(TAqFDCustomConnection)
   strict protected
-    function GetParameterValueByIndex(const pIndex: Integer): string; override;
-    procedure SetParameterValueByIndex(const pIndex: Integer; const pValue: string); override;
+    function GetParameterValueByIndex(const pIndex: Int32): string; override;
+    procedure SetParameterValueByIndex(const pIndex: Int32; const pValue: string); override;
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
     constructor Create; override;
@@ -41,6 +45,9 @@ type
 implementation
 
 uses
+{$if CompilerVersion >= 26}
+  FireDAC.Stan.Param,
+{$endif}
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
   AqDrop.DB.Types,
@@ -79,7 +86,7 @@ begin
   Result := TAqFDMySQLAdapter;
 end;
 
-function TAqFDMySQLConnection.GetParameterValueByIndex(const pIndex: Integer): string;
+function TAqFDMySQLConnection.GetParameterValueByIndex(const pIndex: Int32): string;
 begin
   case pIndex of
     $80:
@@ -95,7 +102,7 @@ begin
   end;
 end;
 
-procedure TAqFDMySQLConnection.SetParameterValueByIndex(const pIndex: Integer; const pValue: string);
+procedure TAqFDMySQLConnection.SetParameterValueByIndex(const pIndex: Int32; const pValue: string);
 begin
   case pIndex of
     $80:

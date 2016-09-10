@@ -667,10 +667,12 @@ end;
 
 class destructor TAqDBConnection.Destroy;
 begin
+{$IFNDEF AUTOREFCOUNT}
   while FConnections.Count > 0 do
   begin
     FConnections.Last.Free;
   end;
+{$ENDIF}
   FConnections.Free;
 end;
 

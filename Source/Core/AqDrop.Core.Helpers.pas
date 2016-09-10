@@ -173,13 +173,14 @@ type
     procedure RaiseInvalidConversionToIntType;
     procedure RaiseInvalidConversionToDateTimeType;
 
-    function GetChar(Index: Integer): Char;
+    function GetChar(Index: Int32): Char;
     function GetLength: Int32;
+  private
+    function CompareTo(pString2: string; const pCaseSensitive: Boolean): Int32;
   public
     const Empty = '';
     const LineBreak = sLineBreak;
 
-    function CompareTo(pString2: string; const pCaseSensitive: Boolean = True): Int32;
     function IndexOf(const pValue: string): Int32; overload; inline;
     function IsEmpty: Boolean;
     function Quote: string;
@@ -239,6 +240,8 @@ type
     function ToDateDef(const pDefault: TDate): TDate;
     function ToTimeDef(const pDefault: TTime): TTime;
 
+    class function SameText(const pText1, pText2: string): Boolean; static; inline;
+
     property Chars[Index: Int32]: Char read GetChar;
     property Length: Int32 read GetLength;
   end;
@@ -247,12 +250,14 @@ type
   public
     function ToString: string; inline;
     function Trunc: Int64; inline;
+    function Frac: Double; inline;
   end;
 
   TAqSingleHelper = record helper for Single
   public
     function ToString: string; inline;
     function Trunc: Int64; inline;
+    function Frac: Single; inline;
   end;
 
   TAqInt8Helper = record helper for Int8
@@ -889,7 +894,7 @@ begin
   Result := System.SysUtils.StrComp(PChar(lString1), PChar(pString2));
 end;
 
-function TAqStringHelper.GetChar(Index: Integer): Char;
+function TAqStringHelper.GetChar(Index: Int32): Char;
 begin
   Result := Self[Index];
 end;
@@ -921,12 +926,12 @@ end;
 
 procedure TAqStringHelper.RaiseInvalidConversionToIntType;
 begin
-  raise EAqInternal.Create('Invalid conversion of string ' + Self + ' to an integer type.');
+  raise EAqInternal.Create('Invalid conversion of string ' + Self.Quote + ' to an integer type.');
 end;
 
 function TAqStringHelper.RightFromPosition(const pPosition: Int32; const pInclusive: Boolean): string;
 var
-  lStart: Integer;
+  lStart: Int32;
 begin
   lStart := pPosition + IfThen(not pInclusive, 1);
   Result := Self.Substring(lStart, Self.Length - lStart);
@@ -935,6 +940,11 @@ end;
 function TAqStringHelper.Quote: string;
 begin
   Result := System.SysUtils.QuotedStr(Self);
+end;
+
+class function TAqStringHelper.SameText(const pText1, pText2: string): Boolean;
+begin
+  Result := System.SysUtils.SameText(pText1, pText2);
 end;
 
 function TAqStringHelper.Substring(StartIndex, Length: Int32): string;
@@ -1328,6 +1338,11 @@ end;
 
 { TAqDoubleHelper }
 
+function TAqDoubleHelper.Frac: Double;
+begin
+  Result := System.Frac(Self);
+end;
+
 function TAqDoubleHelper.ToString: string;
 begin
   Result := FloatToStr(Self);
@@ -1339,6 +1354,11 @@ begin
 end;
 
 { TAqSingleHelper }
+
+function TAqSingleHelper.Frac: Single;
+begin
+  Result := System.Frac(Self);
+end;
 
 function TAqSingleHelper.ToString: string;
 begin

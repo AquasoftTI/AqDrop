@@ -66,7 +66,7 @@ end;
 
 procedure TAqCustomManager<T>.RemoveDependent(const pDependent: T);
 var
-  lIndex: Integer;
+  lIndex: Int32;
 begin
   lIndex := FDependents.IndexOf(pDependent);
 

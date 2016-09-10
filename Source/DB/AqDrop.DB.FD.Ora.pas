@@ -1,13 +1,17 @@
 unit AqDrop.DB.FD.Ora;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
+{$IFNDEF AQMOBILE}
 {$if CompilerVersion >= 26}
   FireDAC.Phys.Oracle,
 {$else}
   uADPhysOracle,
 {$endif}
+{$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.FD,
   AqDrop.DB.FD.TypeMapping;
@@ -27,8 +31,8 @@ type
 
   TAqFDOraConnection = class(TAqFDCustomConnection)
   strict protected
-    function GetParameterValueByIndex(const pIndex: Integer): string; override;
-    procedure SetParameterValueByIndex(const pIndex: Integer; const pValue: string); override;
+    function GetParameterValueByIndex(const pIndex: Int32): string; override;
+    procedure SetParameterValueByIndex(const pIndex: Int32; const pValue: string); override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
@@ -42,6 +46,9 @@ type
 implementation
 
 uses
+{$if CompilerVersion >= 26}
+  FireDAC.Stan.Param,
+{$endif}
   AqDrop.Core.Exceptions,
   AqDrop.DB.Types,
   AqDrop.DB.Ora;
@@ -61,7 +68,7 @@ begin
   Result := TAqFDOraAdapter;
 end;
 
-function TAqFDOraConnection.GetParameterValueByIndex(const pIndex: Integer): string;
+function TAqFDOraConnection.GetParameterValueByIndex(const pIndex: Int32): string;
 begin
   case pIndex of
     $80:
@@ -75,7 +82,7 @@ begin
   end;
 end;
 
-procedure TAqFDOraConnection.SetParameterValueByIndex(const pIndex: Integer; const pValue: string);
+procedure TAqFDOraConnection.SetParameterValueByIndex(const pIndex: Int32; const pValue: string);
 begin
   case pIndex of
     $80:
