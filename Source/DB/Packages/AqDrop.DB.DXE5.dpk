@@ -1,0 +1,54 @@
+package AqDrop.DB.DXE5;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE RELEASE}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'Aquasoft Drop - DB'}
+{$RUNONLY}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  AqDrop.Core.DXE5,
+  DbxCommonDriver,
+  DBXMySQLDriver,
+  DBXFirebirdDriver,
+  DBXMSSQLDriver;
+
+contains
+  AqDrop.DB.Connection in '..\AqDrop.DB.Connection.pas',
+  AqDrop.DB.DBX.MySQL in '..\AqDrop.DB.DBX.MySQL.pas',
+  AqDrop.DB.DBX in '..\AqDrop.DB.DBX.pas',
+  AqDrop.DB.Tokenizer in '..\AqDrop.DB.Tokenizer.pas',
+  AqDrop.DB.DBX.FB in '..\AqDrop.DB.DBX.FB.pas',
+  AqDrop.DB.Types in '..\AqDrop.DB.Types.pas',
+  AqDrop.DB.ORM.Attributes in '..\AqDrop.DB.ORM.Attributes.pas',
+  AqDrop.DB.ORM.Manager in '..\AqDrop.DB.ORM.Manager.pas',
+  AqDrop.DB.ORM.Reader in '..\AqDrop.DB.ORM.Reader.pas',
+  AqDrop.DB.SQL.Intf in '..\AqDrop.DB.SQL.Intf.pas',
+  AqDrop.DB.SQL in '..\AqDrop.DB.SQL.pas',
+  AqDrop.DB.DBX.MSSQL in '..\AqDrop.DB.DBX.MSSQL.pas';
+
+end.

@@ -1,0 +1,14 @@
+unit AqDrop.Core.Types;
+
+interface
+
+type
+  TAqAnsiCharSet = set of AnsiChar;
+
+  TAqDataType = (adtUnknown, adtBoolean, adtEnumerated, adtUInt8, adtInt8, adtUInt16, adtInt16, adtUInt32, adtInt32,
+    adtUInt64, adtInt64, adtCurrency, adtDouble, adtSingle, adtDatetime, adtDate, adtTime, adtAnsiChar, adtChar,
+    adtAnsiString, adtString, adtWideString, adtSet, adtClass, adtMethod, adtVariant, adtRecord, adtInterface);
+
+implementation
+
+end.

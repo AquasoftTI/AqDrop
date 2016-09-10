@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<codetemplate	xmlns="http://schemas.borland.com/Delphi/2005/codetemplates"
+				version="1.0.0">
+	<template name="ifnbe" invoke="manual">
+		<point name="expr">
+			<script language="Delphi">
+				InvokeCodeCompletion;
+			</script>
+			<hint>
+				conditional expression
+			</hint>
+			<text>
+				True
+			</text>
+		</point>
+		<description>
+			if (no begin/end)
+		</description>
+		<author>
+			Embarcadero
+		</author>
+		<code language="Delphi" context="methodbody" delimiter="|"><![CDATA[if |expr| then
+|end|]]>
+		</code>
+	</template>
+</codetemplate>

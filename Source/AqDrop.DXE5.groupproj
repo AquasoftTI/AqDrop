@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{1325B076-6134-4630-8CDD-590D4C10C30F}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Core\Packages\AqDrop.Core.DXE5.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DB\Packages\AqDrop.DB.DXE5.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Register\Packages\AqDrop.Register.DXE5.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="AqDrop_Core_DXE5">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.DXE5.dproj"/>
+    </Target>
+    <Target Name="AqDrop_Core_DXE5:Clean">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.DXE5.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_Core_DXE5:Make">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.DXE5.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_DB_DXE5">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.DXE5.dproj"/>
+    </Target>
+    <Target Name="AqDrop_DB_DXE5:Clean">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.DXE5.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_DB_DXE5:Make">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.DXE5.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_Register_DXE5">
+        <MSBuild Projects="Register\Packages\AqDrop.Register.DXE5.dproj"/>
+    </Target>
+    <Target Name="AqDrop_Register_DXE5:Clean">
+        <MSBuild Projects="Register\Packages\AqDrop.Register.DXE5.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_Register_DXE5:Make">
+        <MSBuild Projects="Register\Packages\AqDrop.Register.DXE5.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="AqDrop_Core_DXE5;AqDrop_DB_DXE5;AqDrop_Register_DXE5"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="AqDrop_Core_DXE5:Clean;AqDrop_DB_DXE5:Clean;AqDrop_Register_DXE5:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="AqDrop_Core_DXE5:Make;AqDrop_DB_DXE5:Make;AqDrop_Register_DXE5:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

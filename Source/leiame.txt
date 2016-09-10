@@ -1,0 +1,36 @@
+Saudações!
+
+É com prazer que a Aquasoft disponibiliza o DROP, um framework desenvolvido para encorajar o desenvolvedor a estudar e utilizar todo o potencial da Orientação a Objetos do Delphi.
+
+O DROP é totalmente aberto. Isto quer dizer que, mantendo o direito autoral da Aquasoft, você poderá utilizar o DROP para qualquer tipo de projeto.
+
+Descrição dos pacotes que compõem o DROP:
+  - Core: contém bibliotecas genéricas do Drop, como tipos básicos, collections, pattenrs, entre outras classes;
+  - DB: contém as classes específicas de comunicação com SGBDs, entre elas, as classes de conexão, e de ORM;
+  - Register: pacote de Design Time para registrar a marca Drop no IDE.
+
+Para Instalar o DROP:
+  - Abra o grupo de projetos específico para a sua versão de Delphi (por exemplo, AqDrop.DXE5.groupproj para o Delphi XE5);
+  - Adicione as pastas que contêm os fontes de runtime à sua Library Path (pasta Core e pasta DB). 
+  - Execute o build em todos os pacotes;
+  - Instale o pacote Register.
+
+NOTAS IMPORTANTES:
+  - Os warnings levantados durante a compilação dos pacotes devem ser desconsiderados, pois não acontecem quando as classes são utilizadas em DPRs;
+  - O Drop é não é compatível com versões anteriores ao Delphi XE3;
+  - O Drop contempla classes especializadas para conexões com MSSQL, MySQL e Firebird. No entanto, o Drop conecta com qualquer SGBD suportado pelo DBX;
+  - A nossa lista de TODOs contém tarefas como a criação de classes especializadas para conexão com Oracle, bem como o suporte ao FireDAC;
+  - Mantenha-se atualizado sobre as novidades do DROP através do nosso twitter e facebook: AquasoftTI;
+
+E, obrigado por utilizar o DROP!
+
+Equipe Aquasoft
+
+
+Aquasoft Tecnologia da Informação
+Parceira Embarcadero no RS
+drop@aquasoft.com.br
+www.aquasoft.com.br
+twitter.com/AquasoftTI
+facebook.com/AquasoftTI
+Fone: +55 (51) 3022-3188

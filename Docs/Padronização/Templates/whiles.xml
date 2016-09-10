@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<codetemplate	xmlns="http://schemas.borland.com/Delphi/2005/codetemplates"
+				version="1.0.0">
+	<template name="whilenbe" invoke="manual">
+		<point name="expr">
+			<script language="Delphi">
+				InvokeCodeCompletion;
+			</script>
+			<text>
+				True
+			</text>
+			<hint>
+				loop condition
+			</hint>
+		</point>
+		<description>
+			while (no begin)
+		</description>
+		<author>
+			Embarcadero
+		</author>
+		<code language="Delphi" context="methodbody" delimiter="|"><![CDATA[while |expr| do
+|end|
+]]>
+		</code>
+	</template>
+</codetemplate>
+
