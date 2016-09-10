@@ -1,32 +1,29 @@
 Greetings!
 
-The Aquasoft joyfully offers to you the DROP, a framework developed to
-encourage developers to study and use the full potential of Delphi Object Orientation.
+Aquasoft joyfully offers to you the DROP, a framework developed to encourage developers to study and use the full potential of Delphi Object Orientation.
 
 The DROP is open source. It means that, keeping the 
 Aquasoft authoring, you can use the DROP for any type of project.
 
 Description of DROP packages:
-  - Core: Contains generic libraries such as basic types, collections,
+  - Core: contains generic libraries such as basic types, collections,
 pattenrs, between other classes;
-  - DB: Contains specific classes to communicating with DBMSs, such as connection classes, and an ORM;
+  - DB: contains generic classes wich provides the basic interface to communicate with DBMSs, such as connection classes, and ORM;
+  - DBX: contains class specializations needed to comunicate with DBMSs using the DBX framework;
+  - FD: contains class specializations needed to comunicate with DBMSs torugh FireDAC components;
   - Register: Design time package to register the Drop in the IDE.
 
 To install the DROP:
   - Open the project group designed for your Delphi version (e.g. AqDrop.DXE5.groupproj is the group for Delphi XE5);
-  - Add the folders containing the runtime units to yout Library Path (Folders Core and DB);
-  - Execute a build all;
+  - Add the folders containing the runtime units to your Library Path (Folders Core and DB);
+  - Execute a 'Build All' command;
   - Install the Register package.
 
 IMPORTANT NOTES:
   - The Drop is provided 'As Is', it means that Aquasoft is not responsible for any problems arising from the use of Drop, and has no obligations to implement / modify the tool to adapt it to any user scenario;
-  - The warnings raised during the compilation of the packages should be
-disregarded, because it does not happen when the classes are used in DPRs;
-  - The Drop is not compatible with earlier versions than Delphi XE3;
-  - The Drop offers specialized classes for connections to MSSQL, MySQL and
-Firebird. However, the Drop connects to any DBMS supported by DBX;
-  - Our TODO list contains tasks such as creating specialized classes
-for connecting to Oracle and create new classes based on FireDAC;
+  - In theory, the source code is compatible with Delphi XE3, but we give official support (by unit tests) only to Delphi XE4 and newer versions; 
+  - The Drop offers specialized classes for connections to MSSQL, MySQL, Firebird, Oracle and Postgres (the last one only by FireDAC). Our roadmap includes tasks to provide support to Interbase and SQLite;
+  - Packages for using DROP in Delphi XE8 were included in version 1.2, but, we're having problems while compiling the packages (we have a QC opened to verify it). If you don't use BPLs to modularize your applications, this problem will not cause any effect, because the inclusion of the source code (in your project or library path) will provide the normal behavior of the framework (guaranteed by unit tests performed in XE8);
   - Stay up to date about the DROP checking our twitter and
 facebook: AquasoftTI.
 
@@ -45,6 +42,15 @@ Phone: +55 (51) 3022-3188
 
 
 VERSION HISTORY:
+----------------------------------------
+2015.07.14: Drop 1.2.0:
+- Support to Delphi XE7 and XE8;
+- Creation of specialized classes to comunicate trough FireDAC components;
+- Support to Oracle (by DBX and FD);
+- Support to Postgres (only by FD);
+- Creation of basic structure to inherit and automatize ORM tasks (including object cache);
+- Attributes to better handle of nullable fields;
+- Hundresd of improvments and small bug fixes;
 ----------------------------------------
 2014.04.16: Drop 1.0.1:
 - Binding support for result lists;

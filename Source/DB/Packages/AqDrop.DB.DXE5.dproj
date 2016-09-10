@@ -1,8 +1,8 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{DE1E0261-2127-4509-AFF5-64400405E99E}</ProjectGuid>
+        <ProjectGuid>{57AC65E7-3248-4801-ADE2-F3DB3BE863A8}</ProjectGuid>
         <MainSource>AqDrop.DB.DXE5.dpk</MainSource>
-        <ProjectVersion>15.3</ProjectVersion>
+        <ProjectVersion>15.1</ProjectVersion>
         <FrameworkType>None</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Release</Config>
@@ -57,13 +57,12 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <GenDll>true</GenDll>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_Locale>1046</VerInfo_Locale>
+        <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
+        <DCC_Description>Aquasoft Drop - DB Library</DCC_Description>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <GenPackage>true</GenPackage>
-        <DCC_Description>Aquasoft Drop - DB</DCC_Description>
-        <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
-        <VerInfo_Locale>1046</VerInfo_Locale>
-        <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
         <DCC_E>false</DCC_E>
@@ -82,10 +81,10 @@
         <DCC_CBuilderOutput>None</DCC_CBuilderOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -96,25 +95,19 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
-        <VerInfo_MinorVer>9</VerInfo_MinorVer>
-        <VerInfo_MajorVer>0</VerInfo_MajorVer>
+        <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=0.9.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=0.9.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.2.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.2.0.0;Comments=</VerInfo_Keys>
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
         <DCC_DebugInformation>0</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <VerInfo_Release>1</VerInfo_Release>
-        <VerInfo_MajorVer>1</VerInfo_MajorVer>
-        <VerInfo_MinorVer>0</VerInfo_MinorVer>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.1.0;Comments=</VerInfo_Keys>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
@@ -123,22 +116,22 @@
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="AqDrop.Core.DXE5.dcp"/>
-        <DCCReference Include="DbxCommonDriver.dcp"/>
-        <DCCReference Include="DBXMySQLDriver.dcp"/>
-        <DCCReference Include="DBXFirebirdDriver.dcp"/>
-        <DCCReference Include="DBXMSSQLDriver.dcp"/>
+        <DCCReference Include="..\AqDrop.DB.Adapter.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Base.Exceptions.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Base.pas"/>
         <DCCReference Include="..\AqDrop.DB.Connection.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.MySQL.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.pas"/>
-        <DCCReference Include="..\AqDrop.DB.Tokenizer.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.FB.pas"/>
-        <DCCReference Include="..\AqDrop.DB.Types.pas"/>
+        <DCCReference Include="..\AqDrop.DB.FB.pas"/>
+        <DCCReference Include="..\AqDrop.DB.MSSQL.pas"/>
+        <DCCReference Include="..\AqDrop.DB.MySQL.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Ora.pas"/>
         <DCCReference Include="..\AqDrop.DB.ORM.Attributes.pas"/>
         <DCCReference Include="..\AqDrop.DB.ORM.Manager.pas"/>
         <DCCReference Include="..\AqDrop.DB.ORM.Reader.pas"/>
+        <DCCReference Include="..\AqDrop.DB.PG.pas"/>
         <DCCReference Include="..\AqDrop.DB.SQL.Intf.pas"/>
         <DCCReference Include="..\AqDrop.DB.SQL.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.MSSQL.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Tokenizer.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Types.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

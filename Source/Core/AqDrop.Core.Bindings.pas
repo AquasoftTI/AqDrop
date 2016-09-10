@@ -256,7 +256,7 @@ begin
       if not (lObject is T) then
       begin
         raise EAqInternal.CreateFmt(StrNewInstanceOfTypeObjectClassNameDoesNotMatchExpectedTypeTClassName,
-          [lObject.ClassName, T.ClassName]);
+          [lObject.QualifiedClassName, T.QualifiedClassName]);
       end;
       Result := lObject as T;
     except

@@ -25,30 +25,30 @@ package AqDrop.DB.DXE4;
 {$IMAGEBASE $400000}
 {$DEFINE RELEASE}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Aquasoft Drop - DB'}
+{$DESCRIPTION 'Aquasoft Drop - DB Library'}
 {$RUNONLY}
 {$IMPLICITBUILD ON}
 
 requires
   rtl,
-  AqDrop.Core.DXE4,
-  DbxCommonDriver,
-  DBXMySQLDriver,
-  DBXFirebirdDriver,
-  DBXMSSQLDriver;
+  AqDrop.Core.DXE4;
 
 contains
+  AqDrop.DB.Adapter in '..\AqDrop.DB.Adapter.pas',
+  AqDrop.DB.Base.Exceptions in '..\AqDrop.DB.Base.Exceptions.pas',
+  AqDrop.DB.Base in '..\AqDrop.DB.Base.pas',
   AqDrop.DB.Connection in '..\AqDrop.DB.Connection.pas',
-  AqDrop.DB.DBX.MySQL in '..\AqDrop.DB.DBX.MySQL.pas',
-  AqDrop.DB.DBX in '..\AqDrop.DB.DBX.pas',
-  AqDrop.DB.Tokenizer in '..\AqDrop.DB.Tokenizer.pas',
-  AqDrop.DB.DBX.FB in '..\AqDrop.DB.DBX.FB.pas',
-  AqDrop.DB.Types in '..\AqDrop.DB.Types.pas',
+  AqDrop.DB.FB in '..\AqDrop.DB.FB.pas',
+  AqDrop.DB.MSSQL in '..\AqDrop.DB.MSSQL.pas',
+  AqDrop.DB.MySQL in '..\AqDrop.DB.MySQL.pas',
+  AqDrop.DB.Ora in '..\AqDrop.DB.Ora.pas',
   AqDrop.DB.ORM.Attributes in '..\AqDrop.DB.ORM.Attributes.pas',
   AqDrop.DB.ORM.Manager in '..\AqDrop.DB.ORM.Manager.pas',
   AqDrop.DB.ORM.Reader in '..\AqDrop.DB.ORM.Reader.pas',
+  AqDrop.DB.PG in '..\AqDrop.DB.PG.pas',
   AqDrop.DB.SQL.Intf in '..\AqDrop.DB.SQL.Intf.pas',
   AqDrop.DB.SQL in '..\AqDrop.DB.SQL.pas',
-  AqDrop.DB.DBX.MSSQL in '..\AqDrop.DB.DBX.MSSQL.pas';
+  AqDrop.DB.Tokenizer in '..\AqDrop.DB.Tokenizer.pas',
+  AqDrop.DB.Types in '..\AqDrop.DB.Types.pas';
 
 end.

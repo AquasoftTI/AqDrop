@@ -3,11 +3,12 @@ unit AqDrop.Core.Collections;
 interface
 
 uses
+  System.SysUtils,
   System.Generics.Defaults,
   System.Generics.Collections,
   System.SyncObjs,
-  AqDrop.Core.Types,
   AqDrop.Core.AnonymousMethods,
+  AqDrop.Core.Types,
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.InterfacedObject;
 
@@ -26,7 +27,7 @@ type
   ///-------------------------------------------------------------------------------------------------------------------
   TAqComparisonResult = (acrEqual, acrGreater, acrLess);
 
-  TAqComparer<T> = reference to function(const pValor1, pValor2: T): TAqComparisonResult;
+  TAqComparerFunction<T> = reference to function(const pValue1, pValue2: T): TAqComparisonResult;
 
   TAqDictionaryContent = (adcKey, adcValue);
   TAqDictionaryContents = set of TAqDictionaryContent;
@@ -68,7 +69,7 @@ type
     /// </returns>
     function IndexOf(const pValue: T): Int32; overload;
 
-    function Find(const pMatchFunction: TAqFunctionGenericParameterReturnBoolean<T>; out pValue: T): Boolean; overload;
+    function Find(const pMatchFunction: TFunc<T, Boolean>; out pValue: T): Boolean; overload;
 
     property Count: Int32 read GetCount;
     property Items[pIndice: Int32]: T read GetItem; default;
@@ -128,8 +129,7 @@ type
     /// </returns>
     function IndexOf(const pValue: TTo): Int32; overload;
 
-    function Find(const pMatchFunction: TAqFunctionGenericParameterReturnBoolean<TTo>;
-      out pValor: TTo): Boolean; overload;
+    function Find(const pMatchFunction: TFunc<TTo, Boolean>; out pValor: TTo): Boolean; overload;
 
     property Count: Int32 read GetCount;
     property Items[Index: Int32]: TTo read GetItem; default;
@@ -150,16 +150,19 @@ type
   /// ------------------------------------------------------------------------------------------------------------------
   TAqList<T> = class(TAqReadList<T>, IAqList<T>)
   strict private
+    FComparer: IComparer<T>;
     FList: TList<T>;
     FReadList: TAqReadList<T>;
     FFreeObjects: Boolean;
 
     procedure ListNotifier(Sender: TObject; const Item: T; Action: TCollectionNotification);
 
+    function GetComparer: IComparer<T>;
+    procedure SetComparer(pValue: IComparer<T>);
   private
    { Private declarations }
   strict protected
-    procedure ExecWithReleaseOff(const pMethod: TAqMethod);
+    procedure ExecWithReleaseOff(const pMethod: TProc);
 
     property FreeObjects: Boolean read FFreeObjects write FFReeObjects;
   public
@@ -282,8 +285,18 @@ type
     /// </returns>
     function Add(const pItem: T): Int32; virtual;
 
+    function Extract(const pIndex: Int32): T;
+
+    function Copy(const pCreateLocker: Boolean = False): TAqList<T>;
+
     function GetIReadList: IAqReadList<T>;
     function GetTReadList: TAqReadList<T>;
+
+    procedure Sort; overload;
+    procedure Sort(const pComparerFunction: TFunc<T, T, Int32>); overload;
+    procedure Sort(pComparer: IComparer<T>); overload;
+
+    property Comparer: IComparer<T> read GetComparer write SetComparer;
   end;
 
   /// ------------------------------------------------------------------------------------------------------------------
@@ -299,7 +312,9 @@ type
     function GetOnwsResults: Boolean;
     procedure SetOnwsResults(const pValue: Boolean);
   strict protected
+{$IFNDEF AUTOREFCOUNT}
     class function MustCountReferences: Boolean; override;
+{$ENDIF}
   public
     function Extract(const pIndex: UInt32 = 0): T;
     procedure ExtractAllTo(const pList: TList<T>);
@@ -483,7 +498,7 @@ type
   ///-------------------------------------------------------------------------------------------------------------------
   TAqCustomAVLTree<TKey, TValue> = class
   strict private
-    FComparer: TAqComparer<TKey>;
+    FComparer: TAqComparerFunction<TKey>;
     FFreeObjects: Boolean;
     FRoot: TAqAVLNode<TValue>;
     FLocker: TCriticalSection;
@@ -549,7 +564,7 @@ type
     ///   PT-BR:
     ///     Se verdadeiro, cria um bloqueador (TCriticalSection, permitindo o uso dos métodos Lock e Release.
     /// </param>
-    constructor Create(const pComparer: TAqComparer<TKey>; const pCreateLocker: Boolean = False); overload;
+    constructor Create(const pComparer: TAqComparerFunction<TKey>; const pCreateLocker: Boolean = False); overload;
     /// <summary>
     ///   EN-US:
     ///     Class constructor.
@@ -574,7 +589,7 @@ type
     ///   PT-BR:
     ///     Se verdadeiro, cria um bloqueador (TCriticalSection, permitindo o uso dos métodos Lock e Release.
     /// </param>
-    constructor Create(const pFreeObjects: Boolean; const pComparer: TAqComparer<TKey>;
+    constructor Create(const pFreeObjects: Boolean; const pComparer: TAqComparerFunction<TKey>;
       const pCreateLocker: Boolean = False); overload;
     /// <summary>
     ///   EN-US:
@@ -721,11 +736,26 @@ type
   protected
     procedure KeyNotify(const Key: TAqID; Action: TCollectionNotification); override;
   public
-    constructor Create(const pLiberarValores: Boolean);
+    constructor Create(const pOwnsValues: Boolean);
     destructor Destroy; override;
 
     function Add(const pValor: TValue): TAqID; reintroduce;
   end;
+
+  TAqListTransporter = class
+  public
+    class function Transport<TFrom: class; TTo: class, constructor>(
+      const pFrom: IAqResultList<TFrom>): TObjectList<TTo>;
+  end;
+
+  TAqComparer<T> = class(TComparer<T>)
+  strict private
+    FComparerFunction: TFunc<T, T, Int32>;
+  public
+    constructor Create(const pComparerFunction: TFunc<T, T, Int32>);
+    function Compare(const Left, Right: T): Integer; override;
+  end;
+
 
 resourcestring
   StrCouldNotAddTheItemToTheList = 'Could not add the item to the list.';
@@ -747,9 +777,9 @@ resourcestring
 implementation
 
 uses
-  System.SysUtils,
   System.Math,
-  AqDrop.Core.Exceptions;
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Helpers.TObject;
 
 { TAqLista<T> }
 
@@ -794,7 +824,7 @@ begin
   inherited;
 end;
 
-procedure TAqList<T>.ExecWithReleaseOff(const pMethod: TAqMethod);
+procedure TAqList<T>.ExecWithReleaseOff(const pMethod: TProc);
 var
   lFreeObjects: Boolean;
 begin
@@ -807,6 +837,26 @@ begin
   finally
     FFreeObjects := lFreeObjects;
   end;
+end;
+
+function TAqList<T>.Extract(const pIndex: Int32): T;
+var
+  lFreeObjects: Boolean;
+begin
+  lFreeObjects := FFreeObjects;
+  FFreeObjects := False;
+
+  try
+    Result := FList[pIndex];
+    FList.Delete(pIndex);
+  finally
+    FFreeObjects := lFreeObjects;
+  end;
+end;
+
+function TAqList<T>.GetComparer: IComparer<T>;
+begin
+  Result := FComparer;
 end;
 
 function TAqList<T>.GetIReadList: IAqReadList<T>;
@@ -841,12 +891,52 @@ begin
   FList.Clear;
 end;
 
+function TAqList<T>.Copy(const pCreateLocker: Boolean = False): TAqList<T>;
+var
+  lItem: T;
+begin
+  Result := TAqList<T>.Create(False, pCreateLocker);
+
+  try
+    for lItem in Self do
+    begin
+      Result.Add(lItem);
+    end;
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
 procedure TAqList<T>.ListNotifier(Sender: TObject; const Item: T; Action: TCollectionNotification);
 begin
   if FFreeObjects and (Action = cnRemoved) then
   begin
     PObject(@Item)^.Free;
   end;
+end;
+
+procedure TAqList<T>.SetComparer(pValue: IComparer<T>);
+begin
+  FComparer := pValue;
+end;
+
+procedure TAqList<T>.Sort;
+begin
+  FList.Sort(FComparer);
+end;
+
+procedure TAqList<T>.Sort(const pComparerFunction: TFunc<T, T, Int32>);
+var
+  lComparer: IComparer<T>;
+begin
+  lComparer := TAqComparer<T>.Create(pComparerFunction);
+  FList.Sort(lComparer);
+end;
+
+procedure TAqList<T>.Sort(pComparer: IComparer<T>);
+begin
+  FList.Sort(pComparer);
 end;
 
 procedure TAqList<T>.Exchange(const pIndex1, pIndex2: Int32);
@@ -915,10 +1005,12 @@ begin
   Result := FreeObjects;
 end;
 
+{$IFNDEF AUTOREFCOUNT}
 class function TAqResultList<T>.MustCountReferences: Boolean;
 begin
   Result := True;
 end;
+{$ENDIF}
 
 procedure TAqResultList<T>.SetOnwsResults(const pValue: Boolean);
 begin
@@ -993,7 +1085,7 @@ begin
   inherited;
 end;
 
-function TAqReadList<T>.Find(const pMatchFunction: TAqFunctionGenericParameterReturnBoolean<T>; out pValue: T): Boolean;
+function TAqReadList<T>.Find(const pMatchFunction: TFunc<T, Boolean>; out pValue: T): Boolean;
 var
   lI: Int32;
 begin
@@ -1195,8 +1287,8 @@ begin
   inherited Create;
 end;
 
-constructor TAqCustomAVLTree<TKey, TValue>.Create(const pFreeObjects: Boolean; const pComparer: TAqComparer<TKey>;
-  const pCreateLocker: Boolean);
+constructor TAqCustomAVLTree<TKey, TValue>.Create(const pFreeObjects: Boolean;
+  const pComparer: TAqComparerFunction<TKey>; const pCreateLocker: Boolean);
 begin
   Create;
 
@@ -1209,7 +1301,8 @@ begin
   end;
 end;
 
-constructor TAqCustomAVLTree<TKey, TValue>.Create(const pComparer: TAqComparer<TKey>; const pCreateLocker: Boolean);
+constructor TAqCustomAVLTree<TKey, TValue>.Create(const pComparer: TAqComparerFunction<TKey>;
+  const pCreateLocker: Boolean);
 begin
   Create(False, pComparer, pCreateLocker);
 end;
@@ -1303,7 +1396,9 @@ begin
     DestroyNode(pNode.Right);
   end;
 
+{$IFNDEF AUTOREFCOUNT}
   pNode.Free;
+{$ENDIF}
 end;
 
 function TAqCustomAVLTree<TKey, TValue>.GetList: IAqResultList<TValue>;
@@ -1617,8 +1712,7 @@ begin
   raise EAqInternal.Create(StrFunctionNotAvailableInTAqFromToList);
 end;
 
-function TAqFromToList<TFrom, TTo>.Find(
-  const pMatchFunction: TAqFunctionGenericParameterReturnBoolean<TTo>; out pValor: TTo): Boolean;
+function TAqFromToList<TFrom, TTo>.Find(const pMatchFunction: TFunc<TTo, Boolean>; out pValor: TTo): Boolean;
 var
   lI: Int32;
 begin
@@ -1733,9 +1827,9 @@ begin
   end;
 end;
 
-constructor TAqIDDictionary<TValue>.Create(const pLiberarValores: Boolean);
+constructor TAqIDDictionary<TValue>.Create(const pOwnsValues: Boolean);
 begin
-  if pLiberarValores then
+  if pOwnsValues then
   begin
     inherited Create([doOwnsValues]);
   end else begin
@@ -1764,7 +1858,7 @@ procedure TAqIDDictionary<TValue>.ReleaseIDs;
 var
   lID: TAqID;
 begin
-  for lID in GetKeys do
+  for lID in Keys do
   begin
     TAqIDGenerator.Release(lID);
   end;
@@ -1833,6 +1927,37 @@ begin
   begin
     raise EAqInternal.Create(StrThisListDoesntHaveALocker);
   end;
+end;
+
+{ TAqListTransporter }
+
+class function TAqListTransporter.Transport<TFrom, TTo>(const pFrom: IAqResultList<TFrom>): TObjectList<TTo>;
+var
+  lObject: TFrom;
+begin
+  Result := TObjectList<TTo>.Create;
+
+  try
+    for lObject in pFrom do
+    begin
+      Result.Add(TObject(lObject).CloneTo<TTo>);
+    end;
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+{ TAqComparer<T> }
+
+function TAqComparer<T>.Compare(const Left, Right: T): Integer;
+begin
+  Result := FComparerFunction(Left, Right);
+end;
+
+constructor TAqComparer<T>.Create(const pComparerFunction: TFunc<T, T, Int32>);
+begin
+  FComparerFunction := pComparerFunction;
 end;
 
 end.

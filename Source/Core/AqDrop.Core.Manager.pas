@@ -19,8 +19,10 @@ type
     FDependents: TAqList<T>;
   strict protected
     procedure AddDependent(const pDependent: T); virtual;
+    procedure RemoveDependent(const pDependent: T); virtual;
 
     procedure IAqManager<T>._AddDependent = AddDependent;
+    procedure IAqManager<T>._RemoveDependent = RemoveDependent;
   public
     constructor Create;
     destructor Destroy; override;
@@ -38,6 +40,7 @@ type
   TAqManager<T: class> = class(TAqCustomManager<T>)
   public
     procedure AddDependent(const pDepedent: T); override;
+    procedure RemoveDependent(const pDepedent: T); override;
   end;
 
 implementation
@@ -61,9 +64,26 @@ begin
   inherited;
 end;
 
+procedure TAqCustomManager<T>.RemoveDependent(const pDependent: T);
+var
+  lIndex: Integer;
+begin
+  lIndex := FDependents.IndexOf(pDependent);
+
+  if lIndex >= 0 then
+  begin
+    FDependents.Extract(lIndex);
+  end;
+end;
+
 { TAqManager<T> }
 
 procedure TAqManager<T>.AddDependent(const pDepedent: T);
+begin
+  inherited;
+end;
+
+procedure TAqManager<T>.RemoveDependent(const pDepedent: T);
 begin
   inherited;
 end;

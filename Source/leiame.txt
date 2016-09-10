@@ -6,7 +6,9 @@ O DROP é totalmente aberto. Isto quer dizer que, mantendo o direito autoral da A
 
 Descrição dos pacotes que compõem o DROP:
   - Core: contém bibliotecas genéricas do Drop, como tipos básicos, collections, pattenrs, entre outras classes;
-  - DB: contém as classes específicas de comunicação com SGBDs, entre elas, as classes de conexão, e de ORM;
+  - DB: contém as classes que servem como base para comunicação com SGBDs, entre elas, as classes de conexão, e de ORM;
+  - DBX: contém as especializações necessárias para comunicação com SGBDs via DBX framework;
+  - FD: contém as especializações necessárias para comunicação com SGBDs via FireDAC;
   - Register: pacote de Design Time para registrar a marca Drop no IDE.
 
 Para Instalar o DROP:
@@ -17,10 +19,9 @@ Para Instalar o DROP:
 
 NOTAS IMPORTANTES:
   - O Drop é disponibilizado na modalidade 'As Is', isto significa que a Aquasoft não se responsabiliza por eventuais problemas decorrentes da utilização do Drop, bem como não é obrigada a implementar / modificar a ferramenta para se adaptar ao cenário de qualquer usuário do Drop;
-  - Os warnings levantados durante a compilação dos pacotes devem ser desconsiderados, pois não acontecem quando as classes são utilizadas em DPRs;
-  - O Drop é não é compatível com versões anteriores ao Delphi XE3;
-  - O Drop contempla classes especializadas para conexões com MSSQL, MySQL e Firebird. No entanto, o Drop conecta com qualquer SGBD suportado pelo DBX;
-  - A nossa lista de TODOs contém tarefas como a criação de classes especializadas para conexão com Oracle, bem como o suporte ao FireDAC;
+  - Na teoria, os fontes do projeto são compatíveis com o Delphi XE3, mas da versão 1.2 em diante, estamos dando suporte oficial (via testes unitários) somente da versão XE4 para cima;
+  - O Drop contempla classes especializadas para conexões com MSSQL, MySQL, Firebird, Oracle e Postgres (este último somente via FD). O backlog do Drop prevê a inclusão de classes especializadas para Interbase e SQLite;
+  - Pacotes para o Delphi XE8 foram incluídos na versão 1.2 do DROP, no entanto, algum problema está acontecendo durante a compilação dos pacotes (temos um QC aberto para verificação). Se você não modulariza suas aplicações via BPLs, este problema não lhe causará nenhum efeito, pois a inclusão dos fontes (via projeto ou library path) em executáveis trará o comporramento correto do DROP (garantido via bateria de testes na versão XE8);
   - Mantenha-se atualizado sobre as novidades do DROP através do nosso twitter e facebook: AquasoftTI;
 
 E, obrigado por utilizar o DROP!
@@ -37,6 +38,15 @@ facebook.com/AquasoftTI
 Fone: +55 (51) 3022-3188
 
 HISTÓRICO DE VERSÕES:
+----------------------------------------
+2015.07.14: Versão 1.2.0 do Drop:
+- Suporte ao Delphi XE7 e XE8;
+- Criação de classes especializadas para comunicação via FireDAC;
+- Suporte ao SGBD Oracle (via DBX e FD);
+- Suporte ao SGBD Postgres (via FD);
+- Criação de estrutura básica para herança e automatização de tarefas de ORM (incluindo cache de objetos);
+- Atributos para melhor tratar campos nullable;
+- Centenas de melhorias e pequenas correções;
 ----------------------------------------
 2014.04.16: Versão 1.0.1 do Drop:
 - Suporte a bindings para listas de resultados;

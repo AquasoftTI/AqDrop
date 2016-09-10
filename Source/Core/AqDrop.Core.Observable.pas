@@ -5,8 +5,13 @@ unit AqDrop.Core.Observable;
 interface
 
 uses
-  System.Rtti, System.Classes, AqDrop.Core.Attributes, AQDrop.Core.Observer.Intf, AqDrop.Core.Observer,
-  AqDrop.Core.AnonymousMethods, AqDrop.Core.Collections;
+  System.Rtti,
+  System.Classes,
+  System.SysUtils,
+  AqDrop.Core.Attributes,
+  AQDrop.Core.Observer.Intf,
+  AqDrop.Core.Observer,
+  AqDrop.Core.Collections;
 
 type
   AqNotifyObserversTag = class(TAqAttribute);
@@ -31,7 +36,7 @@ type
     procedure EndUpdate; virtual;
 
     function RegisterObserver(const pObserverEvent: TNotifyEvent): TAqID; overload;
-    function RegisterObserver(const pObserverMethod: TAqNotifyMethod): TAqID; overload;
+    function RegisterObserver(const pObserverMethod: TProc<TObject>): TAqID; overload;
     function RegisterObserver(pObserver: IAqObserver): TAqID; overload;
     procedure UnregisterObserver(const pObserverID: Int32);
   end;
@@ -48,7 +53,7 @@ begin
   Result := FObserversChannel.RegisterObserver(TAqObserverByEvent.Create(pObserverEvent));
 end;
 
-function TAqObservable.RegisterObserver(const pObserverMethod: TAqNotifyMethod): TAqID;
+function TAqObservable.RegisterObserver(const pObserverMethod: TProc<TObject>): TAqID;
 begin
   Result := FObserversChannel.RegisterObserver(TAqObserverByMethod.Create(pObserverMethod));
 end;
@@ -101,7 +106,7 @@ begin
     FInterceptors := TAqDictionary<string, TVirtualMethodInterceptor>.Create([TAqDictionaryContent.adcValue]);
   end;
 
-  if not FInterceptors.TryGetValue(Self.ClassName, Result) then
+  if not FInterceptors.TryGetValue(Self.QualifiedClassName, Result) then
   begin
     Result := TVirtualMethodInterceptor.Create(Self);
 
@@ -117,7 +122,7 @@ begin
           end;
         end;
 
-      FInterceptors.Add(Self.ClassName, Result);
+      FInterceptors.Add(Self.QualifiedClassName, Result);
     except
       Result.Free;
       raise;

@@ -10,20 +10,21 @@ uses
 type
   TAqDBTokenizerDictionaryID = (diOther, diDigits, diCharacters, diPlus, diMinus, diAsterisk, diSlash, diSharp,
     diUnderscore, diSemicolon, diComma, diColon, diLeftParenthesis, diRightParenthesis, diSpace, diDot,
-    di10, di13, diSingleQuotes, diDoubleQuotes, diInterrogation, diEqual, diAt, diDollar);
+    di10, di13, diSingleQuotes, diDoubleQuotes, diInterrogation, diEqual, diAt, diDollar, diLessThan, diGreaterThan);
 
 const
   TAqDBTokenizerDictionaryMin = diOther;
-  TAqDBTokenizerDictionaryMax = diDollar;
+  TAqDBTokenizerDictionaryMax = diGreaterThan;
 
   TAqDBTokenizerDicionaries: array[TAqDBTokenizerDictionaryMin..TAqDBTokenizerDictionaryMax] of set of AnsiChar = (
     [#0], ['0'..'9'], ['A'..'Z', 'a'..'z'], ['+'], ['-'], ['*'], ['/'], ['#'], ['_'], [';'], [','], [':'], ['('], [')'],
-    [' '], ['.'], [#10], [#13], [''''], ['"'], ['?'], ['='], ['@'], ['$']);
+    [' '], ['.'], [#10], [#13], [''''], ['"'], ['?'], ['='], ['@'], ['$'], ['<'], ['>']);
 
 type
   TAqDBTokenType = (ttOther, ttWord, ttInteger, ttReal, ttSpace, ttLineBreak, ttComment, ttMultiplication, ttDivision,
     ttAddition, ttSubtraction, ttLeftParenthesis, ttRightParenthesis, ttComma, ttSemicolon, ttColon, ttString,
-    ttParameter, ttNamedParameter, ttEqual, ttDot, ttAt);
+    ttParameter, ttNamedParameter, ttEqual, ttDot, ttAt, ttLessThan, ttLessEqualThan, ttGreaterThan,
+    ttGreaterEqualThan);
 
   /// <summary>
   ///   Tokenizer para sentenças SQL.
@@ -78,6 +79,10 @@ var
   lFianlStateEqual: TState;
   lFinalStateDot: TState;
   lFinalStateAt: TState;
+  lFinalStateLessThan: TState;
+  lFinalStateLessEqualThan: TState;
+  lFinalStateGreaterThan: TState;
+  lFinalStateGreaterEqualThan: TState;
   lDictionaryID: TAqDBTokenizerDictionaryID;
 begin
   inherited;
@@ -198,6 +203,18 @@ begin
 
   lFinalStateAt := Automaton.AddFinalState(ttAt);
   Automaton.InitialState.AddTransition(lFinalStateAt).AddDictionary(diAt);
+
+  lFinalStateLessThan := Automaton.AddFinalState(ttLessThan);
+  Automaton.InitialState.AddTransition(lFinalStateLessThan).AddDictionary(diLessThan);
+
+  lFinalStateLessEqualThan := Automaton.AddFinalState(ttLessEqualThan);
+  lFinalStateLessThan.AddTransition(lFinalStateLessEqualThan).AddDictionary(diEqual);
+
+  lFinalStateGreaterThan := Automaton.AddFinalState(ttGreaterThan);
+  Automaton.InitialState.AddTransition(lFinalStateGreaterThan).AddDictionary(diGreaterThan);
+
+  lFinalStateGreaterEqualThan := Automaton.AddFinalState(ttGreaterEqualThan);
+  lFinalStateGreaterThan.AddTransition(lFinalStateGreaterEqualThan).AddDictionary(diEqual);
 end;
 
 class destructor TAqBDTokenizer.Destroy;

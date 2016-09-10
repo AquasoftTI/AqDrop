@@ -3,12 +3,14 @@ unit AqDrop.Core.Helpers.TRttiObject;
 interface
 
 uses
-  System.Rtti, AqDrop.Core.Collections.Intf, AqDrop.Core.AnonymousMethods;
+  System.Rtti,
+  System.SysUtils,
+  AqDrop.Core.Collections.Intf;
 
 type
   TAqRttiObjectHelper = class helper for TRttiObject
   strict private
-    procedure ForEachAttribute<T: TCustomAttribute>(const pProcessing: TAqFunctionGenericParameterReturnBoolean<T>);
+    procedure ForEachAttribute<T: TCustomAttribute>(const pProcessing: TFunc<T, Boolean>);
   public
     function GetAttribute<T: TCustomAttribute>(out pAttribute: T; const pIncidence: UInt32 = 0): Boolean;
     function GetAttributes<T: TCustomAttribute>(out pAttributes: IAqResultList<T>): Boolean; overload;
@@ -31,7 +33,7 @@ begin
   lActualIndex := 0;
 
   ForEachAttribute<T>(
-    function(const pProcessingAttribute: T): Boolean
+    function(pProcessingAttribute: T): Boolean
     begin
       Result := lActualIndex <> pIncidence;
       if not Result then
@@ -61,7 +63,7 @@ begin
 
   try
     ForEachAttribute<T>(
-      function(const pProcessingAttribute: T): Boolean
+      function(pProcessingAttribute: T): Boolean
       begin
         Result := True;
 
@@ -86,7 +88,7 @@ begin
   end;
 end;
 
-procedure TAqRttiObjectHelper.ForEachAttribute<T>(const pProcessing: TAqFunctionGenericParameterReturnBoolean<T>);
+procedure TAqRttiObjectHelper.ForEachAttribute<T>(const pProcessing: TFunc<T, Boolean>);
 var
   lAttributes: TArray<TCustomAttribute>;
   lAttributesCount: Int32;

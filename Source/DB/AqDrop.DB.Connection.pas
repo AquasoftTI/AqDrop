@@ -5,67 +5,17 @@ interface
 uses
   System.Classes,
   System.SyncObjs,
+  System.SysUtils,
   AqDrop.Core.Manager,
-  AqDrop.DB.SQL.Intf,
-  AqDrop.Core.AnonymousMethods,
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.Collections,
   AqDrop.DB.Types,
-  AqDrop.DB.SQL;
+  AqDrop.DB.SQL,
+  AqDrop.DB.Adapter,
+  AqDrop.DB.SQL.Intf;
 
 type
-  TAqDBAutoIncrementType = (aiAutoIncrement, aiGenerator);
-
-  TAqDBMapper = class
-  strict protected
-    function SolveOperator(const pOperator: TAqDBSQLOperator): string; virtual;
-    function SolveDisambiguation(pColumn: IAqDBSQLColumn): string; virtual;
-    function SolveAlias(pAliasable: IAqDBSQLAliasable): string; virtual;
-    function SolveAggregator(pValue: IAqDBSQLValue): string; virtual;
-    function SolveValue(pValue: IAqDBSQLValue; const pUseAlias: Boolean): string; virtual;
-    function SolveValueType(pValue: IAqDBSQLValue): string; virtual;
-    function SolveColumn(pColumn: IAqDBSQLColumn): string; virtual;
-    function SolveOperation(pOperation: IAqDBSQLOperation): string; virtual;
-    function SolveSubselectValue(pColumn: IAqDBSQLSubselect): string; virtual;
-    function SolveConstant(pConstant: IAqDBSQLConstant): string; virtual;
-    function SolveParameter(pParameter: IAqDBSQLParameter): string; virtual;
-    function SolveTextConstant(pConstant: IAqDBSQLTextConstant): string; virtual;
-    function SolveIntConstant(pConstant: IAqDBSQLIntConstant): string; virtual;
-    function SolveDoubleConstant(pConstant: IAqDBSQLDoubleConstant): string; virtual;
-    function SolveCurrencyConstant(pConstant: IAqDBSQLCurrencyConstant): string; virtual;
-    function SolveDateTimeConstant(pConstant: IAqDBSQLDateTimeConstant): string; virtual;
-    function SolveDateConstant(pConstant: IAqDBSQLDateConstant): string; virtual;
-    function SolveTimeConstant(pConstant: IAqDBSQLTimeConstant): string; virtual;
-    function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; virtual;
-    function SolveColumns(pColumnsList: IAqReadList<IAqDBSQLValue>): string; virtual;
-    function SolveSource(pSource: IAqDBSQLSource): string; virtual;
-    function SolveFrom(pSource: IAqDBSQLSource): string; virtual;
-    function SolveTable(pTable: IAqDBSQLTable): string; virtual;
-    function SolveSubselect(pSelect: IAqDBSQLSelect): string; virtual;
-    function SolveSelectBody(pSelect: IAqDBSQLSelect): string; virtual;
-    function SolveJoins(pSelect: IAqDBSQLSelect): string; virtual;
-    function SolveJoin(pJoin: IAqDBSQLJoin): string; virtual;
-    function SolveCondition(pCondition: IAqDBSQLCondition): string; virtual;
-    function SolveOrderBy(pSelect: IAqDBSQLSelect): string; virtual;
-    function SolveLimit(pSelect: IAqDBSQLSelect): string; virtual;
-    function SolveComparisonCondition(pComparisonCondition: IAqDBSQLComparisonCondition): string; virtual;
-    function SolveValueIsNullCondition(pValueIsNullCondition: IAqDBSQLValueIsNullCondition): string; virtual;
-    function SolveComposedCondition(pComposedCondition: IAqDBSQLComposedCondition): string; virtual;
-    function SolveBetweenCondition(pBetweenCondition: IAqDBSQLBetweenCondition): string; virtual;
-    function SolveComparison(const pComparison: TAqDBSQLComparison): string; virtual;
-    function SolveBooleanOperator(const pBooleanOperator: TAqDBSQLBooleanOperator): string; virtual;
-  public
-    function SolveSelect(pSelect: IAqDBSQLSelect): string; virtual;
-    function SolveInsert(pInsert: IAqDBSQLInsert): string; virtual;
-    function SolveUpdate(pUpdate: IAqDBSQLUpdate): string; virtual;
-    function SolveDelete(pDelete: IAqDBSQLDelete): string; virtual;
-    function SolveCommand(pCommand: IAqDBSQLCommand): string; virtual;
-
-    function GetGeneratorName(const pTableName: string): string; virtual;
-  end;
-
   TAqDBConnectionClass = class of TAqDBConnection;
-  TAqDBMapperClass = class of TAqDBMapper;
 
   /// ------------------------------------------------------------------------------------------------------------------
   /// <summary>
@@ -77,22 +27,33 @@ type
   /// ------------------------------------------------------------------------------------------------------------------
   TAqDBConnection = class abstract(TAqManager<TObject>)
   strict private
-    FMapper: TAqDBMapper;
+    FOnwsAdapter: Boolean;
+
+    FTransactionCalls: UInt32;
+    FAdapter: TAqDBAdapter;
+    FReaders: UInt32;
+    FOnFirstReaderOpened: TProc<TAqDBConnection>;
+    FOnLastReaderClosed: TProc<TAqDBConnection>;
 
     procedure CheckConnectionActive;
 
-    function PrepareCommand(const pPreparingFunction: TAqAnonymousFunction<TAqID>): TAqID; overload;
-    function OpenQuery(const pOpeningFunction: TAqAnonymousFunction<IAqDBReader>): IAqDBReader; overload;
-    function ExecuteCommand(const pExecutionFunction: TAqAnonymousFunction<Int64>): Int64; overload;
+    function PrepareCommand(const pPreparingFunction: TFunc<TAqID>): TAqID; overload;
+    function OpenQuery(const pOpeningFunction: TFunc<IAqDBReader>): IAqDBReader; overload;
+    function ExecuteCommand(const pExecutionFunction: TFunc<Int64>): Int64; overload;
 
     class var FConnections: TAqList<TAqDBConnection>;
+  private
+    property OnFirstReaderOpened: TProc<TAqDBConnection> read FOnFirstReaderOpened write FOnFirstReaderOpened;
+    property OnLastReaderClosed: TProc<TAqDBConnection> read FOnLastReaderClosed write FOnLastReaderClosed;
   strict protected
     procedure DoStartTransaction; virtual; abstract;
     procedure DoCommitTransaction; virtual; abstract;
     procedure DoRollbackTransaction; virtual; abstract;
 
-    function DoPrepareCommand(const pSQL: string): TAqID; overload; virtual; abstract;
-    function DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand): TAqID; overload; virtual;
+    function DoPrepareCommand(const pSQL: string;
+      const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID; overload; virtual; abstract;
+    function DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+      const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID; overload; virtual;
 
     procedure DoUnprepareCommand(const pCommandID: TAqID); virtual; abstract;
 
@@ -112,16 +73,23 @@ type
 
     function GetActive: Boolean; virtual; abstract;
     procedure SetActive(const pValue: Boolean); virtual;
-    function GetInTransaction: Boolean; virtual; abstract;
-
-    function GetAutoIncrementType: TAqDBAutoIncrementType; virtual;
+    function GetInTransaction: Boolean;
 
     procedure DoConnect; virtual; abstract;
     procedure DoDisconnect; virtual; abstract;
 
-    class function GetDefaultMapper: TAqDBMapperClass; virtual;
+    function CreateAdapter: TAqDBAdapter; virtual;
+    class function GetDefaultAdapter: TAqDBAdapterClass; virtual;
+
+    procedure RaiseImpossibleToConnect(const pEBase: Exception);
+
+    property TransactionCalls: UInt32 read FTransactionCalls;
   protected
-    procedure SetMapper(const pMapper: TAqDBMapper); virtual;
+    procedure SetAdapter(const pAdapter: TAqDBAdapter); overload; virtual;
+    procedure SetAdapter(const pAdapter: TAqDBAdapter; const pOwnsAdapter: Boolean); overload; virtual;
+    function ExtractAdapter: TAqDBAdapter;
+    procedure IncreaseReaderes;
+    procedure DecrementReaders;
   public
     class constructor Create;
     class destructor Destroy;
@@ -160,8 +128,10 @@ type
     procedure CommitTransaction; virtual;
     procedure RollbackTransaction; virtual;
 
-    function PrepareCommand(const pSQL: string): TAqID; overload; virtual;
-    function PrepareCommand(const pSQLCommand: IAqDBSQLCommand): TAqID; overload; virtual;
+    function PrepareCommand(const pSQL: string;
+      const pParametersInitializer: TAqDBParametersHandlerMethod = nil): TAqID; overload; virtual;
+    function PrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+      const pParametersInitializer: TAqDBParametersHandlerMethod = nil): TAqID; overload; virtual;
 
     procedure UnprepareCommand(const pCommandID: TAqID); virtual;
 
@@ -203,12 +173,11 @@ type
     function OpenQuery(const pCommandID: TAqID;
       const pParametersHandler: TAqDBParametersHandlerMethod = nil): IAqDBReader; overload;
 
-    function GetAutoIncrement(const pGenerator: string = ''): Int64; virtual; abstract;
+    function GetAutoIncrement(const pGenerator: string = ''): Int64; virtual;
 
-    property Mapper: TAqDBMapper read FMapper write SetMapper;
+    property Adapter: TAqDBAdapter read FAdapter write SetAdapter;
     property Active: Boolean read GetActive write SetActive;
     property InTransaction: Boolean read GetInTransaction;
-    property AutoIncrementType: TAqDBAutoIncrementType read GetAutoIncrementType;
   end;
 
   TAqDBPooledConnection<TBaseConnection: TAqDBConnection> = class(TAqDBConnection)
@@ -253,13 +222,25 @@ type
 
       property AutoFlushContextsTime: UInt32 read FAutoFlushContextsTime write SetAutoFlushContextsTime;
     end;
+
+    TAqDBPreparedQuery = class
+    strict private
+        FSQL: string;
+        FParametersInitializer: TAqDBParametersHandlerMethod;
+    public
+      constructor Create(const pSQL: string; const pParametersInitializer: TAqDBParametersHandlerMethod);
+
+      property SQL: string read FSQL write FSQL;
+      property ParametersInitializer: TAqDBParametersHandlerMethod read FParametersInitializer
+        write FParametersInitializer;
+    end;
   strict private
     FPool: TAqList<TAqDBContext>;
-    FConnectionBuilder: TAqAnonymousFunction<TBaseConnection>;
-    FPreparedQueries: TAqIDDictionary<string>;
+    FConnectionBuilder: TFunc<TBaseConnection>;
+    FPreparedQueries: TAqIDDictionary<TAqDBPreparedQuery>;
     FFlushContextsThread: TAqDBFlushContextsThread;
 
-    procedure SolvePoolAndExecute(const pMethod: TAqMethodGenericParameter<TAqDBContext>);
+    procedure SolvePoolAndExecute(const pMethod: TProc<TAqDBContext>);
     function GetActiveConnections: Int32;
     function GetAutoFlushContextsTime: UInt32;
     procedure SetAutoFlushContextsTime(const pValue: UInt32);
@@ -269,8 +250,10 @@ type
     procedure DoCommitTransaction; override;
     procedure DoRollbackTransaction; override;
 
-    function DoPrepareCommand(const pSQL: string): TAqID; override;
-    function DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand): TAqID; override;
+    function DoPrepareCommand(const pSQL: string;
+      const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID; override;
+    function DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+      const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID; override;
 
     procedure DoUnprepareCommand(const pCommandID: TAqID); override;
 
@@ -295,19 +278,21 @@ type
     procedure DoConnect; override;
     procedure DoDisconnect; override;
 
-    function GetInTransaction: Boolean; override;
-    function GetAutoIncrementType: TAqDBAutoIncrementType; override;
+    {TODO: hoje reativar}
+//    function GetInTransaction: Boolean; override;
 
-    class function GetDefaultMapper: TAqDBMapperClass; override;
+    class function GetDefaultAdapter: TAqDBAdapterClass; override;
   protected
-    procedure SetMapper(const pMapeador: TAqDBMapper); override;
+    procedure SetAdapter(const pAdapter: TAqDBAdapter); override;
 
-    property PreparedQueries: TAqIDDictionary<string> read FPreparedQueries;
+    property PreparedQueries: TAqIDDictionary<TAqDBPreparedQuery> read FPreparedQueries;
   public
-    constructor Create(const pConnectionBuilder: TAqAnonymousFunction<TBaseConnection>); reintroduce; virtual;
+    constructor Create(const pConnectionBuilder: TFunc<TBaseConnection>); reintroduce; virtual;
     destructor Destroy; override;
 
-    function GetAutoIncrement(const pGeneratorName: string = ''): Int64; override;
+    procedure StartTransaction; override;
+    procedure CommitTransaction; override;
+    procedure RollbackTransaction; override;
 
     property ActiveConnections: Int32 read GetActiveConnections;
     property AutoFlushContextsTime: UInt32 read GetAutoFlushContextsTime write SetAutoFlushContextsTime;
@@ -316,7 +301,6 @@ type
 implementation
 
 uses
-  System.SysUtils,
   System.DateUtils,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers;
@@ -361,7 +345,7 @@ begin
     end);
 end;
 
-function TAqDBConnection.OpenQuery(const pOpeningFunction: TAqAnonymousFunction<IAqDBReader>): IAqDBReader;
+function TAqDBConnection.OpenQuery(const pOpeningFunction: TFunc<IAqDBReader>): IAqDBReader;
 begin
   try
     CheckConnectionActive;
@@ -388,7 +372,12 @@ begin
   try
     CheckConnectionActive;
 
-    DoStartTransaction;
+    if FTransactionCalls = 0 then
+    begin
+      DoStartTransaction;
+    end;
+
+    Inc(FTransactionCalls);
   except
     on E: Exception do
     begin
@@ -402,7 +391,17 @@ begin
   try
     CheckConnectionActive;
 
-    DoCommitTransaction;
+    if FTransactionCalls = 0 then
+    begin
+      raise EAqInternal.Create('There is no transaction to commit.');
+    end;
+
+    Dec(FTransactionCalls);
+
+    if FTransactionCalls = 0 then
+    begin
+      DoCommitTransaction;
+    end;
   except
     on E: Exception do
     begin
@@ -412,19 +411,26 @@ begin
 end;
 
 constructor TAqDBConnection.Create;
-var
-  lMapperClass: TAqDBMapperClass;
 begin
   inherited;
 
-  lMapperClass := GetDefaultMapper;
-
-  if Assigned(lMapperClass) then
-  begin
-    SetMapper(lMapperClass.Create);
-  end;
+  SetAdapter(CreateAdapter);
 
   FConnections.Add(Self);
+end;
+
+function TAqDBConnection.CreateAdapter: TAqDBAdapter;
+var
+  lAdapterClass: TAqDBAdapterClass;
+begin
+  lAdapterClass := GetDefaultAdapter;
+
+  if Assigned(lAdapterClass) then
+  begin
+    Result := lAdapterClass.Create;
+  end else begin
+    Result := nil;
+  end;
 end;
 
 class constructor TAqDBConnection.Create;
@@ -445,11 +451,27 @@ begin
   DoUnprepareCommand(pCommandID);
 end;
 
+procedure TAqDBConnection.DecrementReaders;
+begin
+  if FReaders > 0 then
+  begin
+    Dec(FReaders);
+
+    if Assigned(FOnLastReaderClosed) and (FReaders = 0) then
+    begin
+      FOnLastReaderClosed(Self);
+    end;
+  end;
+end;
+
 destructor TAqDBConnection.Destroy;
 var
   lI: Int32;
 begin
-  FMapper.Free;
+  if FOnwsAdapter then
+  begin
+    FAdapter.Free;
+  end;
 
   lI := FConnections.IndexOf(Self);
 
@@ -461,7 +483,7 @@ begin
   inherited;
 end;
 
-function TAqDBConnection.ExecuteCommand(const pExecutionFunction: TAqAnonymousFunction<Int64>): Int64;
+function TAqDBConnection.ExecuteCommand(const pExecutionFunction: TFunc<Int64>): Int64;
 begin
   Result := 0;
 
@@ -487,26 +509,59 @@ begin
     end);
 end;
 
-function TAqDBConnection.GetAutoIncrementType: TAqDBAutoIncrementType;
+function TAqDBConnection.GetAutoIncrement(const pGenerator: string): Int64;
+var
+  lReader: IAqDBReader;
+  lQuery: string;
 begin
-  Result := TAqDBAutoIncrementType.aiAutoIncrement;
+  lQuery := Adapter.SQLSolver.GetAutoIncrementQuery(pGenerator);
+
+  if lQuery.IsEmpty then
+  begin
+    Result := 0;
+  end else begin
+    lReader := OpenQuery(lQuery);
+
+    if not lReader.Next then
+    begin
+      raise EAqInternal.Create('It wasn''t possible to get the generator value.');
+    end;
+
+    Result := lReader.Values[0].AsInt64;
+  end;
 end;
 
-class function TAqDBConnection.GetDefaultMapper: TAqDBMapperClass;
+class function TAqDBConnection.GetDefaultAdapter: TAqDBAdapterClass;
 begin
-  Result := TAqDBMapper;
+  Result := TAqDBAdapter;
 end;
 
-function TAqDBConnection.PrepareCommand(const pSQLCommand: IAqDBSQLCommand): TAqID;
+function TAqDBConnection.GetInTransaction: Boolean;
+begin
+  Result := FTransactionCalls > 0;
+end;
+
+procedure TAqDBConnection.IncreaseReaderes;
+begin
+  if Assigned(FOnFirstReaderOpened) and (FReaders = 0) then
+  begin
+    FOnFirstReaderOpened(Self);
+  end;
+
+  Inc(FReaders);
+end;
+
+function TAqDBConnection.PrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+  const pParametersInitializer: TAqDBParametersHandlerMethod = nil): TAqID;
 begin
   Result := PrepareCommand(
     function: TAqID
     begin
-      Result := DoPrepareCommand(pSQLCommand);
+      Result := DoPrepareCommand(pSQLCommand, pParametersInitializer);
     end);
 end;
 
-function TAqDBConnection.PrepareCommand(const pPreparingFunction: TAqAnonymousFunction<TAqID>): TAqID;
+function TAqDBConnection.PrepareCommand(const pPreparingFunction: TFunc<TAqID>): TAqID;
 begin
   Result := 0;
 
@@ -525,18 +580,24 @@ end;
 function TAqDBConnection.DoOpenQuery(const pSQLCommand: IAqDBSQLSelect;
   const pParametersHandler: TAqDBParametersHandlerMethod): IAqDBReader;
 begin
-  Result := DoOpenQuery(FMapper.SolveSelect(pSQLCommand), pParametersHandler);
+  Result := DoOpenQuery(FAdapter.SQLSolver.SolveSelect(pSQLCommand), pParametersHandler);
 end;
 
 function TAqDBConnection.DoExecuteCommand(const pSQLCommand: IAqDBSQLCommand;
   const pParametersHandler: TAqDBParametersHandlerMethod): Int64;
 begin
-  Result := DoExecuteCommand(FMapper.SolveCommand(pSQLCommand), pParametersHandler);
+  Result := DoExecuteCommand(FAdapter.SQLSolver.SolveCommand(pSQLCommand), pParametersHandler);
 end;
 
-function TAqDBConnection.DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand): TAqID;
+function TAqDBConnection.DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+  const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID;
 begin
-  Result := DoPrepareCommand(FMapper.SolveCommand(pSQLCommand));
+  Result := DoPrepareCommand(FAdapter.SQLSolver.SolveCommand(pSQLCommand), pParametersInitializer);
+end;
+
+procedure TAqDBConnection.RaiseImpossibleToConnect(const pEBase: Exception);
+begin
+  pEBase.RaiseOuterException(EAqFriendly.Create('It wasn''t possible to stablish a connection to the DB.'));
 end;
 
 procedure TAqDBConnection.RollbackTransaction;
@@ -544,7 +605,17 @@ begin
   try
     CheckConnectionActive;
 
-    DoRollbackTransaction;
+    if FTransactionCalls = 0 then
+    begin
+      raise EAqInternal.Create('There are no transaction to revert.');
+    end;
+
+    Dec(FTransactionCalls);
+
+    if FTransactionCalls = 0 then
+    begin
+      DoRollbackTransaction;
+    end;
   except
     on E: Exception do
     begin
@@ -553,19 +624,19 @@ begin
   end;
 end;
 
-function TAqDBConnection.PrepareCommand(const pSQL: string): TAqID;
+function TAqDBConnection.PrepareCommand(const pSQL: string;
+  const pParametersInitializer: TAqDBParametersHandlerMethod = nil): TAqID;
 begin
   Result := PrepareCommand(
     function: TAqID
     begin
-      Result := DoPrepareCommand(pSQL);
+      Result := DoPrepareCommand(pSQL, pParametersInitializer);
     end);
 end;
 
-procedure TAqDBConnection.SetMapper(const pMapper: TAqDBMapper);
+procedure TAqDBConnection.SetAdapter(const pAdapter: TAqDBAdapter);
 begin
-  FreeAndNil(FMapper);
-  FMapper := pMapper;
+  SetAdapter(pAdapter, True);
 end;
 
 procedure TAqDBConnection.SetActive(const pValue: Boolean);
@@ -581,6 +652,17 @@ begin
       DoDisconnect;
     end;
   end;
+end;
+
+procedure TAqDBConnection.SetAdapter(const pAdapter: TAqDBAdapter; const pOwnsAdapter: Boolean);
+begin
+  if FOnwsAdapter then
+  begin
+    FAdapter.Free;
+  end;
+
+  FAdapter := pAdapter;
+  FOnwsAdapter := pOwnsAdapter;
 end;
 
 class destructor TAqDBConnection.Destroy;
@@ -602,6 +684,13 @@ begin
     end);
 end;
 
+function TAqDBConnection.ExtractAdapter: TAqDBAdapter;
+begin
+  Result := FAdapter;
+  FAdapter := nil;
+  FOnwsAdapter := False;
+end;
+
 function TAqDBConnection.ExecuteCommand(const pSQLCommand: IAqDBSQLCommand;
   const pParametersHandler: TAqDBParametersHandlerMethod): Int64;
 begin
@@ -612,546 +701,37 @@ begin
     end);
 end;
 
-{ TAqDBMapper }
-
-function TAqDBMapper.GetGeneratorName(const pTableName: string): string;
-begin
-  Result := Format('GEN_%S_ID', [pTableName]);
-end;
-
-function TAqDBMapper.SolveAggregator(pValue: IAqDBSQLValue): string;
-var
-  lAggregatorMask: string;
-begin
-  case pValue.Aggregator of
-    TAqDBSQLAggregatorType.atNone:
-      lAggregatorMask := '%s';
-    TAqDBSQLAggregatorType.atCount:
-      lAggregatorMask := 'count(%s)';
-    TAqDBSQLAggregatorType.atSum:
-      lAggregatorMask := 'sum(%s)';
-    TAqDBSQLAggregatorType.atAvg:
-      lAggregatorMask := 'avg(%s)';
-    TAqDBSQLAggregatorType.atMax:
-      lAggregatorMask := 'max(%s)';
-    TAqDBSQLAggregatorType.atMin:
-      lAggregatorMask := 'min(%s)';
-  else
-    raise EAqInternal.Create('Aggragator not expected.');
-  end;
-
-  Result := Format(lAggregatorMask, [SolveValueType(pValue)]);
-end;
-
-function TAqDBMapper.SolveAlias(pAliasable: IAqDBSQLAliasable): string;
-begin
-  if pAliasable.IsAliasDefined then
-  begin
-    Result := pAliasable.Alias;
-  end else begin
-    Result := '';
-  end;
-end;
-
-function TAqDBMapper.SolveBetweenCondition(pBetweenCondition: IAqDBSQLBetweenCondition): string;
-begin
-  Result := SolveValue(pBetweenCondition.Value, False) + ' between ' +
-    SolveValue(pBetweenCondition.RangeBegin, False) + ' and ' + SolveValue(pBetweenCondition.RangeEnd, False);
-end;
-
-function TAqDBMapper.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
-begin
-  if pConstant.Value then
-  begin
-    Result := 'True'.Quote;
-  end else begin
-    Result := 'False'.Quote;
-  end;
-end;
-
-function TAqDBMapper.SolveBooleanOperator(const pBooleanOperator: TAqDBSQLBooleanOperator): string;
-begin
-  case pBooleanOperator of
-    TAqDBSQLBooleanOperator.boAnd:
-      Result := 'and';
-    TAqDBSQLBooleanOperator.boOr:
-      Result := 'or';
-    TAqDBSQLBooleanOperator.boXor:
-      Result := 'xor';
-  else
-    raise EAqInternal.Create('Unexpected Boolean Operator.');
-  end;
-end;
-
-function TAqDBMapper.SolveValue(pValue: IAqDBSQLValue; const pUseAlias: Boolean): string;
-begin
-  Result := SolveAggregator(pValue);
-
-  if pUseAlias and pValue.IsAliasDefined then
-  begin
-    Result := Result + ' as ' + SolveAlias(pValue);
-  end;
-end;
-
-function TAqDBMapper.SolveValueIsNullCondition(pValueIsNullCondition: IAqDBSQLValueIsNullCondition): string;
-begin
-  Result := SolveValue(pValueIsNullCondition.Value, False) + ' is null';
-end;
-
-function TAqDBMapper.SolveOperation(pOperation: IAqDBSQLOperation): string;
-begin
-  Result := '(' + SolveValue(pOperation.LeftOperand, False) + ' ' + SolveOperator(pOperation.Operator) + ' ' +
-    SolveValue(pOperation.RightOperand, False) + ')';
-end;
-
-function TAqDBMapper.SolveColumn(pColumn: IAqDBSQLColumn): string;
-begin
-  Result := SolveDisambiguation(pColumn) + pColumn.Expression;
-end;
-
-function TAqDBMapper.SolveColumns(pColumnsList: IAqReadList<IAqDBSQLValue>): string;
-var
-  lColumn: IAqDBSQLValue;
-  lColumnsText: TStringList;
-begin
-  lColumnsText := TStringList.Create;
-
-  try
-    if pColumnsList.Count = 0 then
-    begin
-      lColumnsText.Add('*');
-    end else begin
-      for lColumn in pColumnsList do
-      begin
-        lColumnsText.Add(SolveValue(lColumn, True));
-      end;
-    end;
-
-    lColumnsText.StrictDelimiter := True;
-    lColumnsText.Delimiter := ',';
-    Result := lColumnsText.DelimitedText;
-  finally
-    lColumnsText.Free;
-  end;
-end;
-
-function TAqDBMapper.SolveSubselectValue(pColumn: IAqDBSQLSubselect): string;
-begin
-  Result := SolveSubselect(pColumn.Select);
-end;
-
-function TAqDBMapper.SolveCommand(pCommand: IAqDBSQLCommand): string;
-begin
-  case pCommand.CommandType of
-    TAqDBSQLCommandType.ctSelect:
-      Result := SolveSelect(pCommand.GetAsSelect);
-    TAqDBSQLCommandType.ctInsert:
-      Result := SolveInsert(pCommand.GetAsInsert);
-    TAqDBSQLCommandType.ctUpdate:
-      Result := SolveUpdate(pCommand.GetAsUpdate);
-    TAqDBSQLCommandType.ctDelete:
-      Result := SolveDelete(pCommand.GetAsDelete);
-  else
-    raise EAqInternal.Create('Command type not supoorted.');
-  end;
-end;
-
-function TAqDBMapper.SolveComparison(const pComparison: TAqDBSQLComparison): string;
-begin
-  case pComparison of
-    TAqDBSQLComparison.cpEqual:
-      Result := '=';
-    TAqDBSQLComparison.cpGreaterThan:
-      Result := '>';
-    TAqDBSQLComparison.cpGreaterEqual:
-      Result := '>=';
-    TAqDBSQLComparison.cpLessThan:
-      Result := '<';
-    TAqDBSQLComparison.cpLessEqual:
-      Result := '<=';
-  else
-    raise EAqInternal.Create('Unexpected Comparison Type.');
-  end;
-end;
-
-function TAqDBMapper.SolveComparisonCondition(pComparisonCondition: IAqDBSQLComparisonCondition): string;
-begin
-  Result := SolveValue(pComparisonCondition.LeftValue, False) + ' ' +
-    SolveComparison(pComparisonCondition.Comparison) + ' ' + SolveValue(pComparisonCondition.RightValue, False);
-end;
-
-function TAqDBMapper.SolveComposedCondition(pComposedCondition: IAqDBSQLComposedCondition): string;
-var
-  lI: Int32;
-begin
-  if pComposedCondition.Conditions.Count = 0 then
-  begin
-    Result := '';
-  end else begin
-    Result := '(' + SolveCondition(pComposedCondition.Conditions.First);
-
-    for lI := 1 to pComposedCondition.Conditions.Count - 1 do
-    begin
-      Result := ' ' + SolveBooleanOperator(pComposedCondition.LinkOperators[lI - 1]) + ' ' +
-        SolveCondition(pComposedCondition.Conditions[lI]);
-    end;
-
-    Result := Result + ')';
-  end;
-end;
-
-function TAqDBMapper.SolveCondition(pCondition: IAqDBSQLCondition): string;
-begin
-  case pCondition.ConditionType of
-    TAqDBSQLConditionType.ctComparison:
-      Result := SolveComparisonCondition(pCondition.GetAsComparison);
-    TAqDBSQLConditionType.ctValueIsNull:
-      Result := SolveValueIsNullCondition(pCondition.GetAsValueIsNull);
-    TAqDBSQLConditionType.ctComposed:
-      Result := SolveComposedCondition(pCondition.GetAsComposed);
-    TAqDBSQLConditionType.ctBetween:
-      Result := SolveBetweenCondition(pCondition.GetAsBetween);
-  else
-    raise EAqInternal.Create('Unexpected condition type.');
-  end;
-end;
-
-function TAqDBMapper.SolveConstant(pConstant: IAqDBSQLConstant): string;
-begin
-  case pConstant.ConstantType of
-    TAqDBSQLConstantValueType.cvText:
-      Result := SolveTextConstant(pConstant.GetAsTextConstant);
-    TAqDBSQLConstantValueType.cvInt:
-      Result := SolveIntConstant(pConstant.GetAsIntConstant);
-    TAqDBSQLConstantValueType.cvDouble:
-      Result := SolveDoubleConstant(pConstant.GetAsDoubleConstant);
-    TAqDBSQLConstantValueType.cvCurrency:
-      Result := SolveCurrencyConstant(pConstant.GetAsCurrencyConstant);
-    TAqDBSQLConstantValueType.cvDateTime:
-      Result := SolveDateTimeConstant(pConstant.GetAsDateTimeConstant);
-    TAqDBSQLConstantValueType.cvDate:
-      Result := SolveDateConstant(pConstant.GetAsDateConstant);
-    TAqDBSQLConstantValueType.cvTime:
-      Result := SolveTimeConstant(pConstant.GetAsTimeConstant);
-    TAqDBSQLConstantValueType.cvBoolean:
-      Result := SolveBooleanConstant(pConstant.GetAsBooleanConstant);
-  else
-    raise EAqInternal.Create('Constant type not expected.');
-  end;
-end;
-
-function TAqDBMapper.SolveCurrencyConstant(pConstant: IAqDBSQLCurrencyConstant): string;
-begin
-  Result := pConstant.Value.ToString;
-end;
-
-function TAqDBMapper.SolveDateConstant(pConstant: IAqDBSQLDateConstant): string;
-begin
-  Result := pConstant.Value.Format('yyyy.mm.dd').Quote;
-end;
-
-function TAqDBMapper.SolveDateTimeConstant(pConstant: IAqDBSQLDateTimeConstant): string;
-begin
-  Result := pConstant.Value.Format('yyyy.mm.dd hh:mm:ss:zzz').Quote;
-end;
-
-function TAqDBMapper.SolveDelete(pDelete: IAqDBSQLDelete): string;
-begin
-  Result := 'delete from ' + SolveTable(pDelete.Table);
-
-  if pDelete.IsConditionDefined then
-  begin
-    Result := Result + ' where ' + SolveCondition(pDelete.Condition);
-  end;
-end;
-
-function TAqDBMapper.SolveDisambiguation(pColumn: IAqDBSQLColumn): string;
-begin
-  if pColumn.IsSourceDefined then
-  begin
-    if pColumn.Source.IsAliasDefined then
-    begin
-      Result := SolveAlias(pColumn.Source) + '.';
-    end else if pColumn.Source.SourceType = stTable then
-    begin
-      Result := pColumn.Source.GetAsTable.Name + '.';
-    end else begin
-      raise EAqInternal.Create('Column source doesn''t have a valid desambiguation.');
-    end;
-  end else begin
-    Result := '';
-  end;
-end;
-
-function TAqDBMapper.SolveDoubleConstant(pConstant: IAqDBSQLDoubleConstant): string;
-begin
-  Result := pConstant.Value.ToString;
-end;
-
-function TAqDBMapper.SolveFrom(pSource: IAqDBSQLSource): string;
-begin
-  Result := 'from ' + SolveSource(pSource);
-end;
-
-function TAqDBMapper.SolveInsert(pInsert: IAqDBSQLInsert): string;
-var
-  lColumns: TStringList;
-  lValues: TStringList;
-  lAssignment: IAqDBSQLAssignment;
-begin
-  Result := 'insert into ' + SolveTable(pInsert.Table);
-
-  if pInsert.Assignments.Count = 0 then
-  begin
-    raise EAqInternal.Create('Insert has no assignments.');
-  end;
-
-  lColumns := TStringList.Create;
-
-  try
-    lValues := TStringList.Create;
-
-    try
-      for lAssignment in pInsert.Assignments do
-      begin
-        lColumns.Add(SolveColumn(lAssignment.Column));
-        lValues.Add(SolveValue(lAssignment.Value, False));
-      end;
-
-      lColumns.StrictDelimiter := True;
-      lColumns.Delimiter := ',';
-      lValues.StrictDelimiter := True;
-      lValues.Delimiter := ',';
-
-      Result := Result + ' (' + lColumns.DelimitedText + ') values (' + lValues.DelimitedText + ')';
-    finally
-      lValues.Free;
-    end;
-  finally
-    lColumns.Free;
-  end;
-end;
-
-function TAqDBMapper.SolveIntConstant(pConstant: IAqDBSQLIntConstant): string;
-begin
-  Result := pConstant.Value.ToString;
-end;
-
-function TAqDBMapper.SolveJoin(pJoin: IAqDBSQLJoin): string;
-begin
-  case pJoin.JoinType of
-    TAqDBSQLJoinType.jtInnerJoin:
-      Result := 'inner join ';
-    TAqDBSQLJoinType.jtLeftJoin:
-      Result := 'left join ';
-  else
-    raise EAqInternal.Create('Unexpected Join Type.');
-  end;
-
-  Result := Result + SolveSource(pJoin.Source) + ' on ' + SolveCondition(pJoin.Condition);
-end;
-
-function TAqDBMapper.SolveJoins(pSelect: IAqDBSQLSelect): string;
-var
-  lJoin: IAqDBSQLJoin;
-begin
-  Result := '';
-
-  if pSelect.HasJoins then
-  begin
-    for lJoin in pSelect.Joins do
-    begin
-      Result := Result + SolveJoin(lJoin) + ' ';
-    end;
-
-    Result := ' ' + Result.Trim;
-  end;
-end;
-
-function TAqDBMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;
-begin
-  Result := '';
-end;
-
-function TAqDBMapper.SolveOperator(const pOperator: TAqDBSQLOperator): string;
-begin
-  case pOperator of
-    TAqDBSQLOperator.opSum:
-      Result := '+';
-    TAqDBSQLOperator.opSubtraction:
-      Result := '-';
-    TAqDBSQLOperator.opMultiplication:
-      Result := '*';
-    TAqDBSQLOperator.opDivision:
-      Result := '/';
-  else
-    raise EAqInternal.Create('Operator not expected.');
-  end;
-end;
-
-function TAqDBMapper.SolveOrderBy(pSelect: IAqDBSQLSelect): string;
-var
-  lValues: TStringList;
-  lValue: IAqDBSQLValue;
-begin
-  if pSelect.IsOrderByDefined then
-  begin
-    lValues := TStringList.Create;
-
-    try
-      for lValue in pSelect.OrderBy do
-      begin
-        lValues.Add(SolveValue(lValue, False))
-      end;
-
-      lValues.StrictDelimiter := True;
-      lValues.Delimiter := ',';
-
-      Result := ' order by ' + lValues.DelimitedText;
-    finally
-      lValues.Free;
-    end;
-  end;
-end;
-
-function TAqDBMapper.SolveParameter(pParameter: IAqDBSQLParameter): string;
-begin
-  Result := ':' + pParameter.Name;
-end;
-
-function TAqDBMapper.SolveSource(pSource: IAqDBSQLSource): string;
-begin
-  case pSource.SourceType of
-    stTable:
-      Result := SolveTable(pSource.GetAsTable);
-    stSelect:
-      Result := SolveSubselect(pSource.GetAsSelect);
-  else
-    raise EAqInternal.Create('Unexpectes source type.');
-  end;
-end;
-
-function TAqDBMapper.SolveSelect(pSelect: IAqDBSQLSelect): string;
-begin
-  Result := 'select ' + SolveSelectBody(pSelect);
-end;
-
-function TAqDBMapper.SolveSelectBody(pSelect: IAqDBSQLSelect): string;
-begin
-  Result := SolveColumns(pSelect.Columns) + ' ' + SolveFrom(pSelect.Source) + SolveJoins(pSelect);
-
-  if pSelect.IsConditionDefined then
-  begin
-    Result := Result + ' where ' + SolveCondition(pSelect.Condition);
-  end;
-
-  Result := Result + SolveOrderBy(pSelect);
-end;
-
-function TAqDBMapper.SolveSubselect(pSelect: IAqDBSQLSelect): string;
-begin
-  if not pSelect.IsAliasDefined then
-  begin
-    raise EAqInternal.Create('It''s not possible to generate a Subselect without an alias.');
-  end;
-
-  Result := '(' + SolveSelect(pSelect) + ') as ' + SolveAlias(pSelect);
-end;
-
-function TAqDBMapper.SolveTable(pTable: IAqDBSQLTable): string;
-begin
-  Result := pTable.Name;
-
-  if pTable.IsAliasDefined then
-  begin
-    Result := Result + ' as ' + SolveAlias(pTable);
-  end;
-end;
-
-function TAqDBMapper.SolveTextConstant(pConstant: IAqDBSQLTextConstant): string;
-begin
-  Result := pConstant.Value.Quote;
-end;
-
-function TAqDBMapper.SolveTimeConstant(pConstant: IAqDBSQLTimeConstant): string;
-begin
-  Result := pConstant.Value.Format('hh:mm:ss:zzz').Quote;
-end;
-
-function TAqDBMapper.SolveUpdate(pUpdate: IAqDBSQLUpdate): string;
-var
-  lAssignments: TStringList;
-  lAssignment: IAqDBSQLAssignment;
-begin
-  Result := 'update ' + SolveTable(pUpdate.Table) + ' set ';
-
-  if pUpdate.Assignments.Count = 0 then
-  begin
-    raise EAqInternal.Create('Update has no assignments.');
-  end;
-
-  lAssignments := TStringList.Create;
-
-  try
-    for lAssignment in pUpdate.Assignments do
-    begin
-      lAssignments.Add(SolveColumn(lAssignment.Column) + ' = ' + SolveValue(lAssignment.Value, False));
-    end;
-
-    lAssignments.StrictDelimiter := True;
-    lAssignments.Delimiter := ',';
-    Result := Result + lAssignments.DelimitedText;
-
-    if pUpdate.IsConditionDefined then
-    begin
-      Result := Result + ' where ' + SolveCondition(pUpdate.Condition);
-    end;
-  finally
-    lAssignments.Free;
-  end;
-end;
-
-function TAqDBMapper.SolveValueType(pValue: IAqDBSQLValue): string;
-begin
-  case pValue.ValueType of
-    TAqDBSQLValueType.vtColumn:
-      Result := SolveColumn(pValue.GetAsColumn);
-    TAqDBSQLValueType.vtOperation:
-      Result := SolveOperation(pValue.GetAsOperation);
-    TAqDBSQLValueType.vtSubselect:
-      Result := SolveSubselectValue(pValue.GetAsSubselect);
-    TAqDBSQLValueType.vtConstant:
-      Result := SolveConstant(pValue.GetAsConstant);
-    TAqDBSQLValueType.vtParameter:
-      Result := SolveParameter(pValue.GetAsParameter);
-  else
-    raise EAqInternal.Create('Value type not expected.');
-  end;
-end;
 
 { TAqDBPooledConnection<TBaseConnection> }
 
-constructor TAqDBPooledConnection<TBaseConnection>.Create(
-  const pConnectionBuilder: TAqAnonymousFunction<TBaseConnection>);
+procedure TAqDBPooledConnection<TBaseConnection>.CommitTransaction;
+begin
+  SolvePoolAndExecute(
+    procedure(pContext: TAqDBContext)
+    begin
+      pContext.Connection.CommitTransaction;
+    end);
+end;
+
+constructor TAqDBPooledConnection<TBaseConnection>.Create(const pConnectionBuilder: TFunc<TBaseConnection>);
 var
-  lBaseConnection: TAqDBConnection;
+  lBaseContext: TAqDBContext;
 begin
   FConnectionBuilder := pConnectionBuilder;
-  lBaseConnection := nil;
-  try
-    inherited Create;
 
-    FPreparedQueries := TAqIDDictionary<string>.Create(False);
-    FPool := TAqList<TAqDBContext>.Create(True, True);
+  FPreparedQueries := TAqIDDictionary<TAqDBPreparedQuery>.Create(True);
+  FPool := TAqList<TAqDBContext>.Create(True, True);
 
-    lBaseConnection := pConnectionBuilder();
-    FPool.Add(TAqDBContext.Create(Self, lBaseConnection));
-  except
-    lBaseConnection.Free;
-    raise;
+  inherited Create;
+
+  lBaseContext := CreateNewContext;
+
+  if not Assigned(Adapter) then
+  begin
+    SetAdapter(lBaseContext.Connection.ExtractAdapter);
   end;
 
-  AutoFlushContextsTime := 10 * SecsPerMin;
+  AutoFlushContextsTime := 3 * SecsPerMin;
 end;
 
 function TAqDBPooledConnection<TBaseConnection>.CreateNewContext: TAqDBContext;
@@ -1165,7 +745,12 @@ begin
     try
       lConnection := FConnectionBuilder();
       try
-        lConnection.Active := Active;
+        lConnection.Connect;
+
+        if Assigned(Adapter) then
+        begin
+          lConnection.SetAdapter(Adapter, False);
+        end;
       except
         lConnection.Free;
         raise;
@@ -1190,9 +775,18 @@ begin
   inherited;
 end;
 
-class function TAqDBPooledConnection<TBaseConnection>.GetDefaultMapper: TAqDBMapperClass;
+class function TAqDBPooledConnection<TBaseConnection>.GetDefaultAdapter: TAqDBAdapterClass;
 begin
   Result := nil;
+end;
+
+procedure TAqDBPooledConnection<TBaseConnection>.RollbackTransaction;
+begin
+  SolvePoolAndExecute(
+    procedure(pContext: TAqDBContext)
+    begin
+      pContext.Connection.RollbackTransaction;
+    end);
 end;
 
 function TAqDBPooledConnection<TBaseConnection>.GetActive: Boolean;
@@ -1227,40 +821,16 @@ begin
   end;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.GetAutoIncrement(const pGeneratorName: string): Int64;
-var
-  lResult: Int64;
-begin
-  SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
-    begin
-      lResult := pContext.Connection.GetAutoIncrement(pGeneratorName);
-    end);
-
-  Result := lResult;
-end;
-
-function TAqDBPooledConnection<TBaseConnection>.GetAutoIncrementType: TAqDBAutoIncrementType;
-begin
-  FPool.Lock;
-
-  try
-    Result := FPool.First.Connection.AutoIncrementType;
-  finally
-    FPool.Release;
-  end;
-end;
-
-function TAqDBPooledConnection<TBaseConnection>.GetInTransaction: Boolean;
-var
-  lResult: Boolean;
-begin
-  SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
-    begin
-      lResult := pContext.Connection.InTransaction;
-    end);
-end;
+//function TAqDBPooledConnection<TBaseConnection>.GetInTransaction: Boolean;
+//var
+//  lResult: Boolean;
+//begin
+//  SolvePoolAndExecute(
+//    procedure(const pContext: TAqDBContext)
+//    begin
+//      lResult := pContext.Connection.InTransaction;
+//    end);
+//end;
 
 function TAqDBPooledConnection<TBaseConnection>.DoOpenQuery(const pSQLCommand: IAqDBSQLSelect;
   const pTratadorParametros: TAqDBParametersHandlerMethod): IAqDBReader;
@@ -1268,7 +838,7 @@ var
   lResult: IAqDBReader;
 begin
   SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
+    procedure(pContext: TAqDBContext)
     begin
       lResult := pContext.Connection.OpenQuery(pSQLCommand, pTratadorParametros);
     end);
@@ -1282,7 +852,7 @@ var
   lResult: IAqDBReader;
 begin
   SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
+    procedure(pContext: TAqDBContext)
     begin
       lResult := pContext.Connection.OpenQuery(pContext.GetCommandID(pCommandID), pTratadorParametros);
     end);
@@ -1296,7 +866,7 @@ var
   lResult: IAqDBReader;
 begin
   SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
+    procedure(pContext: TAqDBContext)
     begin
       lResult := pContext.Connection.OpenQuery(pSQL, pTratadorParametros);
     end);
@@ -1306,11 +876,7 @@ end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.DoStartTransaction;
 begin
-  SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
-    begin
-      pContext.Connection.StartTransaction;
-    end);
+  raise EAqInternal.Create('The fisical transaction methods of this class cannot be called.');
 end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.DoConnect;
@@ -1331,11 +897,7 @@ end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.DoCommitTransaction;
 begin
-  SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
-    begin
-      pContext.Connection.CommitTransaction;
-    end);
+  raise EAqInternal.Create('The fisical transaction methods of this class cannot be called.');
 end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.DoDisconnect;
@@ -1379,9 +941,12 @@ end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.FreeFlushContextThread;
 begin
-  FFlushContextsThread.Terminate;
-  FFlushContextsThread.WaitFor;
-  FreeAndNil(FFlushContextsThread);
+  if Assigned(FFlushContextsThread) then
+  begin
+    FFlushContextsThread.Terminate;
+    FFlushContextsThread.WaitFor;
+    FreeAndNil(FFlushContextsThread);
+  end;
 end;
 
 function TAqDBPooledConnection<TBaseConnection>.DoExecuteCommand(const pSQLCommand: IAqDBSQLCommand;
@@ -1390,7 +955,7 @@ var
   lResult: Int64;
 begin
   SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
+    procedure(pContext: TAqDBContext)
     begin
       lResult := pContext.Connection.ExecuteCommand(pSQLCommand, pTratadorParametros);
     end);
@@ -1404,7 +969,7 @@ var
   lResult: Int64;
 begin
   SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
+    procedure(pContext: TAqDBContext)
     begin
       lResult := pContext.Connection.ExecuteCommand(pContext.GetCommandID(pCommandID), pTratadorParametros);
     end);
@@ -1418,7 +983,7 @@ var
   lResult: Int64;
 begin
   SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
+    procedure(pContext: TAqDBContext)
     begin
       lResult := pContext.Connection.ExecuteCommand(pSQL, pTratadorParametros);
     end);
@@ -1426,27 +991,25 @@ begin
   Result := lResult;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand): TAqID;
+function TAqDBPooledConnection<TBaseConnection>.DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+  const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID;
 begin
-  Result := DoPrepareCommand(FPool.First.Connection.Mapper.SolveCommand(pSQLCommand));
+  Result := DoPrepareCommand(FPool.First.Connection.Adapter.SQLSolver.SolveCommand(pSQLCommand),
+    pParametersInitializer);
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoPrepareCommand(const pSQL: string): TAqID;
+function TAqDBPooledConnection<TBaseConnection>.DoPrepareCommand(const pSQL: string;
+  const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID;
 begin
-  Result := FPreparedQueries.Add(pSQL);
+  Result := FPreparedQueries.Add(TAqDBPreparedQuery.Create(pSQL, pParametersInitializer));
 end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.DoRollbackTransaction;
 begin
-  SolvePoolAndExecute(
-    procedure(const pContext: TAqDBContext)
-    begin
-      pContext.Connection.RollbackTransaction;
-    end);
+  raise EAqInternal.Create('The fisical transaction methods of this class cannot be called.');
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.SolvePoolAndExecute(
-  const pMethod: TAqMethodGenericParameter<TAqDBContext>);
+procedure TAqDBPooledConnection<TBaseConnection>.SolvePoolAndExecute(const pMethod: TProc<TAqDBContext>);
 var
   lI: Int32;
   lLockedContext: TAqDBContext;
@@ -1491,24 +1054,24 @@ begin
   try
     pMethod(lLockedContext);
   finally
-    FPool.Lock;
-
-    try
-      lLockedContext.ReleaseConnection;
-    finally
-      FPool.Release;
-    end;
+    lLockedContext.ReleaseConnection;
   end;
+end;
+
+procedure TAqDBPooledConnection<TBaseConnection>.StartTransaction;
+begin
+  SolvePoolAndExecute(
+    procedure(pContext: TAqDBContext)
+    begin
+      pContext.Connection.StartTransaction;
+    end);
 end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.SetAutoFlushContextsTime(const pValue: UInt32);
 begin
   if pValue = 0 then
   begin
-    if Assigned(FFlushContextsThread) then
-    begin
-      FreeFlushContextThread;
-    end;
+    FreeFlushContextThread;
   end else begin
     if not Assigned(FFlushContextsThread) then
     begin
@@ -1519,15 +1082,17 @@ begin
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.SetMapper(const pMapeador: TAqDBMapper);
+procedure TAqDBPooledConnection<TBaseConnection>.SetAdapter(const pAdapter: TAqDBAdapter);
 var
   lContext: TAqDBContext;
 begin
   FPool.Lock;
   try
+    inherited;
+
     for lContext in FPool do
     begin
-      lContext.Connection.SetMapper(pMapeador);
+      lContext.Connection.SetAdapter(pAdapter, False);
     end;
   finally
     FPool.Release;
@@ -1542,6 +1107,16 @@ begin
   FMasterConnection := pMasterConnections;
   FConnection := pBaseConection;
   FPreparedQueries := TAqDictionary<TAqID, TAqID>.Create;
+  FConnection.OnFirstReaderOpened :=
+    procedure(pConnection: TAqDBConnection)
+    begin
+      Self.LockConnection;
+    end;
+  FConnection.OnLastReaderClosed :=
+    procedure(pConnection: TAqDBConnection)
+    begin
+      Self.ReleaseConnection;
+    end;
 end;
 
 destructor TAqDBPooledConnection<TBaseConnection>.TAqDBContext.Destroy;
@@ -1554,16 +1129,16 @@ end;
 
 function TAqDBPooledConnection<TBaseConnection>.TAqDBContext.GetCommandID(const pMasterCommandID: TAqID): TAqID;
 var
-  lSQL: string;
+  lPreparedQuery: TAqDBPreparedQuery;
 begin
   if not FPreparedQueries.TryGetValue(pMasterCommandID, Result) then
   begin
-    if not FMasterConnection.PreparedQueries.TryGetValue(pMasterCommandID, lSQL) then
+    if not FMasterConnection.PreparedQueries.TryGetValue(pMasterCommandID, lPreparedQuery) then
     begin
       raise EAqInternal.CreateFmt('Command from ID %d not found.', [pMasterCommandID]);
     end;
 
-    Result := FConnection.PrepareCommand(lSQL);
+    Result := FConnection.PrepareCommand(lPreparedQuery.SQL, lPreparedQuery.ParametersInitializer);
 
     try
       FPreparedQueries.Add(pMasterCommandID, Result);
@@ -1581,26 +1156,38 @@ end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.TAqDBContext.ReleaseConnection;
 begin
-  if FCalls > 0 then
-  begin
-    Dec(FCalls);
-    if not FConnection.InTransaction and (FCalls = 0) then
+  Self.FMasterConnection.FPool.Lock;
+
+  try
+    if FCalls > 0 then
     begin
-      FLockerThread := 0;
-      FLastUsedAt := Now;
+      Dec(FCalls);
+      if not FConnection.InTransaction and (FCalls = 0) then
+      begin
+        FLockerThread := 0;
+        FLastUsedAt := Now;
+      end;
     end;
+  finally
+    Self.FMasterConnection.FPool.Release;
   end;
 end;
 
 procedure TAqDBPooledConnection<TBaseConnection>.TAqDBContext.LockConnection;
 begin
-  if (FLockerThread <> 0) and (FLockerThread <> TThread.CurrentThread.ThreadID) then
-  begin
-    raise EAqInternal.Create('This context is already locked to another thread.');
-  end;
+  Self.FMasterConnection.FPool.Lock;
 
-  FLockerThread := TThread.CurrentThread.ThreadID;
-  Inc(FCalls);
+  try
+    if (FLockerThread <> 0) and (FLockerThread <> TThread.CurrentThread.ThreadID) then
+    begin
+      raise EAqInternal.Create('This context is already locked to another thread.');
+    end;
+
+    FLockerThread := TThread.CurrentThread.ThreadID;
+    Inc(FCalls);
+  finally
+    Self.FMasterConnection.FPool.Release;
+  end;
 end;
 
 { TAqDBPooledConnection<TBaseConnection>.TAqDBFlushContextsThread }
@@ -1645,7 +1232,7 @@ begin
         FPool.Release;
       end;
 
-      lNextAttempt := Now.IncMinute;
+      lNextAttempt := Now.IncSecond((FAutoFlushContextsTime div 4) + 1);
     end;
     Sleep(10);
   end;
@@ -1661,6 +1248,15 @@ begin
   finally
     FPool.Release;
   end;
+end;
+
+{ TAqDBPooledConnection<TBaseConnection>.TAqDBPreparedQuery }
+
+constructor TAqDBPooledConnection<TBaseConnection>.TAqDBPreparedQuery.Create(const pSQL: string;
+  const pParametersInitializer: TAqDBParametersHandlerMethod);
+begin
+  FSQL := pSQL;
+  FParametersInitializer := pParametersInitializer;
 end;
 
 end.

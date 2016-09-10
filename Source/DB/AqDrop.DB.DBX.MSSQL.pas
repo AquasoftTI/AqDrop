@@ -5,30 +5,28 @@ interface
 uses
   Data.DBXMSSQL,
   AqDrop.DB.SQL.Intf,
+  AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
   AqDrop.DB.DBX;
 
 type
-  TAqDBXMSSQLMapper = class(TAqDBXMapper)
+  TAqDBXMSSQLAdapter = class(TAqDBXAdapter)
   strict protected
-    function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
-  public
-    function SolveSelect(pSelect: IAqDBSQLSelect): string; override;
+    class function GetDefaultSolver: TAqDBSQLSolverClass; override;
   end;
 
   TAqDBXMSSQLConnection = class(TAqDBXCustomConnection)
   strict protected
     function GetPropertyValueAsString(const pIndex: Integer): string; override;
     procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
-    class function GetDefaultMapper: TAqDBMapperClass; override;
+
+    class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
     constructor Create; override;
 
-    function GetAutoIncrement(const pGenerator: string = ''): Int64; override;
-
     property HostName: string index $80 read GetPropertyValueAsString write SetPropertyValueAsString;
     property DataBase: string index $81 read GetPropertyValueAsString write SetPropertyValueAsString;
-    property Username: string index $82 read GetPropertyValueAsString write SetPropertyValueAsString;
+    property UserName: string index $82 read GetPropertyValueAsString write SetPropertyValueAsString;
     property Password: string index $83 read GetPropertyValueAsString write SetPropertyValueAsString;
   end;
 
@@ -39,24 +37,7 @@ uses
   Data.DBXCommon,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
-  AqDrop.DB.Types;
-
-{ TAqDBXMSSQLMapper }
-
-function TAqDBXMSSQLMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;
-begin
-  if pSelect.IsLimitDefined then
-  begin
-    Result := 'top ' + pSelect.Limit.ToString + ' ';
-  end else begin
-    Result := '';
-  end;
-end;
-
-function TAqDBXMSSQLMapper.SolveSelect(pSelect: IAqDBSQLSelect): string;
-begin
-  Result := 'select ' + SolveLimit(pSelect) + SolveSelectBody(pSelect);
-end;
+  AqDrop.DB.Types, AqDrop.DB.MSSQL;
 
 { TAqDBXMSSQLConnection }
 
@@ -70,23 +51,9 @@ begin
   Self.GetDriverFunc := 'getSQLDriverMSSQL';
 end;
 
-function TAqDBXMSSQLConnection.GetAutoIncrement(const pGenerator: string): Int64;
-var
-  lReader: IAqDBReader;
+class function TAqDBXMSSQLConnection.GetDefaultAdapter: TAqDBAdapterClass;
 begin
-  lReader := OpenQuery('select @@identity');
-
-  if not lReader.Next then
-  begin
-    raise EAqInternal.Create('It wasn''t possible to get the last insert id.');
-  end;
-
-  Result := lReader.Values[0].AsInt64;
-end;
-
-class function TAqDBXMSSQLConnection.GetDefaultMapper: TAqDBMapperClass;
-begin
-  Result := TAqDBXMSSQLMapper;
+  Result := TAqDBXMSSQLAdapter;
 end;
 
 function TAqDBXMSSQLConnection.GetPropertyValueAsString(const pIndex: Integer): string;
@@ -119,6 +86,13 @@ begin
   else
     inherited;
   end;
+end;
+
+{ TAqDBXMSSQLAdapter }
+
+class function TAqDBXMSSQLAdapter.GetDefaultSolver: TAqDBSQLSolverClass;
+begin
+  Result := TAqDBMSSQLSQLSolver;
 end;
 
 end.

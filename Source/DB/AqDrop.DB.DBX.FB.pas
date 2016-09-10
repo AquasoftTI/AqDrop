@@ -7,31 +7,34 @@ uses
   Data.DBXFirebird,
   AqDrop.DB.Connection,
   AqDrop.DB.DBX,
-  AqDrop.DB.SQL.Intf;
+  AqDrop.DB.SQL.Intf,
+  AqDrop.DB.Adapter;
 
 type
-  TAqDBXFBMapper = class(TAqDBXMapper)
-  strict protected
-    function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
-    function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
+  TAqDBXFBDataConverter = class(TAqDBXDataConverter)
   public
-    function SolveSelect(pSelect: IAqDBSQLSelect): string; override;
     procedure BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean); override;
   end;
+
+  TAqDBXFBAdapter = class(TAqDBXAdapter)
+  strict protected
+    function GetAutoIncrementType: TAqDBAutoIncrementType; override;
+    class function GetDefaultConverter: TAqDBXDataConverterClass; override;
+    class function GetDefaultSolver: TAqDBSQLSolverClass; override;
+  end;
+
 
   TAqDBXFBConnection = class(TAqDBXCustomConnection)
   strict protected
     function GetPropertyValueAsString(const pIndex: Integer): string; override;
     procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
-    class function GetDefaultMapper: TAqDBMapperClass; override;
-    function GetAutoIncrementType: TAqDBAutoIncrementType; override;
+
+    class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
     constructor Create; override;
 
-    function GetAutoIncrement(const pGenerator: string = ''): Int64; override;
-
     property DataBase: string index $80 read GetPropertyValueAsString write SetPropertyValueAsString;
-    property Username: string index $81 read GetPropertyValueAsString write SetPropertyValueAsString;
+    property UserName: string index $81 read GetPropertyValueAsString write SetPropertyValueAsString;
     property Password: string index $82 read GetPropertyValueAsString write SetPropertyValueAsString;
   end;
 
@@ -42,7 +45,8 @@ uses
   System.SysUtils,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
-  AqDrop.DB.Types;
+  AqDrop.DB.Types,
+  AqDrop.DB.FB;
 
 { TAqDBXFBConnection }
 
@@ -56,28 +60,9 @@ begin
   Self.GetDriverFunc := 'getSQLDriverINTERBASE';
 end;
 
-function TAqDBXFBConnection.GetAutoIncrement(const pGenerator: string): Int64;
-var
-  lReader: IAqDBReader;
+class function TAqDBXFBConnection.GetDefaultAdapter: TAqDBAdapterClass;
 begin
-  lReader := OpenQuery('select gen_id(' + pGenerator + ', 1) from RDB$DATABASE');
-
-  if not lReader.Next then
-  begin
-    raise EAqInternal.Create('It wasn''t possible to get the last insert id.');
-  end;
-
-  Result := lReader.Values[0].AsInt64;
-end;
-
-function TAqDBXFBConnection.GetAutoIncrementType: TAqDBAutoIncrementType;
-begin
-  Result := TAqDBAutoIncrementType.aiGenerator;
-end;
-
-class function TAqDBXFBConnection.GetDefaultMapper: TAqDBMapperClass;
-begin
-  Result := TAqDBXFBMapper;
+  Result := TAqDBXFBAdapter;
 end;
 
 function TAqDBXFBConnection.GetPropertyValueAsString(const pIndex: Integer): string;
@@ -108,9 +93,9 @@ begin
   end;
 end;
 
-{ TAqDBXFBMapper }
+{ TAqDBXFBDataConverter }
 
-procedure TAqDBXFBMapper.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
+procedure TAqDBXFBDataConverter.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
 begin
   pParameter.DataType := TDBXDataTypes.AnsiStringType;
 
@@ -122,31 +107,21 @@ begin
   end;
 end;
 
-function TAqDBXFBMapper.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
-begin
-  if pConstant.Value then
-  begin
-    Result := '1';
-  end else begin
-    Result := '0';
-  end;
+{ TAqDBXFBAdapter }
 
-  Result := Result.Quote;
+function TAqDBXFBAdapter.GetAutoIncrementType: TAqDBAutoIncrementType;
+begin
+  Result := TAqDBAutoIncrementType.aiGenerator;
 end;
 
-function TAqDBXFBMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;
+class function TAqDBXFBAdapter.GetDefaultConverter: TAqDBXDataConverterClass;
 begin
-  if pSelect.IsLimitDefined then
-  begin
-    Result := ' first ' + pSelect.Limit.ToString + ' ';
-  end else begin
-    Result := '';
-  end;
+  Result := TAqDBXFBDataConverter;
 end;
 
-function TAqDBXFBMapper.SolveSelect(pSelect: IAqDBSQLSelect): string;
+class function TAqDBXFBAdapter.GetDefaultSolver: TAqDBSQLSolverClass;
 begin
-  Result := 'select ' + SolveLimit(pSelect) + SolveSelectBody(pSelect);
+  Result := TAqDBFBSQLSolver;
 end;
 
 end.

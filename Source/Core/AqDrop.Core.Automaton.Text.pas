@@ -2,6 +2,8 @@ unit AqDrop.Core.Automaton.Text;
 
 interface
 
+{$I 'AqDrop.Core.Defines.inc'}
+
 uses
   AqDrop.Core.Automaton, AqDrop.Core.Types;
 
@@ -69,8 +71,10 @@ type
     ///   PT-BR:
     ///     Retorna o dicionário adicionado ao autômato.
     /// </returns>
+{$IFNDEF AQMOBILE}
     function AddDictionary(const pDictionaryID: TIdentifier;
        const pValues: TAqAnsiCharSet): TAqAutomatonDictionary<TIdentifier, Char>; overload;
+{$ENDIF}
   end;
 
 resourcestring
@@ -108,6 +112,7 @@ begin
   Result := AddDictionary(pDictionaryID, lValues);
 end;
 
+{$IFNDEF AQMOBILE}
 function TAqTextAutomaton<TIdentifier, TOutput>.AddDictionary(const pDictionaryID: TIdentifier;
   const pValues: TAqAnsiCharSet): TAqAutomatonDictionary<TIdentifier, Char>;
 var
@@ -125,6 +130,7 @@ begin
 
   Result := AddDictionary(pDictionaryID, lValues);
 end;
+{$ENDIF}
 
 function TAqTextAutomaton<TIdentifier, TOutput>.GetDefaultValue: Char;
 begin

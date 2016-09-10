@@ -3,22 +3,28 @@ unit AqDrop.Core.Observer;
 interface
 
 uses
-  System.Classes, System.Generics.Collections, AqDrop.Core.InterfacedObject,
-  AqDrop.Core.Observer.Intf, AqDrop.Core.AnonymousMethods, AqDrop.Core.Collections;
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  AqDrop.Core.InterfacedObject,
+  AqDrop.Core.Observer.Intf,
+  AqDrop.Core.Collections;
 
 type
   TAqObserver = class(TAqInterfacedObject, IAqObserver)
   strict protected
+{$IFNDEF AUTOREFCOUNT}
     class function MustCountReferences: Boolean; override;
+{$ENDIF}
   public
     procedure Notify(const Sender: TObject); virtual; abstract;
   end;
 
   TAqObserverByMethod = class(TAqObserver)
   strict private
-    FObserverMethod: TAqNotifyMethod;
+    FObserverMethod: TProc<TObject>;
   public
-    constructor Create(const pMethod: TAqNotifyMethod);
+    constructor Create(const pMethod: TProc<TObject>);
 
     procedure Notify(const Sender: TObject); override;
   end;
@@ -55,7 +61,7 @@ uses
 
 { TAqObserverByMethod }
 
-constructor TAqObserverByMethod.Create(const pMethod: TAqNotifyMethod);
+constructor TAqObserverByMethod.Create(const pMethod: TProc<TObject>);
 begin
   inherited Create;
 
@@ -124,9 +130,11 @@ end;
 
 { TAqNotificacao }
 
+{$IFNDEF AUTOREFCOUNT}
 class function TAqObserver.MustCountReferences: Boolean;
 begin
   Result := True;
 end;
+{$ENDIF}
 
 end.

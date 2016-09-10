@@ -18,6 +18,7 @@ type
   TAqDBORMColumn = class
   strict private
     FAttribute: AqColumn;
+    function GetAlias: string;
   strict protected
     function GetName: string; virtual; abstract;
 
@@ -34,6 +35,7 @@ type
 
     property Attribute: AqColumn read FAttribute;
     property Name: string read GetName;
+    property Alias: string read GetAlias;
     property &Type: TAqDataType read GetType;
   end;
 
@@ -335,7 +337,7 @@ end;
 
 class constructor TAqDBORM.Create;
 begin
-  FTableSeparator := '___';
+  FTableSeparator := '.';
 end;
 
 constructor TAqDBORM.Create;
@@ -383,8 +385,8 @@ begin
 
   if lSeparatorPosition >= 0 then
   begin
-    lTableName := LeftStr(pName, lSeparatorPosition - 1);
-    lColumnName := RightStr(pName, Length(pName) - (Length(FTableSeparator) + lSeparatorPosition - 1));
+    lTableName := pName.LeftFromPosition(lSeparatorPosition);
+    lColumnName := pName.RightFromPosition(lSeparatorPosition);
 
     if lTableName.CompareTo(FMainTable.Name, False) = 0 then
     begin
@@ -520,60 +522,183 @@ begin
   FAttribute := pAttribute;
 end;
 
+function TAqDBORMColumn.GetAlias: string;
+begin
+  if Assigned(FAttribute) and FAttribute.IsAliasDefined then
+  begin
+    Result := FAttribute.Alias;
+  end else begin
+    Result := '';
+  end;
+end;
+
 procedure TAqDBORMColumn.SetDBValue(const pInstance: TObject; pValue: IAqDBValue);
+  function IsNullIfZeroActive: Boolean;
+  begin
+    Result := Assigned(FAttribute) and (TAqDBColumnAttribute.caNullIfZero in FAttribute.Attributes);
+  end;
+
+  function IsNullIfEmptyActive: Boolean;
+  begin
+    Result := Assigned(FAttribute) and (TAqDBColumnAttribute.caNullIfEmpty in FAttribute.Attributes);
+  end;
+
 var
   lValue: TValue;
 begin
+{TODO: implementar aqui o if null}
+
   lValue := GetValue(pInstance);
+
   case GetType of
     TAqDataType.adtBoolean:
       pValue.AsBoolean := lValue.AsBoolean;
     TAqDataType.adtEnumerated:
       pValue.AsInt64 := lValue.AsOrdinal;
     TAqDataType.adtUInt8:
-      pValue.AsUInt8 := lValue.AsInteger;
+      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtUInt8);
+      end else begin
+        pValue.AsUInt8 := lValue.AsInteger;
+      end;
     TAqDataType.adtInt8:
-      pValue.AsInt8 := lValue.AsInteger;
+      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtInt8);
+      end else begin
+        pValue.AsInt8 := lValue.AsInteger;
+      end;
     TAqDataType.adtUInt16:
-      pValue.AsUInt16 := lValue.AsInteger;
+      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtUInt16);
+      end else begin
+        pValue.AsUInt16 := lValue.AsInteger;
+      end;
     TAqDataType.adtInt16:
-      pValue.AsInt16 := lValue.AsInteger;
+      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtInt16);
+      end else begin
+        pValue.AsInt16 := lValue.AsInteger;
+      end;
     TAqDataType.adtUInt32:
 {$IF CompilerVersion >= 25}
-      pValue.AsUInt32 := lValue.AsUInt64;
+      if (lValue.AsUInt64 = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtUInt32);
+      end else begin
+        pValue.AsUInt32 := lValue.AsUInt64;
+      end;
 {$ELSE}
-      pValue.AsUInt32 := lValue.AsInt64;
+      if (lValue.AsInt64 = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtInt32);
+      end else begin
+        pValue.AsUInt32 := lValue.AsInt64;
+      end;
 {$IFEND}
     TAqDataType.adtInt32:
-      pValue.AsInt32 :=  lValue.AsInteger;
+      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtInt32);
+      end else begin
+        pValue.AsInt32 :=  lValue.AsInteger;
+      end;
     TAqDataType.adtUInt64:
 {$IF CompilerVersion >= 25}
-      pValue.AsUInt64 := lValue.AsUInt64;
+      if (lValue.AsUInt64 = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtUInt64);
+      end else begin
+        pValue.AsUInt64 := lValue.AsUInt64;
+      end;
 {$ELSE}
-      pValue.AsUInt64 := lValue.AsInt64;
+      if (lValue.AsInt64 = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtInt32);
+      end else begin
+        pValue.AsUInt64 := lValue.AsInt64;
+      end;
 {$IFEND}
     TAqDataType.adtInt64:
-      pValue.AsInt64 := lValue.AsInt64;
+      if (lValue.AsInt64 = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtInt64);
+      end else begin
+        pValue.AsInt64 := lValue.AsInt64;
+      end;
     TAqDataType.adtCurrency:
-      pValue.AsCurrency := lValue.AsCurrency;
+      if (lValue.AsCurrency = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtCurrency);
+      end else begin
+        pValue.AsCurrency := lValue.AsCurrency;
+      end;
     TAqDataType.adtDouble:
-      pValue.AsDouble := lValue.AsExtended;
+      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtDouble);
+      end else begin
+        pValue.AsDouble := lValue.AsExtended;
+      end;
     TAqDataType.adtSingle:
-      pValue.AsSingle := lValue.AsExtended;
+      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtSingle);
+      end else begin
+        pValue.AsSingle := lValue.AsExtended;
+      end;
     TAqDataType.adtDatetime:
-      pValue.AsDateTime := lValue.AsExtended;
+      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtDatetime);
+      end else begin
+        pValue.AsDateTime := lValue.AsExtended;
+      end;
     TAqDataType.adtDate:
-      pValue.AsDate := lValue.AsExtended;
+      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtDate);
+      end else begin
+        pValue.AsDate := lValue.AsExtended;
+      end;
     TAqDataType.adtTime:
-      pValue.AsTime := lValue.AsExtended;
+      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      begin
+        pValue.SetNull(TAqDataType.adtTime);
+      end else begin
+        pValue.AsTime := lValue.AsExtended;
+      end;
     TAqDataType.adtAnsiChar:
-      pValue.AsAnsiString := AnsiString(lValue.AsString);
+      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      begin
+        pValue.SetNull(TAqDataType.adtAnsiChar);
+      end else begin
+        pValue.AsAnsiString := AnsiString(lValue.AsString);
+      end;
     TAqDataType.adtChar:
-      pValue.AsString := lValue.AsString;
+      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      begin
+        pValue.SetNull(TAqDataType.adtChar);
+      end else begin
+        pValue.AsString := lValue.AsString;
+      end;
     TAqDataType.adtAnsiString:
-      pValue.AsAnsiString := AnsiString(lValue.AsString);
+      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      begin
+        pValue.SetNull(TAqDataType.adtAnsiString);
+      end else begin
+        pValue.AsAnsiString := AnsiString(lValue.AsString);
+      end;
     TAqDataType.adtString, TAqDataType.adtWideString:
-      pValue.AsString := lValue.AsString;
+      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      begin
+        pValue.SetNull(TAqDataType.adtWideString);
+      end else begin
+        pValue.AsString := lValue.AsString;
+      end;
   else
     raise EAqInternal.Create('Unexpected type when setting value to ' + Self.Name + ' DB Value.');
   end;

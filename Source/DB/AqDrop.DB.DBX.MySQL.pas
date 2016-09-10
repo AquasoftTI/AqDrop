@@ -5,35 +5,37 @@ interface
 uses
   Data.DBXCommon,
   Data.DBXMySQL,
+  AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
   AqDrop.DB.DBX,
   AqDrop.DB.SQL.Intf;
 
 type
-  TAqDBXMySQLMapper = class(TAqDBXMapper)
-  strict protected
-    function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
-    function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
+  TAqDBXMySQLDataConverter = class(TAqDBXDataConverter)
   public
     procedure BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean); override;
     procedure UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8); override;
     procedure UInt16ToParameter(const pParameter: TDBXParameter; const pValue: UInt16); override;
-    function SolveSelect(pSelect: IAqDBSQLSelect): string; override;
+  end;
+
+  TAqDBXMySQLAdapter = class(TAqDBXAdapter)
+  strict protected
+    class function GetDefaultConverter: TAqDBXDataConverterClass; override;
+    class function GetDefaultSolver: TAqDBSQLSolverClass; override;
   end;
 
   TAqDBXMySQLConnection = class(TAqDBXCustomConnection)
   strict protected
     function GetPropertyValueAsString(const pIndex: Integer): string; override;
     procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
-    class function GetDefaultMapper: TAqDBMapperClass; override;
+
+    class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
     constructor Create; override;
 
-    function GetAutoIncrement(const pGenerator: string = ''): Int64; override;
-
     property HostName: string index $80 read GetPropertyValueAsString write SetPropertyValueAsString;
     property DataBase: string index $81 read GetPropertyValueAsString write SetPropertyValueAsString;
-    property Username: string index $82 read GetPropertyValueAsString write SetPropertyValueAsString;
+    property UserName: string index $82 read GetPropertyValueAsString write SetPropertyValueAsString;
     property Password: string index $83 read GetPropertyValueAsString write SetPropertyValueAsString;
   end;
 
@@ -41,47 +43,25 @@ implementation
 
 uses
   System.SysUtils,
-  AqDrop.Core.Helpers, AqDrop.DB.Types, AqDrop.Core.Exceptions;
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Helpers,
+  AqDrop.DB.Types,
+  AqDrop.DB.MySQL;
 
-{ TAqDBXMySQLMapper }
+{ TAqDBXMySQLDataConverter }
 
-procedure TAqDBXMySQLMapper.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
+procedure TAqDBXMySQLDataConverter.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
 begin
   pParameter.DataType := TDBXDataTypes.Int8Type;
   pParameter.Value.SetInt8(pValue.ToInt8);
 end;
 
-function TAqDBXMySQLMapper.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
-begin
-  if pConstant.Value then
-  begin
-    Result := 'True';
-  end else begin
-    Result := 'False';
-  end;
-end;
-
-function TAqDBXMySQLMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;
-begin
-  if pSelect.IsLimitDefined then
-  begin
-    Result := ' limit ' + pSelect.Limit.ToString;
-  end else begin
-    Result := '';
-  end;
-end;
-
-function TAqDBXMySQLMapper.SolveSelect(pSelect: IAqDBSQLSelect): string;
-begin
-  Result := inherited + SolveLimit(pSelect);
-end;
-
-procedure TAqDBXMySQLMapper.UInt16ToParameter(const pParameter: TDBXParameter; const pValue: UInt16);
+procedure TAqDBXMySQLDataConverter.UInt16ToParameter(const pParameter: TDBXParameter; const pValue: UInt16);
 begin
   UInt32ToParameter(pParameter, pValue);
 end;
 
-procedure TAqDBXMySQLMapper.UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8);
+procedure TAqDBXMySQLDataConverter.UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8);
 begin
   UInt32ToParameter(pParameter, pValue);
 end;
@@ -98,23 +78,9 @@ begin
   Self.GetDriverFunc := 'getSQLDriverMYSQL';
 end;
 
-function TAqDBXMySQLConnection.GetAutoIncrement(const pGenerator: string): Int64;
-var
-  lReader: IAqDBReader;
+class function TAqDBXMySQLConnection.GetDefaultAdapter: TAqDBAdapterClass;
 begin
-  lReader := OpenQuery('select last_insert_id()');
-
-  if not lReader.Next then
-  begin
-    raise EAqInternal.Create('It wasn''t possible to get the last insert id.');
-  end;
-
-  Result := lReader.Values[0].AsInt64;
-end;
-
-class function TAqDBXMySQLConnection.GetDefaultMapper: TAqDBMapperClass;
-begin
-  Result := TAqDBXMySQLMapper;
+  Result := TAqDBXMySQLAdapter;
 end;
 
 function TAqDBXMySQLConnection.GetPropertyValueAsString(const pIndex: Integer): string;
@@ -147,6 +113,18 @@ begin
   else
     inherited;
   end;
+end;
+
+{ TAqDBXMySQLAdapter }
+
+class function TAqDBXMySQLAdapter.GetDefaultConverter: TAqDBXDataConverterClass;
+begin
+  Result := TAqDBXMySQLDataConverter;
+end;
+
+class function TAqDBXMySQLAdapter.GetDefaultSolver: TAqDBSQLSolverClass;
+begin
+  Result := TAqDBMySQLSQLSolver;
 end;
 
 end.

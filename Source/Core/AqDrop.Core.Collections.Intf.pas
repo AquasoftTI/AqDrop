@@ -3,8 +3,9 @@ unit AqDrop.Core.Collections.Intf;
 interface
 
 uses
-  System.Generics.Collections,
-  AqDrop.Core.AnonymousMethods;
+  System.SysUtils,
+  System.Generics.Defaults,
+  System.Generics.Collections;
 
 type
   IAqReadList<T> = interface
@@ -49,7 +50,7 @@ type
     /// </returns>
     function IndexOf(const pValue: T): Int32; overload;
 
-    function Find(const pMatchFunction: TAqFunctionGenericParameterReturnBoolean<T>; out pValue: T): Boolean; overload;
+    function Find(const pMatchFunction: TFunc<T, Boolean>; out pValue: T): Boolean; overload;
 
     /// <summary>
     ///   EN-US:
@@ -119,6 +120,14 @@ type
     procedure ExtractAllTo(const pList: TList<T>);
     function ExtractAll: TList<T>;
 
+    function GetComparer: IComparer<T>;
+    procedure SetComparer(pValue: IComparer<T>);
+
+    procedure Sort; overload;
+    procedure Sort(const pComparerFunction: TFunc<T, T, Int32>); overload;
+    procedure Sort(pComparer: IComparer<T>); overload;
+
+    property Comparer: IComparer<T> read GetComparer write SetComparer;
     property OnwsResults: Boolean read GetOnwsResults write SetOnwsResults;
   end;
 
@@ -204,6 +213,17 @@ type
     ///     Retorna o índice do item adicionado à lista.
     /// </returns>
     function Add(const pItem: T): Int32;
+
+    function Extract(const pIndex: Int32): T;
+
+    function GetComparer: IComparer<T>;
+    procedure SetComparer(pValue: IComparer<T>);
+
+    procedure Sort; overload;
+    procedure Sort(const pComparerFunction: TFunc<T, T, Int32>); overload;
+    procedure Sort(pComparer: IComparer<T>); overload;
+
+    property Comparer: IComparer<T> read GetComparer write SetComparer;
   end;
 
 implementation

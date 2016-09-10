@@ -1,7 +1,6 @@
-package AqDrop.Register.DXE3;
+package AqDrop.DB.FD.DXE8;
 
 {$R *.res}
-{$R *.dres}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
@@ -26,16 +25,22 @@ package AqDrop.Register.DXE3;
 {$IMAGEBASE $400000}
 {$DEFINE RELEASE}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Aquasoft Drop'}
-{$DESIGNONLY}
+{$DESCRIPTION 'Aquasoft Drop - FireDAC Support'}
+{$RUNONLY}
 {$IMPLICITBUILD ON}
 
 requires
   rtl,
-  designide;
+  AqDrop.Core.DXE8,
+  AqDrop.DB.DXE8;
 
 contains
-  AqDrop.Register.AboutBox in '..\AqDrop.Register.AboutBox.pas',
-  AqDrop.Register.Splash in '..\AqDrop.Register.Splash.pas';
+  AqDrop.DB.FD.FB in '..\AqDrop.DB.FD.FB.pas',
+  AqDrop.DB.FD.MSSQL in '..\AqDrop.DB.FD.MSSQL.pas',
+  AqDrop.DB.FD.MySQL in '..\AqDrop.DB.FD.MySQL.pas',
+  AqDrop.DB.FD.Ora in '..\AqDrop.DB.FD.Ora.pas',
+  AqDrop.DB.FD in '..\AqDrop.DB.FD.pas',
+  AqDrop.DB.FD.PG in '..\AqDrop.DB.FD.PG.pas',
+  AqDrop.DB.FD.TypeMapping in '..\AqDrop.DB.FD.TypeMapping.pas';
 
 end.

@@ -2,6 +2,8 @@ unit AqDrop.Core.Helpers;
 
 interface
 
+{$I 'AqDrop.Core.Defines.inc'}
+
 uses
   System.SysUtils,
   System.DateUtils,
@@ -17,7 +19,9 @@ type
     function ToInt32: Int32; inline;
     function ToInt8: Int8; inline;
     function ToString: string; overload; inline;
+{$IFNDEF AQMOBILE}
     function ToAnsiChar: AnsiChar;
+{$ENDIF}
   end;
 
   TAqWeekDay = (Monday = DayMonday, Tuesday = DayTuesday, Wednesday = DayWednesday, Thursday = DayThursday,
@@ -152,8 +156,10 @@ type
 
   TAqBcdHelper = record helper for TBcd
   public
-    function ToCurrency: Currency;
-    function ToString: string;
+    function ToCurrency: Currency; inline;
+    function ToDouble: Double; inline;
+    function ToInt64: Int64; inline;
+    function ToString: string; inline;
   end;
 
   TAqCurrencyHelper = record helper for Currency
@@ -171,14 +177,16 @@ type
     function GetLength: Int32;
   public
     const Empty = '';
+    const LineBreak = sLineBreak;
 
     function CompareTo(pString2: string; const pCaseSensitive: Boolean = True): Int32;
     function IndexOf(const pValue: string): Int32; overload; inline;
     function IsEmpty: Boolean;
     function Quote: string;
     function Substring(StartIndex: Int32; Length: Int32): string; overload;
+    function LeftFromPosition(const pPosition: Int32; const pInclusive: Boolean = False): string;
+    function RightFromPosition(const pPosition: Int32; const pInclusive: Boolean = False): string;
     function ToUpper: string; overload; inline;
-    function ToUpper(LocaleID: TLocaleID): string; overload;
     function Trim: string;
 
     function ToBoolean: Boolean;
@@ -214,6 +222,22 @@ type
     function ToDateTime: TDateTime;
     function ToDate: TDate;
     function ToTime: TTime;
+
+    function ToInt8Def(const pDefault: Int8): Int8;
+    function ToUInt8Def(const pDefault: UInt8): UInt8;
+    function ToInt16Def(const pDefault: Int16): Int16;
+    function ToUInt16Def(const pDefault: UInt16): UInt16;
+    function ToInt32Def(const pDefault: Int32): Int32;
+    function ToUInt32Def(const pDefault: UInt32): UInt32;
+    function ToInt64Def(const pDefault: Int64): Int64;
+    function ToUInt64Def(const pDefault: UInt64): UInt64;
+
+    function ToDoubleDef(const pDefault: Double): Double;
+    function ToCurrencyDef(const pDefault: Currency): Currency;
+
+    function ToDateTimeDef(const pDefault: TDateTime): TDateTime;
+    function ToDateDef(const pDefault: TDate): TDate;
+    function ToTimeDef(const pDefault: TTime): TTime;
 
     property Chars[Index: Int32]: Char read GetChar;
     property Length: Int32 read GetLength;
@@ -279,12 +303,11 @@ implementation
 
 uses
   System.Math,
-  AqDrop.Core.Exceptions,
+  AqDrop.Core.Exceptions
 {$IF defined(MSWINDOWS)}
-  Winapi.Windows;
-{$ELSE}
-  ;
+  ,Winapi.Windows
 {$ENDIF}
+  ;
 
 { TAqBooleanHelper }
 
@@ -293,6 +316,7 @@ begin
   Result := SizeOf(Boolean);
 end;
 
+{$IFNDEF AQMOBILE}
 function TAqBooleanHelper.ToAnsiChar: AnsiChar;
 begin
   if Self then
@@ -302,6 +326,7 @@ begin
     Result := '0';
   end;
 end;
+{$ENDIF}
 
 function TAqBooleanHelper.ToInt8: Int8;
 begin
@@ -819,6 +844,20 @@ begin
   Data.FmtBcd.BCDToCurr(Self, Result);
 end;
 
+function TAqBcdHelper.ToDouble: Double;
+begin
+  Result := Data.FmtBcd.BcdToDouble(Self);
+end;
+
+function TAqBcdHelper.ToInt64: Int64;
+begin
+{$if CompilerVersion >= 27}
+  Result := Data.FmtBcd.BcdToInt64(Self);
+{$else}
+  Result := StrToInt64(BcdToStr(Self));
+{$endif}
+end;
+
 function TAqBcdHelper.ToString: string;
 begin
   Result := Data.FmtBcd.BcdToStr(Self);
@@ -870,6 +909,11 @@ begin
   Result := Self = Empty;
 end;
 
+function TAqStringHelper.LeftFromPosition(const pPosition: Int32; const pInclusive: Boolean): string;
+begin
+  Result := Self.Substring(0, pPosition + IfThen(pInclusive, 1));
+end;
+
 procedure TAqStringHelper.RaiseInvalidConversionToDateTimeType;
 begin
   raise EAqInternal.Create('Invalid conversion of string ' + Self + ' to a DateTime type.');
@@ -878,6 +922,14 @@ end;
 procedure TAqStringHelper.RaiseInvalidConversionToIntType;
 begin
   raise EAqInternal.Create('Invalid conversion of string ' + Self + ' to an integer type.');
+end;
+
+function TAqStringHelper.RightFromPosition(const pPosition: Int32; const pInclusive: Boolean): string;
+var
+  lStart: Integer;
+begin
+  lStart := pPosition + IfThen(not pInclusive, 1);
+  Result := Self.Substring(lStart, Self.Length - lStart);
 end;
 
 function TAqStringHelper.Quote: string;
@@ -911,11 +963,27 @@ begin
   end;
 end;
 
+function TAqStringHelper.ToCurrencyDef(const pDefault: Currency): Currency;
+begin
+  if not Self.TryToCurrency(Result) then
+  begin
+    Result := pDefault;
+  end;
+end;
+
 function TAqStringHelper.ToDate: TDate;
 begin
   if not TryToDate(Result) then
   begin
     RaiseInvalidConversionToDateTimeType;
+  end;
+end;
+
+function TAqStringHelper.ToDateDef(const pDefault: TDate): TDate;
+begin
+  if not Self.TryToDate(Result) then
+  begin
+    Result := pDefault;
   end;
 end;
 
@@ -927,11 +995,27 @@ begin
   end;
 end;
 
+function TAqStringHelper.ToDateTimeDef(const pDefault: TDateTime): TDateTime;
+begin
+  if not Self.TryToDateTime(Result) then
+  begin
+    Result := pDefault;
+  end;
+end;
+
 function TAqStringHelper.ToDouble: Double;
 begin
   if not TryToDouble(Result) then
   begin
     raise EAqInternal.Create('Invalid conversion of string ' + Self + ' to a Double type.');
+  end;
+end;
+
+function TAqStringHelper.ToDoubleDef(const pDefault: Double): Double;
+begin
+  if not Self.TryToDouble(Result) then
+  begin
+    Result := pDefault;
   end;
 end;
 
@@ -943,11 +1027,27 @@ begin
   end;
 end;
 
+function TAqStringHelper.ToInt16Def(const pDefault: Int16): Int16;
+begin
+  if not Self.TryToInt16(Result) then
+  begin
+    Result := pDefault;
+  end;
+end;
+
 function TAqStringHelper.ToInt32: Int32;
 begin
   if not TryToInt32(Result) then
   begin
     RaiseInvalidConversionToIntType;
+  end;
+end;
+
+function TAqStringHelper.ToInt32Def(const pDefault: Int32): Int32;
+begin
+  if not Self.TryToInt32(Result) then
+  begin
+    Result := pDefault;
   end;
 end;
 
@@ -959,11 +1059,27 @@ begin
   end;
 end;
 
+function TAqStringHelper.ToInt64Def(const pDefault: Int64): Int64;
+begin
+  if not Self.TryToInt64(Result) then
+  begin
+    Result := pDefault;
+  end;
+end;
+
 function TAqStringHelper.ToInt8: Int8;
 begin
   if not TryToInt8(Result) then
   begin
     RaiseInvalidConversionToIntType;
+  end;
+end;
+
+function TAqStringHelper.ToInt8Def(const pDefault: Int8): Int8;
+begin
+  if not Self.TryToInt8(Result) then
+  begin
+    Result := pDefault;
   end;
 end;
 
@@ -975,9 +1091,17 @@ begin
   end;
 end;
 
+function TAqStringHelper.ToTimeDef(const pDefault: TTime): TTime;
+begin
+  if not Self.TryToTime(Result) then
+  begin
+    Result := pDefault;
+  end;
+end;
+
 function TAqStringHelper.ToUpper: string;
 begin
-  Result := ToUpper(SysLocale.DefaultLCID);
+  Result := System.SysUtils.UpperCase(Self);
 end;
 
 function TAqStringHelper.ToUInt16: UInt16;
@@ -985,6 +1109,14 @@ begin
   if not TryToUInt16(Result) then
   begin
     RaiseInvalidConversionToIntType;
+  end;
+end;
+
+function TAqStringHelper.ToUInt16Def(const pDefault: UInt16): UInt16;
+begin
+  if not Self.TryToUInt16(Result) then
+  begin
+    Result := pDefault;
   end;
 end;
 
@@ -996,11 +1128,27 @@ begin
   end;
 end;
 
+function TAqStringHelper.ToUInt32Def(const pDefault: UInt32): UInt32;
+begin
+  if not Self.TryToUInt32(Result) then
+  begin
+    Result := pDefault;
+  end;
+end;
+
 function TAqStringHelper.ToUInt64: UInt64;
 begin
   if not TryToUInt64(Result) then
   begin
     RaiseInvalidConversionToIntType;
+  end;
+end;
+
+function TAqStringHelper.ToUInt64Def(const pDefault: UInt64): UInt64;
+begin
+  if not Self.TryToUInt64(Result) then
+  begin
+    Result := pDefault;
   end;
 end;
 
@@ -1012,82 +1160,13 @@ begin
   end;
 end;
 
-function TAqStringHelper.ToUpper(LocaleID: TLocaleID): string;
-{$IF defined(MSWINDOWS)}
+function TAqStringHelper.ToUInt8Def(const pDefault: UInt8): UInt8;
 begin
-  Result := Self;
-  if Result <> '' then
+  if not Self.TryToUInt8(Result) then
   begin
-    UniqueString(Result);
-
-    if LCMapString(LocaleID, LCMAP_UPPERCASE or LCMAP_LINGUISTIC_CASING, PChar(Self), Self.Length,
-      PChar(Result), Result.Length) = 0 then
-    begin
-      RaiseLastOSError;
-    end;
+    Result := pDefault;
   end;
 end;
-{$ELSEIF defined(USE_LIBICU)}
-var
-  lResLen: Int32;
-  lErrorCode: UErrorCode;
-begin
-  if Self.Length > 0 then
-  begin
-    lErrorCode := U_ZERO_ERROR;
-    SetLength(Result, Self.Length);
-    lResLen := u_strToUpper(PChar(Result), Result.Length, PChar(Self), Self.Length, LocaleID, lErrorCode);
-    if (lErrorCode > U_ZERO_ERROR) then
-    begin
-      SetLength(Result, lResLen);
-      lErrorCode := U_ZERO_ERROR;
-      lResLen := u_strToUpper(PChar(Result), Result.Length, PChar(Self), Self.Length, LocaleID, lErrorCode);
-      if (lErrorCode > U_ZERO_ERROR) then
-      begin
-        raise EOverflow.CreateFmt(SICUErrorOverflow, [Int32(lErrorCode), u_errorName(lErrorCode), lResLen]);
-      end;
-    end;
-  end else begin
-    Result := Self;
-  end;
-end;
-{$ELSEIF defined(MACOS)}
-var
-  lMutableStringRef: CFMutableStringRef;
-  lOrig: Int32;
-  lNew: Int32;
-begin
-  Result := Self;
-  if Result <> '' then
-  begin
-    lOrig := Result.Length;
-    lNew := 2 * lOrig;
-    SetLength(Result, lNew);
-    lMutableStringRef := CFStringCreateMutableWithExternalCharactersNoCopy(kCFAllocatorDefault,
-      PChar(Result), lOrig, lNew, kCFAllocatorNull);
-    if lMutableStringRef <> nil then
-    begin
-      try
-        if LocaleID = nil then
-        begin
-          LocaleID := UTF8CompareLocale;
-        end;
-        CFStringUppercase(lMutableStringRef, LocaleID);
-        lNew := CFStringGetLength(CFStringRef(lMutableStringRef));
-        SetLength(Result, lNew);
-      finally
-        CFRelease(lMutableStringRef);
-      end;
-    end else begin
-      raise ECFError.Create(SCFStringFailed);
-    end;
-  end;
-end;
-{$ELSE !MSWINDOWS !MACOS}
-begin
-  Error(rePlatformNotImplemented);
-end;
-{$ENDIF !MSWINDOWS !MACOS}
 
 function TAqStringHelper.Trim: string;
 var

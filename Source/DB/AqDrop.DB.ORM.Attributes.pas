@@ -54,23 +54,31 @@ type
     property Links: TAqReadList<TAqDBLink> read GetLinks;
   end;
 
-  TAqDBColumnAttribute = (caPrimaryKey, caAutoIncrement);
+  TAqDBColumnAttribute = (caPrimaryKey, caAutoIncrement, caNullIfZero, caNullIfEmpty);
   TAqDBColumnAttributes = set of TAqDBColumnAttribute;
 
   AqColumn = class(TAqDBAttribute)
   strict private
     FName: string;
     FAttributes: TAqDBColumnAttributes;
+    FAlias: string;
+
     function GetStatusAttribute(const Index: Int32): Boolean;
     function GetIsNameDefined: Boolean;
+    function GetIsAliasDefined: Boolean;
   strict protected
     function GetAttributes: TAqDBColumnAttributes; virtual;
   public
-    constructor Create(const pName: string = ''; const pAttributes: TAqDBColumnAttributes = []);
+    constructor Create(const pName: string); overload;
+    constructor Create(const pName: string; const pAlias: string); overload;
+    constructor Create(const pName: string; const pAttributes: TAqDBColumnAttributes); overload;
+    constructor Create(const pName: string; const pAlias: string; const pAttributes: TAqDBColumnAttributes); overload;
 
     property IsNameDefined: Boolean read GetIsNameDefined;
-    property Name: string read FName;
+    property IsAliasDefined: Boolean read GetIsAliasDefined;
 
+    property Name: string read FName;
+    property Alias: string read FAlias;
     property Attributes: TAqDBColumnAttributes read GetAttributes;
     property PrimaryKey: Boolean index 0 read GetStatusAttribute;
     property AutoIncrement: Boolean index 1 read GetStatusAttribute;
@@ -89,9 +97,11 @@ type
   strict protected
     function GetAttributes: TAqDBColumnAttributes; override;
   public
-    constructor Create(const pName: string = ''; const pAttributes: TAqDBColumnAttributes = [];
-      const pGeneratorName: string = ''); overload;
-    constructor Create(const pName: string; const pGeneratorName: string); overload;
+    constructor Create(const pName: string; const pAlias: string; const pGeneratorName: string); overload;
+    constructor Create(const pName: string; const pAttributes: TAqDBColumnAttributes;
+      const pGeneratorName: string); overload;
+    constructor Create(const pName: string; const pAlias: string;
+      const pAttributes: TAqDBColumnAttributes; const pGeneratorName: string); overload;
 
     property IsGeneratorDefined: Boolean read GetIsGeneratorDefined;
     property GeneratorName: string read FGeneratorName;
@@ -117,15 +127,36 @@ end;
 
 { AqColumn }
 
-constructor AqColumn.Create(const pName: string; const pAttributes: TAqDBColumnAttributes);
+constructor AqColumn.Create(const pName, pAlias: string);
+begin
+  Create(pName, pAlias, []);
+end;
+
+constructor AqColumn.Create(const pName: string);
+begin
+  Create(pName, '', []);
+end;
+
+constructor AqColumn.Create(const pName, pAlias: string; const pAttributes: TAqDBColumnAttributes);
 begin
   FName := pName;
+  FAlias := pAlias;
   FAttributes := pAttributes;
+end;
+
+constructor AqColumn.Create(const pName: string; const pAttributes: TAqDBColumnAttributes);
+begin
+  Create(pName, '', pAttributes);
 end;
 
 function AqColumn.GetAttributes: TAqDBColumnAttributes;
 begin
   Result := FAttributes;
+end;
+
+function AqColumn.GetIsAliasDefined: Boolean;
+begin
+  Result := not FAlias.IsEmpty;
 end;
 
 function AqColumn.GetIsNameDefined: Boolean;
@@ -226,17 +257,22 @@ end;
 
 { AqAutoIncrementColumn }
 
+constructor AqAutoIncrementColumn.Create(const pName, pAlias, pGeneratorName: string);
+begin
+  Create(pName, pAlias, [], pGeneratorName);
+end;
+
 constructor AqAutoIncrementColumn.Create(const pName: string; const pAttributes: TAqDBColumnAttributes;
   const pGeneratorName: string);
 begin
-  inherited Create(pName, pAttributes);
-
-  FGeneratorName := pGeneratorName;
+  Create(pName, '', pAttributes, pGeneratorName);
 end;
 
-constructor AqAutoIncrementColumn.Create(const pName, pGeneratorName: string);
+constructor AqAutoIncrementColumn.Create(const pName, pAlias: string; const pAttributes: TAqDBColumnAttributes;
+  const pGeneratorName: string);
 begin
-  Create(pName, [], pGeneratorName);
+  inherited Create(pName, pAlias, pAttributes);
+  FGeneratorName := pGeneratorName;
 end;
 
 function AqAutoIncrementColumn.GetAttributes: TAqDBColumnAttributes;

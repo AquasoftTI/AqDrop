@@ -35,7 +35,7 @@ requires
   designide;
 
 contains
-  AqDrop.Register.Splash in '..\AqDrop.Register.Splash.pas',
-  AqDrop.Register.AboutBox in '..\AqDrop.Register.AboutBox.pas';
+  AqDrop.Register.AboutBox in '..\AqDrop.Register.AboutBox.pas',
+  AqDrop.Register.Splash in '..\AqDrop.Register.Splash.pas';
 
 end.

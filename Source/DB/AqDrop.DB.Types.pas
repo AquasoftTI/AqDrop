@@ -3,13 +3,17 @@ unit AqDrop.DB.Types;
 interface
 
 uses
-  Data.SqlTimSt, Data.FmtBcd, AqDrop.Core.Collections, System.Rtti, AqDrop.Core.Types;
+  System.Rtti,
+  Data.SqlTimSt,
+  Data.FmtBcd,
+  AqDrop.Core.Collections,
+  AqDrop.Core.Types;
 
 type
   IAqDBReadValue = interface
     ['{F1900805-2836-42B7-88A5-776D97A02795}']
     function GetName: string;
-    procedure SetName(const pNome: string);
+    procedure SetName(const pName: string);
 
     function GetIsNull: Boolean;
 
@@ -61,6 +65,8 @@ type
 
   IAqDBValue = interface(IAqDBReadValue)
     ['{6C1F05B1-85D1-4EA3-9DBB-0EC1F90FEC27}']
+    procedure SetDataType(const pDataType: TAqDataType);
+
     procedure SetAsString(const pValue: string);
     procedure SetAsAnsiString(const pValue: AnsiString);
     procedure SetAsBoolean(const pValue: Boolean);
@@ -81,6 +87,8 @@ type
     procedure SetAsSingle(const pValue: Single);
     procedure SetAsDouble(const pValue: Double);
     procedure SetAsCurrency(const pValue: Currency);
+
+    procedure SetNull(const pDataType: TAqDataType = TAqDataType.adtUnknown);
 
     property AsString: string read GetAsString write SetAsString;
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
@@ -107,7 +115,7 @@ type
   IAqDBValues<I: IAqDBReadValue> = interface
     ['{23BB2D01-268C-403A-B27B-120D72D45DA4}']
     function GetValueByIndex(pIndex: Int32): I;
-    function GetValueByName(pNome: string): I;
+    function GetValueByName(pName: string): I;
     function GetCount: Int32;
 
     property Values[pName: string]: I read GetValueByName; default;

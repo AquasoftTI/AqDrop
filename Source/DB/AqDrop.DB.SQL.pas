@@ -102,6 +102,7 @@ type
     function GetConstantType: TAqDBSQLConstantValueType; virtual; abstract;
     function GetAsTextConstant: IAqDBSQLTextConstant; virtual;
     function GetAsIntConstant: IAqDBSQLIntConstant; virtual;
+    function GetAsUIntConstant: IAqDBSQLUIntConstant; virtual;
     function GetAsDoubleConstant: IAqDBSQLDoubleConstant; virtual;
     function GetAsCurrencyConstant: IAqDBSQLCurrencyConstant; virtual;
     function GetAsDateTimeConstant: IAqDBSQLDateTimeConstant; virtual;
@@ -129,6 +130,12 @@ type
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
     function GetAsIntConstant: IAqDBSQLIntConstant; override;
+  end;
+
+  TAqDBSQLUIntConstant = class(TAqDBSQLGenericConstant<UInt64>, IAqDBSQLUIntConstant)
+  strict protected
+    function GetConstantType: TAqDBSQLConstantValueType; override;
+    function GetAsUIntConstant: IAqDBSQLUIntConstant; override;
   end;
 
   TAqDBSQLDoubleConstant = class(TAqDBSQLGenericConstant<Double>, IAqDBSQLDoubleConstant)
@@ -218,6 +225,10 @@ type
     function GetLeftValue: IAqDBSQLValue;
     function GetComparison: TAqDBSQLComparison;
     function GetRightValue: IAqDBSQLValue;
+
+    procedure SetLeftValue(pValue: IAqDBSQLValue);
+    procedure SetRightValue(pValue: IAqDBSQLValue);
+    procedure SetComparison(const pComparison: TAqDBSQLComparison);
   strict protected
     function GetConditionType: TAqDBSQLConditionType; override;
     function GetAsComparison: IAqDBSQLComparisonCondition; override;
@@ -274,6 +285,12 @@ type
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
     function AddColumnEqual(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: UInt64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: UInt64;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
     function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Double;
@@ -584,15 +601,33 @@ type
   TAqDBSQLJoin = class(TAqDBSQLAliasable, IAqDBSQLJoin)
   strict private
     FType: TAqDBSQLJoinType;
-    FSource: IAqDBSQLSource;
+    FMainSource: IAqDBSQLSource;
+    FJoinSource: IAqDBSQLSource;
     FCondition: IAqDBSQLCondition;
 
     function GetSource: IAqDBSQLSource;
     function GetCondition: IAqDBSQLCondition;
     function GetJoinType: TAqDBSQLJoinType;
   public
-    constructor Create(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
-      pCondition: IAqDBSQLCondition);
+    constructor Create(const pType: TAqDBSQLJoinType; pMainSource: IAqDBSQLSource; pJoinSource: IAqDBSQLSource;
+      pCondition: IAqDBSQLCondition); overload;
+
+    function &On(const pColumnName: string): IAqDBSQLJoin;
+    function EqualsTo(const pColumnName: string): IAqDBSQLJoin;
+  end;
+
+  TAqDBSQLOrderByItem = class(TAqDBSQLAbstraction, IAqDBSQLOrderByItem)
+  strict private
+    FValue: IAqDBSQLValue;
+    FDesc: Boolean;
+
+    function GetValue: IAqDBSQLValue;
+    function GetDesc: Boolean;
+  public
+    constructor Create(pValue: IAqDBSQLValue; const pDesc: Boolean);
+
+    property Value: IAqDBSQLValue read GetValue;
+    property Desc: Boolean read GetDesc;
   end;
 
   TAqDBSQLSelect = class(TAqDBSQLSource, IAqDBSQLSource, IAqDBSQLSelect, IAqDBSQLCommand)
@@ -602,7 +637,7 @@ type
     FJoins: TAqList<IAqDBSQLJoin>;
     FLimit: UInt32;
     FCondition: IAqDBSQLCondition;
-    FOrderBy: TAqList<IAqDBSQLValue>;
+    FOrderBy: TAqList<IAqDBSQLOrderByItem>;
 
     constructor InternalCreate(const pAlias: string);
 
@@ -622,7 +657,7 @@ type
     procedure SetLimit(const pValue: UInt32);
 
     function GetIsOrderByDefined: Boolean;
-    function GetOrderBy: IAqReadList<IAqDBSQLValue>;
+    function GetOrderBy: IAqReadList<IAqDBSQLOrderbyItem>;
 
     function GetAsDelete: IAqDBSQLDelete;
     function GetAsInsert: IAqDBSQLInsert;
@@ -636,14 +671,17 @@ type
     constructor Create(const pSourceTable: string; const pAlias: string = ''); overload;
     destructor Destroy; override;
 
+    function GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
+
     function AddColumn(pValue: IAqDBSQLValue): Int32; overload;
     function AddColumn(const pExpression: string; const pAlias: string = ''; pSource: IAqDBSQLSource = nil;
       const pAggregator: TAqDBSQLAggregatorType = atNone): IAqDBSQLColumn; overload;
 
     function AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
       pCondition: IAqDBSQLCondition): IAqDBSQLJoin;
+    function InnerJoin(const pTableName: string): IAqDBSQLJoin;
 
-    function AddOrderBy(pValue: IAqDBSQLValue): Int32;
+    function AddOrderBy(pValue: IAqDBSQLValue; const pDesc: Boolean): Int32;
 
     procedure UnsetLimit;
   end;
@@ -698,6 +736,7 @@ type
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
     procedure SetCondition(pValue: IAqDBSQLCondition);
+    function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
   strict protected
     function GetCommandType: TAqDBSQLCommandType; override;
     function GetAsUpdate: IAqDBSQLUpdate; override;
@@ -719,6 +758,7 @@ type
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
     procedure SetCondition(pValue: IAqDBSQLCondition);
+    function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
   strict protected
     function GetCommandType: TAqDBSQLCommandType; override;
     function GetAsDelete: IAqDBSQLDelete; override;
@@ -868,7 +908,7 @@ end;
 function TAqDBSQLSelect.AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
   pCondition: IAqDBSQLCondition): IAqDBSQLJoin;
 begin
-  Result := TAqDBSQLJoin.Create(pType, pSource, pCondition);
+  Result := TAqDBSQLJoin.Create(pType, Self.FSource, pSource, pCondition);
 
   if not Assigned(FJoins) then
   begin
@@ -878,24 +918,24 @@ begin
   FJoins.Add(Result);
 end;
 
-function TAqDBSQLSelect.AddOrderBy(pValue: IAqDBSQLValue): Int32;
+function TAqDBSQLSelect.AddOrderBy(pValue: IAqDBSQLValue; const pDesc: Boolean): Int32;
 begin
   if not Assigned(FOrderBy) then
   begin
-    FOrderBy := TAqList<IAqDBSQLValue>.Create;
+    FOrderBy := TAqList<IAqDBSQLOrderByItem>.Create;
   end;
 
-  Result := FOrderBy.Add(pValue);
+  Result := FOrderBy.Add(TAqDBSQLOrderByItem.Create(pValue, pDesc));
 end;
 
 function TAqDBSQLSelect.GetAsDelete: IAqDBSQLDelete;
 begin
-  raise EAqInternal.Create('Objects of ' + Self.ClassName + ' cannot be consumed as IAqDBDelete.');
+  raise EAqInternal.Create('Objects of ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBDelete.');
 end;
 
 function TAqDBSQLSelect.GetAsInsert: IAqDBSQLInsert;
 begin
-  raise EAqInternal.Create('Objects of ' + Self.ClassName + ' cannot be consumed as IAqDBInsert.');
+  raise EAqInternal.Create('Objects of ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBInsert.');
 end;
 
 function TAqDBSQLSelect.GetAsSelect: IAqDBSQLSelect;
@@ -905,7 +945,12 @@ end;
 
 function TAqDBSQLSelect.GetAsUpdate: IAqDBSQLUpdate;
 begin
-  raise EAqInternal.Create('Objects of ' + Self.ClassName + ' cannot be consumed as IAqDBSQLUpdate.');
+  raise EAqInternal.Create('Objects of ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLUpdate.');
+end;
+
+function TAqDBSQLSelect.InnerJoin(const pTableName: string): IAqDBSQLJoin;
+begin
+  Result := AddJoin(TAqDBSQLJoinType.jtInnerJoin, TAqDBSQLTable.Create(pTableName), nil);
 end;
 
 constructor TAqDBSQLSelect.InternalCreate(const pAlias: string);
@@ -944,6 +989,25 @@ begin
   FColumns.Free;
 
   inherited;
+end;
+
+function TAqDBSQLSelect.GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
+var
+  lI: Integer;
+begin
+  lI := 0;
+  Result := nil;
+
+  while not Assigned(Result) and (lI < FColumns.Count) do
+  begin
+    if (FColumns[lI].ValueType = TAqDBSQLValueType.vtColumn) and
+      (FColumns[lI].GetAsColumn.Expression = pExpression) then
+    begin
+      Result := FColumns[lI].GetAsColumn;
+    end else begin
+      Inc(lI);
+    end;
+  end;
 end;
 
 function TAqDBSQLSelect.GetColumns: IAqReadList<IAqDBSQLValue>;
@@ -996,7 +1060,7 @@ begin
   Result := FLimit;
 end;
 
-function TAqDBSQLSelect.GetOrderBy: IAqReadList<IAqDBSQLValue>;
+function TAqDBSQLSelect.GetOrderBy: IAqReadList<IAqDBSQLOrderByItem>;
 begin
   Result := FOrderBy.GetIReadList;
 end;
@@ -1010,12 +1074,12 @@ end;
 
 function TAqDBSQLSource.GetAsSelect: IAqDBSQLSelect;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLSelect.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLSelect.');
 end;
 
 function TAqDBSQLSource.GetAsTable: IAqDBSQLTable;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBTable.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBTable.');
 end;
 
 { TAqDBOperationColumn }
@@ -1059,27 +1123,28 @@ end;
 
 function TAqDBSQLValue.GetAsColumn: IAqDBSQLColumn;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBColumn.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBColumn.');
 end;
 
 function TAqDBSQLValue.GetAsConstant: IAqDBSQLConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLConstant.');
 end;
 
 function TAqDBSQLValue.GetAsOperation: IAqDBSQLOperation;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBOperationValue.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBOperationValue.');
 end;
 
 function TAqDBSQLValue.GetAsParameter: IAqDBSQLParameter;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLParameter.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLParameter.');
 end;
 
 function TAqDBSQLValue.GetAsSubselect: IAqDBSQLSubselect;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLSubselect.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLSubselect.');
 end;
 
 constructor TAqDBSQLValue.Create(const pAlias: string; const pAggregator: TAqDBSQLAggregatorType);
@@ -1139,6 +1204,21 @@ begin
   Result := FRightValue;
 end;
 
+procedure TAqDBSQLComparisonCondition.SetComparison(const pComparison: TAqDBSQLComparison);
+begin
+  FComparison := pComparison;
+end;
+
+procedure TAqDBSQLComparisonCondition.SetLeftValue(pValue: IAqDBSQLValue);
+begin
+  FLeftValue := pValue;
+end;
+
+procedure TAqDBSQLComparisonCondition.SetRightValue(pValue: IAqDBSQLValue);
+begin
+  FRightValue := pValue;
+end;
+
 { TAqDBSQLValueIsNullCondition }
 
 constructor TAqDBSQLValueIsNullCondition.Create(pValue: IAqDBSQLValue);
@@ -1170,12 +1250,31 @@ end;
 
 { TAqDBSQLJoin }
 
-constructor TAqDBSQLJoin.Create(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource; pCondition: IAqDBSQLCondition);
+function TAqDBSQLJoin.&On(const pColumnName: string): IAqDBSQLJoin;
+begin
+  FCondition := TAqDBSQLComparisonCondition.Create(TAqDBSQLColumn.Create(pColumnName, FJoinSource),
+    TAqDBSQLComparison.cpEqual, nil);
+  Result := Self;
+end;
+
+constructor TAqDBSQLJoin.Create(const pType: TAqDBSQLJoinType; pMainSource: IAqDBSQLSource; pJoinSource: IAqDBSQLSource;
+  pCondition: IAqDBSQLCondition);
 begin
   inherited Create;
 
-  FSource := pSource;
+  FMainSource := pMainSource;
+  FJoinSource := pJoinSource;
   FCondition := pCondition;
+end;
+
+function TAqDBSQLJoin.EqualsTo(const pColumnName: string): IAqDBSQLJoin;
+begin
+  if (FCondition.ConditionType = TAqDBSQLConditionType.ctComparison) then
+  begin
+    FCondition.GetAsComparison.RightValue := TAqDBSQLColumn.Create(pColumnName, FMainSource);
+  end;
+
+  Result := Self;
 end;
 
 function TAqDBSQLJoin.GetCondition: IAqDBSQLCondition;
@@ -1190,7 +1289,7 @@ end;
 
 function TAqDBSQLJoin.GetSource: IAqDBSQLSource;
 begin
-  Result := FSource;
+  Result := FJoinSource;
 end;
 
 { TAqDBSQLComposedCondition }
@@ -1358,6 +1457,21 @@ begin
 end;
 
 function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: Boolean;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: UInt64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLUIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: UInt64;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
@@ -2006,22 +2120,25 @@ end;
 
 function TAqDBSQLCondition.GetAsBetween: IAqDBSQLBetweenCondition;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLComparisonCondition.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLComparisonCondition.');
 end;
 
 function TAqDBSQLCondition.GetAsComparison: IAqDBSQLComparisonCondition;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLComparisonCondition.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLComparisonCondition.');
 end;
 
 function TAqDBSQLCondition.GetAsComposed: IAqDBSQLComposedCondition;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLComposedCondition.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLComposedCondition.');
 end;
 
 function TAqDBSQLCondition.GetAsValueIsNull: IAqDBSQLValueIsNullCondition;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName +
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
     ' cannot be consumed as IAqDBSQLValueIsNullCondition.');
 end;
 
@@ -2029,22 +2146,22 @@ end;
 
 function TAqDBSQLCommand.GetAsDelete: IAqDBSQLDelete;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDelete.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLDelete.');
 end;
 
 function TAqDBSQLCommand.GetAsInsert: IAqDBSQLInsert;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLInsert.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLInsert.');
 end;
 
 function TAqDBSQLCommand.GetAsSelect: IAqDBSQLSelect;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLSelect.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLSelect.');
 end;
 
 function TAqDBSQLCommand.GetAsUpdate: IAqDBSQLUpdate;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLUpdate.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName + ' cannot be consumed as IAqDBSQLUpdate.');
 end;
 
 { TAqDBSQLInsert }
@@ -2179,7 +2296,8 @@ end;
 
 function TAqDBSQLConstant.GetAsBooleanConstant: IAqDBSQLBooleanConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLBooleanConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLBooleanConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsConstant: IAqDBSQLConstant;
@@ -2189,37 +2307,50 @@ end;
 
 function TAqDBSQLConstant.GetAsCurrencyConstant: IAqDBSQLCurrencyConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLCurrencyConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLCurrencyConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsDateConstant: IAqDBSQLDateConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDateConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLDateConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsDateTimeConstant: IAqDBSQLDateTimeConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDateTimeConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLDateTimeConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsDoubleConstant: IAqDBSQLDoubleConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDoubleConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLDoubleConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsIntConstant: IAqDBSQLIntConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLIntConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName
+    + ' cannot be consumed as IAqDBSQLIntConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsTextConstant: IAqDBSQLTextConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLTextConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLTextConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsTimeConstant: IAqDBSQLTimeConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLTimeConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLTimeConstant.');
+end;
+
+function TAqDBSQLConstant.GetAsUIntConstant: IAqDBSQLUIntConstant;
+begin
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName
+    + ' cannot be consumed as IAqDBSQLUIntConstant.');
 end;
 
 function TAqDBSQLConstant.GetValueType: TAqDBSQLValueType;
@@ -2305,6 +2436,22 @@ begin
   Create(TAqDBSQLTable.Create(pTableName));
 end;
 
+function TAqDBSQLUpdate.CustomizeCondition(pNewCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+begin
+  if GetIsConditionDefined then
+  begin
+    Result := TAqDBSQLComposedCondition.Create(FCondition);
+    if Assigned(pNewCondition) then
+    begin
+      Result.AddAnd(pNewCondition);
+    end;
+  end else begin
+    Result := TAqDBSQLComposedCondition.Create(pNewCondition);
+  end;
+
+  FCondition := Result;
+end;
+
 destructor TAqDBSQLUpdate.Destroy;
 begin
   FAssignments.Free;
@@ -2363,6 +2510,22 @@ end;
 constructor TAqDBSQLDelete.Create(const pTableName: string);
 begin
   Create(TAqDBSQLTable.Create(pTableName));
+end;
+
+function TAqDBSQLDelete.CustomizeCondition(pNewCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+begin
+  if GetIsConditionDefined then
+  begin
+    Result := TAqDBSQLComposedCondition.Create(FCondition);
+    if Assigned(pNewCondition) then
+    begin
+      Result.AddAnd(pNewCondition);
+    end;
+  end else begin
+    Result := TAqDBSQLComposedCondition.Create(pNewCondition);
+  end;
+
+  FCondition := Result;
 end;
 
 function TAqDBSQLDelete.GetAsDelete: IAqDBSQLDelete;
@@ -2444,6 +2607,36 @@ end;
 function TAqDBSQLCurrencyConstant.GetConstantType: TAqDBSQLConstantValueType;
 begin
   Result := TAqDBSQLConstantValueType.cvCurrency;
+end;
+
+{ TAqDBSQLUIntConstant }
+
+function TAqDBSQLUIntConstant.GetAsUIntConstant: IAqDBSQLUIntConstant;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLUIntConstant.GetConstantType: TAqDBSQLConstantValueType;
+begin
+  Result := TAqDBSQLConstantValueType.cvUInt;
+end;
+
+{ TAqDBSQLOderByItem }
+
+constructor TAqDBSQLOrderByItem.Create(pValue: IAqDBSQLValue; const pDesc: Boolean);
+begin
+  FValue := pValue;
+  FDesc := pDesc;
+end;
+
+function TAqDBSQLOrderByItem.GetDesc: Boolean;
+begin
+  Result := FDesc;
+end;
+
+function TAqDBSQLOrderByItem.GetValue: IAqDBSQLValue;
+begin
+  Result := FValue;
 end;
 
 end.

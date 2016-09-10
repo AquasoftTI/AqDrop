@@ -1,8 +1,8 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{FD485273-25C8-42DF-BFDB-E7C10821079F}</ProjectGuid>
+        <ProjectGuid>{F657A9BE-AE14-4FAE-BB80-C817628360F2}</ProjectGuid>
         <MainSource>AqDrop.Core.DXE5.dpk</MainSource>
-        <ProjectVersion>15.3</ProjectVersion>
+        <ProjectVersion>15.1</ProjectVersion>
         <FrameworkType>None</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Release</Config>
@@ -57,13 +57,12 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <GenDll>true</GenDll>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_Locale>1046</VerInfo_Locale>
+        <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
+        <DCC_Description>Aquasoft Drop - Core Library</DCC_Description>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <GenPackage>true</GenPackage>
-        <DCC_Description>Aquasoft Drop - Core</DCC_Description>
-        <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
-        <VerInfo_Locale>1046</VerInfo_Locale>
-        <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
         <DCC_E>false</DCC_E>
@@ -82,10 +81,10 @@
         <DCC_CBuilderOutput>None</DCC_CBuilderOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -96,25 +95,21 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
-        <VerInfo_MinorVer>9</VerInfo_MinorVer>
-        <VerInfo_MajorVer>0</VerInfo_MajorVer>
+        <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=0.9.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=0.9.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.2.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.2.0.0;Comments=</VerInfo_Keys>
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
         <DCC_DebugInformation>0</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <VerInfo_Release>1</VerInfo_Release>
-        <VerInfo_MajorVer>1</VerInfo_MajorVer>
-        <VerInfo_MinorVer>0</VerInfo_MinorVer>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.1.0;Comments=</VerInfo_Keys>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
@@ -129,10 +124,14 @@
         <DCCReference Include="..\AqDrop.Core.Attributes.pas"/>
         <DCCReference Include="..\AqDrop.Core.Automaton.pas"/>
         <DCCReference Include="..\AqDrop.Core.Automaton.Text.pas"/>
+        <DCCReference Include="..\AqDrop.Core.Bindings.pas"/>
         <DCCReference Include="..\AqDrop.Core.Calendar.pas"/>
         <DCCReference Include="..\AqDrop.Core.Collections.Intf.pas"/>
         <DCCReference Include="..\AqDrop.Core.Collections.pas"/>
         <DCCReference Include="..\AqDrop.Core.Exceptions.pas"/>
+        <DCCReference Include="..\AqDrop.Core.Helpers.Exception.pas"/>
+        <DCCReference Include="..\AqDrop.Core.Helpers.pas"/>
+        <DCCReference Include="..\AqDrop.Core.Helpers.TObject.pas"/>
         <DCCReference Include="..\AqDrop.Core.Helpers.TRttiObject.pas"/>
         <DCCReference Include="..\AqDrop.Core.Helpers.TRttiType.pas"/>
         <DCCReference Include="..\AqDrop.Core.InterfacedObject.pas"/>
@@ -143,8 +142,7 @@
         <DCCReference Include="..\AqDrop.Core.Observer.pas"/>
         <DCCReference Include="..\AqDrop.Core.Tokenizer.pas"/>
         <DCCReference Include="..\AqDrop.Core.Types.pas"/>
-        <DCCReference Include="..\AqDrop.Core.Helpers.pas"/>
-        <DCCReference Include="..\AqDrop.Core.Bindings.pas"/>
+        <None Include="..\AqDrop.Core.Defines.inc"/>
         <None Include="..\AqDrop.Core.FullRTTIForMethods.inc"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

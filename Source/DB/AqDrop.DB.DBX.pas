@@ -4,18 +4,50 @@ interface
 
 uses
   System.Rtti,
+  System.SysUtils,
   Data.DBXCommon,
   Data.SqlTimSt,
   Data.FmtBcd,
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Collections,
-  AqDrop.Core.AnonymousMethods,
   AqDrop.Core.Types,
-  AqDrop.DB.Connection,
-  AqDrop.DB.Types;
+  AqDrop.DB.Types,
+  AqDrop.DB.Adapter,
+  AqDrop.DB.Connection;
+
+const
+  TAqDBXDataTypeMapping: array[TAqDataType] of TDBXType = (
+    TDBXDataTypes.UnknownType,           // adtUnknown
+    TDBXDataTypes.BooleanType,           // adtBoolean
+    TDBXDataTypes.Int32Type,             // adtEnumerated
+    TDBXDataTypes.UInt8Type,             // adtUInt8
+    TDBXDataTypes.Int8Type,              // adtInt8
+    TDBXDataTypes.UInt16Type,            // adtUInt16
+    TDBXDataTypes.Int16Type,             // adtInt16
+    TDBXDataTypes.UInt32Type,            // adtUInt32
+    TDBXDataTypes.Int32Type,             // adtInt32
+    TDBXDataTypes.UInt64Type,            // adtUInt64
+    TDBXDataTypes.Int64Type,             // adtInt64
+    TDBXDataTypes.CurrencyType,          // adtCurrency
+    TDBXDataTypes.DoubleType,            // adtDouble
+    TDBXDataTypes.SingleType,            // adtSingle
+    TDBXDataTypes.DateTimeType,          // adtDatetime
+    TDBXDataTypes.DateType,              // adtDate
+    TDBXDataTypes.TimeType,              // adtTime
+    TDBXDataTypes.AnsiStringType,        // adtAnsiChar
+    TDBXDataTypes.WideStringType,        // adtChar
+    TDBXDataTypes.AnsiStringType,        // adtAnsiString
+    TDBXDataTypes.WideStringType,        // adtString
+    TDBXDataTypes.WideStringType,        // adtWideString
+    TDBXDataTypes.UnknownType,           // adtSet
+    TDBXDataTypes.UnknownType,           // adtClass
+    TDBXDataTypes.UnknownType,           // adtMethod
+    TDBXDataTypes.VariantType,           // adtVariant
+    TDBXDataTypes.UnknownType,           // adtRecord
+    TDBXDataTypes.UnknownType);          // adtInterface
 
 type
-  TAqDBXMapper = class(TAqDBMapper)
+  TAqDBXDataConverter = class
   public
     function DBToString(const pValue: TDBXValue): string; virtual;
     function DBToAnsiString(const pValue: TDBXValue): AnsiString; virtual;
@@ -59,6 +91,23 @@ type
     procedure SingleToParameter(const pParameter: TDBXParameter; const pValue: Single); virtual;
     procedure DoubleToParameter(const pParameter: TDBXParameter; const pValue: Double); virtual;
     procedure CurrencyToParameter(const pParameter: TDBXParameter; const pValue: Currency); virtual;
+  end;
+
+  TAqDBXDataConverterClass = class of TAqDBXDataConverter;
+
+  TAqDBXAdapter = class(TAqDBAdapter)
+  strict private
+    FDBXConverter: TAqDBXDataConverter;
+
+    procedure SetDBXConverter(const pValue: TAqDBXDataConverter);
+  strict protected
+    function CreateConverter: TAqDBXDataConverter; virtual;
+    class function GetDefaultConverter: TAqDBXDataConverterClass; virtual;
+  public
+    constructor Create; override;
+    destructor Destroy; override;
+
+    property DBXConverter: TAqDBXDataConverter read FDBXConverter write SetDBXConverter;
   end;
 
   TAqDBXBaseValues = class;
@@ -119,6 +168,8 @@ type
   strict protected
     function GetValue: TDBXValue; override;
 
+    procedure SetDataType(const pDataType: TAqDataType);
+
     procedure SetAsString(const pValue: string); virtual;
     procedure SetAsAnsiString(const pValue: AnsiString); virtual;
     procedure SetAsBoolean(const pValue: Boolean); virtual;
@@ -139,6 +190,8 @@ type
     procedure SetAsSingle(const pValue: Single); virtual;
     procedure SetAsDouble(const pValue: Double); virtual;
     procedure SetAsCurrency(const pValue: Currency); virtual;
+
+    procedure SetNull(const pDataType: TAqDataType = TAqDataType.adtUnknown);
   public
     constructor Create(const pValues: TAqDBXBaseValues; const pName: string; const pDBXParameter: TDBXParameter);
 
@@ -227,9 +280,9 @@ type
     destructor Destroy; override;
 
     function Execute(const pParametersHandler: TAqDBParametersHandlerMethod): Int64;
-    function Abrir(const pParametersHandler: TAqDBParametersHandlerMethod): TAqDBXReader;
+    function Open(const pParametersHandler: TAqDBParametersHandlerMethod): TAqDBXReader;
 
-    procedure Prepare;
+    procedure Prepare(const pParametersInitializer: TAqDBParametersHandlerMethod);
 
     property DBXCommand: TDBXCommand read FDBXCommand;
     property Parameters: TAqDBXParameters read FParameters;
@@ -268,7 +321,6 @@ type
   strict private
     FDBXConnection: TDBXConnection;
     FDBXTransaction: TDBXTransaction;
-    FTransactionCalls: UInt32;
     FProperties: TDBXProperties;
     FPreparedQueries: TAqIDDictionary<TAqDBXCommand>;
 
@@ -277,6 +329,8 @@ type
 
     function GetProperty(pName: string): string;
     procedure SetProperty(pName: string; const pValue: string);
+    function GetDBXAdapter: TAqDBXAdapter;
+    procedure SetDBXAdapter(const pValue: TAqDBXAdapter);
   strict protected
     procedure DoConnect; override;
     procedure DoDisconnect; override;
@@ -285,9 +339,9 @@ type
     procedure SetPropertyValueAsString(const pIndex: Int32; const pValue: string); virtual;
 
     function GetActive: Boolean; override;
-    function GetInTransaction: Boolean; override;
 
-    function DoPrepareCommand(const pSQL: string): TAqID; override;
+    function DoPrepareCommand(const pSQL: string;
+      const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID; override;
     procedure DoUnprepareCommand(const pCommandID: TAqID); override;
 
     function DoExecuteCommand(const pSQL: string;
@@ -300,13 +354,11 @@ type
     function DoOpenQuery(const pCommandID: TAqID;
       const pParametersHandler: TAqDBParametersHandlerMethod): IAqDBReader; override;
 
-    procedure SetMapper(const pMapper: TAqDBMapper); override;
-    procedure SetDBXMapper(const pMapper: TAqDBXMapper); virtual;
-    function GetDBXMapper: TAqDBXMapper; virtual;
-
     procedure DoStartTransaction; override;
     procedure DoCommitTransaction; override;
-    procedure DoRollbackTransaction; overload; override;
+    procedure DoRollbackTransaction; override;
+
+    class function GetDefaultAdapter: TAqDBAdapterClass; override;
 
     property DriverName: string index $00 read GetPropertyValueAsString write SetPropertyValueAsString;
     property VendorLib: string index $01 read GetPropertyValueAsString write SetPropertyValueAsString;
@@ -314,15 +366,13 @@ type
     property GetDriverFunc: string index $03 read GetPropertyValueAsString write SetPropertyValueAsString;
 
     property Properties[Name: string]: string read GetProperty write SetProperty;
-
-    class function GetDefaultMapper: TAqDBMapperClass; override;
+  protected
+    procedure SetAdapter(const pAdapter: TAqDBAdapter); override;
   public
     constructor Create; override;
     destructor Destroy; override;
 
-    procedure RollbackTransaction(const pRegardTransactionCalls: Boolean); reintroduce; overload;
-
-    property DBXMapper: TAqDBXMapper read GetDBXMapper write SetDBXMapper;
+    property DBXAdapter: TAqDBXAdapter read GetDBXAdapter write SetDBXAdapter;
   end;
 
   /// ------------------------------------------------------------------------------------------------------------------
@@ -335,9 +385,9 @@ type
   /// ------------------------------------------------------------------------------------------------------------------
   TAqDBXConnection = class(TAqDBXCustomConnection)
   strict private
-    FGetterAutoIncrement: TAqAnonymousFunction<Int64>;
+    FGetterAutoIncrement: TFunc<Int64>;
   public
-    function GetAutoIncrement(const pGenerator: string = ''): Int64; override;
+    function GetAutoIncrement(const pGeneratorName: string = ''): Int64; override;
 
     property DriverName;
     property VendorLib;
@@ -345,13 +395,12 @@ type
     property GetDriverFunc;
     property Properties;
 
-    property GetterAutoIncrement: TAqAnonymousFunction<Int64> read FGetterAutoIncrement write FGetterAutoIncrement;
+    property GetterAutoIncrement: TFunc<Int64> read FGetterAutoIncrement write FGetterAutoIncrement;
   end;
 
 implementation
 
 uses
-  System.SysUtils,
   System.StrUtils,
   System.DateUtils,
   System.Classes,
@@ -372,7 +421,7 @@ begin
     on E: Exception do
     begin
       FreeAndNil(FDBXConnection);
-      E.RaiseOuterException(EAqFriendly.Create('It wasn''t possible to stablish a connection to the DB.'));
+      RaiseImpossibleToConnect(E);
     end;
   end;
 end;
@@ -404,21 +453,16 @@ end;
 
 destructor TAqDBXCustomConnection.Destroy;
 begin
+  if Assigned(FDBXTransaction) then
+  begin
+    FDBXConnection.RollbackFreeAndNil(FDBXTransaction);
+  end;
+
   FPreparedQueries.Free;
   FDBXConnection.Free;
   FProperties.Free;
 
   inherited;
-end;
-
-function TAqDBXCustomConnection.GetDBXMapper: TAqDBXMapper;
-begin
-  Result := TAqDBXMapper(inherited Mapper);
-end;
-
-class function TAqDBXCustomConnection.GetDefaultMapper: TAqDBMapperClass;
-begin
-  Result := TAqDBXMapper;
 end;
 
 function TAqDBXCustomConnection.GetProperty(pName: string): string;
@@ -431,9 +475,14 @@ begin
   Result := Assigned(FDBXConnection);
 end;
 
-function TAqDBXCustomConnection.GetInTransaction: Boolean;
+function TAqDBXCustomConnection.GetDBXAdapter: TAqDBXAdapter;
 begin
-  Result := Assigned(FDBXTransaction);
+  Result := TAqDBXAdapter(Adapter);
+end;
+
+class function TAqDBXCustomConnection.GetDefaultAdapter: TAqDBAdapterClass;
+begin
+  Result := TAqDBXAdapter;
 end;
 
 function TAqDBXCustomConnection.GetPropertyValueAsString(const pIndex: Int32): string;
@@ -458,7 +507,6 @@ begin
 
   try
     TAqDBXParser.Execute(Result.Parameters, pSQL);
-
     Result.DBXCommand.Text := pSQL;
     Result.DBXCommand.Prepare;
   except
@@ -501,19 +549,19 @@ begin
   end;
 end;
 
-procedure TAqDBXCustomConnection.SetMapper(const pMapper: TAqDBMapper);
+procedure TAqDBXCustomConnection.SetDBXAdapter(const pValue: TAqDBXAdapter);
 begin
-  if not (pMapper is TAqDBXMapper) then
+  SetAdapter(pValue);
+end;
+
+procedure TAqDBXCustomConnection.SetAdapter(const pAdapter: TAqDBAdapter);
+begin
+  if not (pAdapter is TAqDBXAdapter) then
   begin
-    raise EAqInternal.Create('Mapper not suported.');
+    raise EAqInternal.Create('Invalid Adapter for a DBX Connection.');
   end;
 
   inherited;
-end;
-
-procedure TAqDBXCustomConnection.SetDBXMapper(const pMapper: TAqDBXMapper);
-begin
-  SetMapper(pMapper);
 end;
 
 procedure TAqDBXCustomConnection.SetProperty(pName: string; const pValue: string);
@@ -544,9 +592,9 @@ var
 begin
   if FPreparedQueries.TryGetValue(pCommandID, lCommand) then
   begin
-    Result := lCommand.Abrir(pParametersHandler);
+    Result := lCommand.Open(pParametersHandler);
   end else begin
-    raise EAqInternal.Create('Command of Index ' + pCommandID.ToString + ' not found.');
+    raise EAqInternal.Create('Command of ID ' + pCommandID.ToString + ' not found.');
   end;
 end;
 
@@ -554,27 +602,12 @@ procedure TAqDBXCustomConnection.DoStartTransaction;
 begin
   inherited;
 
-  if FTransactionCalls = 0 then
-  begin
-    FDBXTransaction := FDBXConnection.BeginTransaction;
-  end;
-
-  Inc(FTransactionCalls);
+  FDBXTransaction := FDBXConnection.BeginTransaction;
 end;
 
 procedure TAqDBXCustomConnection.DoCommitTransaction;
 begin
-  if FTransactionCalls = 0 then
-  begin
-    raise EAqInternal.Create('There is no transaction to commit.');
-  end;
-
-  Dec(FTransactionCalls);
-
-  if FTransactionCalls = 0 then
-  begin
-    FDBXConnection.CommitFreeAndNil(FDBXTransaction);
-  end;
+  FDBXConnection.CommitFreeAndNil(FDBXTransaction);
 
   inherited;
 end;
@@ -592,7 +625,8 @@ begin
   end;
 end;
 
-function TAqDBXCustomConnection.DoPrepareCommand(const pSQL: string): TAqID;
+function TAqDBXCustomConnection.DoPrepareCommand(const pSQL: string;
+  const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID;
 var
   lCommand: TAqDBXCommand;
 begin
@@ -600,7 +634,9 @@ begin
 
   try
     lCommand := PrepareDBXCommand(pSQL);
-    lCommand.Prepare;
+
+    lCommand.Prepare(pParametersInitializer);
+
     Result := FPreparedQueries.Add(lCommand);
   except
     lCommand.Free;
@@ -610,25 +646,9 @@ end;
 
 procedure TAqDBXCustomConnection.DoRollbackTransaction;
 begin
-  RollbackTransaction(True);
+  FDBXConnection.RollbackFreeAndNil(FDBXTransaction);
 
   inherited;
-end;
-
-procedure TAqDBXCustomConnection.RollbackTransaction(const pRegardTransactionCalls: Boolean);
-begin
-  if FTransactionCalls = 0 then
-  begin
-    raise EAqInternal.Create('There are no transaction to revert.');
-  end;
-
-  if not pRegardTransactionCalls or (FTransactionCalls = 1) then
-  begin
-    FDBXConnection.RollbackFreeAndNil(FDBXTransaction);
-    FTransactionCalls := 0;
-  end else begin
-    Dec(FTransactionCalls);
-  end;
 end;
 
 procedure TAqDBXCustomConnection.DoUnprepareCommand(const pCommandID: TAqID);
@@ -693,102 +713,102 @@ end;
 
 function TAqDBXBaseValue.GetAsAnsiString: AnsiString;
 begin
-  Result := Values.Connction.DBXMapper.DBToAnsiString(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToAnsiString(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsBCD: TBcd;
 begin
-  Result := Values.Connction.DBXMapper.DBToBCD(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToBCD(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsBoolean: Boolean;
 begin
-  Result := Values.Connction.DBXMapper.DBToBoolean(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToBoolean(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsCurrency: Currency;
 begin
-  Result := Values.Connction.DBXMapper.DBToCurrency(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToCurrency(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsDate: TDate;
 begin
-  Result := Values.Connction.DBXMapper.DBToDate(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToDate(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsDateTime: TDateTime;
 begin
-  Result := Values.Connction.DBXMapper.DBToDateTime(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToDateTime(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsDouble: Double;
 begin
-  Result := Values.Connction.DBXMapper.DBToDouble(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToDouble(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsInt16: Int16;
 begin
-  Result := Values.Connction.DBXMapper.DBToInt16(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToInt16(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsInt32: Int32;
 begin
-  Result := Values.Connction.DBXMapper.DBToInt32(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToInt32(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsInt64: Int64;
 begin
-  Result := Values.Connction.DBXMapper.DBToInt64(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToInt64(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsInt8: Int8;
 begin
-  Result := Values.Connction.DBXMapper.DBToInt8(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToInt8(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsSingle: Single;
 begin
-  Result := Values.Connction.DBXMapper.DBToSingle(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToSingle(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsString: string;
 begin
-  Result := Values.Connction.DBXMapper.DBToString(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToString(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsTime: TTime;
 begin
-  Result := Values.Connction.DBXMapper.DBToTime(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToTime(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsTimeStamp: TSQLTimeStamp;
 begin
-  Result := Values.Connction.DBXMapper.DBToTimeStamp(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToTimeStamp(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsTimeStampOffset: TSQLTimeStampOffset;
 begin
-  Result := Values.Connction.DBXMapper.DBToTimeStampOffset(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToTimeStampOffset(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsUInt16: UInt16;
 begin
-  Result := Values.Connction.DBXMapper.DBToUInt16(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToUInt16(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsUInt32: UInt32;
 begin
-  Result := Values.Connction.DBXMapper.DBToUInt32(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToUInt32(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsUInt64: UInt64;
 begin
-  Result := Values.Connction.DBXMapper.DBToUInt64(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToUInt64(GetValue);
 end;
 
 function TAqDBXBaseValue.GetAsUInt8: UInt8;
 begin
-  Result := Values.Connction.DBXMapper.DBToUInt8(GetValue);
+  Result := Values.Connction.DBXAdapter.DBXConverter.DBToUInt8(GetValue);
 end;
 
 function TAqDBXBaseValue.GetName: string;
@@ -837,102 +857,113 @@ end;
 
 procedure TAqDBXParameter.SetAsAnsiString(const pValue: AnsiString);
 begin
-  Values.Connction.DBXMapper.AnsiStringToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.AnsiStringToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsBCD(const pValue: TBcd);
 begin
-  Values.Connction.DBXMapper.BCDToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.BCDToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsBoolean(const pValue: Boolean);
 begin
-  Values.Connction.DBXMapper.BooleanToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.BooleanToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsCurrency(const pValue: Currency);
 begin
-  Values.Connction.DBXMapper.CurrencyToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.CurrencyToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsDate(const pValue: TDate);
 begin
-  Values.Connction.DBXMapper.DateToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.DateToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsDateTime(const pValue: TDateTime);
 begin
-  Values.Connction.DBXMapper.DateTimeToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.DateTimeToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsDouble(const pValue: Double);
 begin
-  Values.Connction.DBXMapper.DoubleToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.DoubleToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsInt16(const pValue: Int16);
 begin
-  Values.Connction.DBXMapper.Int16ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.Int16ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsInt32(const pValue: Int32);
 begin
-  Values.Connction.DBXMapper.Int32ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.Int32ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsInt64(const pValue: Int64);
 begin
-  Values.Connction.DBXMapper.Int64ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.Int64ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsInt8(const pValue: Int8);
 begin
-  Values.Connction.DBXMapper.Int8ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.Int8ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsSingle(const pValue: Single);
 begin
-  Values.Connction.DBXMapper.SingleToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.SingleToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsString(const pValue: string);
 begin
-  Values.Connction.DBXMapper.StringToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.StringToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsTime(const pValue: TTime);
 begin
-  Values.Connction.DBXMapper.TimeToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.TimeToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsTimeStamp(const pValue: TSQLTimeStamp);
 begin
-  Values.Connction.DBXMapper.TimeStampToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.TimeStampToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsTimeStampOffset(const pValue: TSQLTimeStampOffset);
 begin
-  Values.Connction.DBXMapper.TimeStampOffsetToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.TimeStampOffsetToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsUInt16(const pValue: UInt16);
 begin
-  Values.Connction.DBXMapper.UInt16ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.UInt16ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsUInt32(const pValue: UInt32);
 begin
-  Values.Connction.DBXMapper.UInt32ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.UInt32ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsUInt64(const pValue: UInt64);
 begin
-  Values.Connction.DBXMapper.UInt64ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.UInt64ToParameter(FDBXParameter, pValue);
 end;
 
 procedure TAqDBXParameter.SetAsUInt8(const pValue: UInt8);
 begin
-  Values.Connction.DBXMapper.UInt8ToParameter(FDBXParameter, pValue);
+  Values.Connction.DBXAdapter.DBXConverter.UInt8ToParameter(FDBXParameter, pValue);
+end;
+
+procedure TAqDBXParameter.SetDataType(const pDataType: TAqDataType);
+begin
+  FDBXParameter.DataType := TAqDBXDataTypeMapping[pDataType];
+end;
+
+procedure TAqDBXParameter.SetNull;
+begin
+  FDBXParameter.DataType := TAqDBXDataTypeMapping[pDataType];
+  FDBXParameter.Value.SetNull;
 end;
 
 { TAqDBXFakeParameterByName }
@@ -1195,6 +1226,8 @@ constructor TAqDBXReader.Create(const pConnection: TAqDBXCustomConnection; const
 var
   lValue: TDBXValue;
 begin
+  pConnection.IncreaseReaderes;
+
   inherited Create(pConnection);
 
   FCommand := pCommand;
@@ -1214,6 +1247,8 @@ begin
   begin
     FCommand.Free;
   end;
+
+  Connction.DecrementReaders;
 
   inherited;
 end;
@@ -1284,430 +1319,500 @@ begin
   FConnection := pConnection;
 end;
 
-{ TAqDBXMapper }
+{ TAqDBXDataConverter }
 
-procedure TAqDBXMapper.AnsiStringToParameter(const pParameter: TDBXParameter;
+procedure TAqDBXDataConverter.AnsiStringToParameter(const pParameter: TDBXParameter;
   const pValue: AnsiString);
 begin
   pParameter.DataType := TDBXDataTypes.AnsiStringType;
   pParameter.Value.SetAnsiString(pValue);
 end;
 
-procedure TAqDBXMapper.BCDToParameter(const pParameter: TDBXParameter; const pValue: TBcd);
+procedure TAqDBXDataConverter.BCDToParameter(const pParameter: TDBXParameter; const pValue: TBcd);
 begin
   pParameter.DataType := TDBXDataTypes.BcdType;
   pParameter.Value.SetBcd(pValue);
 end;
 
-function TAqDBXMapper.DBToAnsiString(const pValue: TDBXValue): AnsiString;
+function TAqDBXDataConverter.DBToAnsiString(const pValue: TDBXValue): AnsiString;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := pValue.GetAnsiString;
-  else
-    Result := AnsiString(DBToString(pValue));
+  if pValue.IsNull then
+  begin
+    Result := '';
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := pValue.GetAnsiString;
+    else
+      Result := AnsiString(DBToString(pValue));
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToBCD(const pValue: TDBXValue): TBcd;
+function TAqDBXDataConverter.DBToBCD(const pValue: TDBXValue): TBcd;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString);
-    TDBXDataTypes.Int16Type:
-      Result := Int32(pValue.AsInt16);
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd;
-    TDBXDataTypes.UInt16Type:
-      Result := Int32(pValue.AsUInt16);
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle;
-    TDBXDataTypes.Int8Type:
-      Result := Int32(pValue.AsInt8);
-    TDBXDataTypes.UInt8Type:
-      Result := Int32(pValue.AsUInt8);
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a BCD field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString);
+      TDBXDataTypes.Int16Type:
+        Result := Int32(pValue.AsInt16);
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd;
+      TDBXDataTypes.UInt16Type:
+        Result := Int32(pValue.AsUInt16);
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle;
+      TDBXDataTypes.Int8Type:
+        Result := Int32(pValue.AsInt8);
+      TDBXDataTypes.UInt8Type:
+        Result := Int32(pValue.AsUInt8);
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a BCD field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToBoolean(const pValue: TDBXValue): Boolean;
+function TAqDBXDataConverter.DBToBoolean(const pValue: TDBXValue): Boolean;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result :=  string(pValue.GetAnsiString).ToBoolean;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean;
-    TDBXDataTypes.Int16Type:
-      Result := Boolean(pValue.AsInt16);
-    TDBXDataTypes.Int32Type:
-      Result := Boolean(pValue.AsInt32);
-    TDBXDataTypes.UInt16Type:
-      Result := Boolean(pValue.AsUInt16);
-    TDBXDataTypes.Int64Type:
-      Result := Boolean(pValue.AsInt64);
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToBoolean;
-    TDBXDataTypes.Int8Type:
-      Result := Boolean(pValue.AsInt8);
-    TDBXDataTypes.UInt8Type:
-      Result := Boolean(pValue.AsUInt8);
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a boolean field.');
+  if pValue.IsNull then
+  begin
+    Result := False;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result :=  string(pValue.GetAnsiString).ToBoolean;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean;
+      TDBXDataTypes.Int16Type:
+        Result := Boolean(pValue.AsInt16);
+      TDBXDataTypes.Int32Type:
+        Result := Boolean(pValue.AsInt32);
+      TDBXDataTypes.UInt16Type:
+        Result := Boolean(pValue.AsUInt16);
+      TDBXDataTypes.Int64Type:
+        Result := Boolean(pValue.AsInt64);
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToBoolean;
+      TDBXDataTypes.Int8Type:
+        Result := Boolean(pValue.AsInt8);
+      TDBXDataTypes.UInt8Type:
+        Result := Boolean(pValue.AsUInt8);
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a boolean field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToCurrency(const pValue: TDBXValue): Currency;
+function TAqDBXDataConverter.DBToCurrency(const pValue: TDBXValue): Currency;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToCurrency;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd.ToCurrency;
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToCurrency;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a Currency field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToCurrency;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd.ToCurrency;
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToCurrency;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a Currency field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToDate(const pValue: TDBXValue): TDate;
+function TAqDBXDataConverter.DBToDate(const pValue: TDBXValue): TDate;
 var
   lTimeStamp: TSQLTimeStamp;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToDate;
-    TDBXDataTypes.DateType:
-      Result := pValue.AsDateTime.DateOf;
-    TDBXDataTypes.DoubleType:
-      Result := DateOf(pValue.AsDouble);
-    TDBXDataTypes.DateTimeType:
-      Result := pValue.AsDateTime.DateOf;
-    TDBXDataTypes.TimeStampType:
-      begin
-        lTimeStamp := pValue.AsTimeStamp;
-        Result := TDate.EncodeDate(lTimeStamp.Year, lTimeStamp.Month, lTimeStamp.Day);
-      end;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToDate;
-    TDBXDataTypes.SingleType:
-      Result := DateOf(pValue.AsSingle);
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a date field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToDate;
+      TDBXDataTypes.DateType:
+        Result := pValue.AsDateTime.DateOf;
+      TDBXDataTypes.DoubleType:
+        Result := DateOf(pValue.AsDouble);
+      TDBXDataTypes.DateTimeType:
+        Result := pValue.AsDateTime.DateOf;
+      TDBXDataTypes.TimeStampType:
+        begin
+          lTimeStamp := pValue.AsTimeStamp;
+          Result := TDate.EncodeDate(lTimeStamp.Year, lTimeStamp.Month, lTimeStamp.Day);
+        end;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToDate;
+      TDBXDataTypes.SingleType:
+        Result := DateOf(pValue.AsSingle);
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a date field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToDateTime(const pValue: TDBXValue): TDateTime;
+function TAqDBXDataConverter.DBToDateTime(const pValue: TDBXValue): TDateTime;
 var
   lTimeStamp: TSQLTimeStamp;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToDateTime;
-    TDBXDataTypes.DateType:
-      Result := pValue.AsDateTime;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble;
-    TDBXDataTypes.DateTimeType:
-      Result := pValue.AsDateTime;
-    TDBXDataTypes.TimeStampType:
-      begin
-        lTimeStamp := pValue.AsTimeStamp;
-        Result := TDateTime.EncodeDateTime(lTimeStamp.Year, lTimeStamp.Month, lTimeStamp.Day, lTimeStamp.Hour,
-          lTimeStamp.Minute, lTimeStamp.Second, lTimeStamp.Fractions);
-      end;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToDateTime;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a datetime field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToDateTime;
+      TDBXDataTypes.DateType:
+        Result := pValue.AsDateTime;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble;
+      TDBXDataTypes.DateTimeType:
+        Result := pValue.AsDateTime;
+      TDBXDataTypes.TimeStampType:
+        begin
+          lTimeStamp := pValue.AsTimeStamp;
+          Result := TDateTime.EncodeDateTime(lTimeStamp.Year, lTimeStamp.Month, lTimeStamp.Day, lTimeStamp.Hour,
+            lTimeStamp.Minute, lTimeStamp.Second, lTimeStamp.Fractions);
+        end;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToDateTime;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a datetime field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToDouble(const pValue: TDBXValue): Double;
+function TAqDBXDataConverter.DBToDouble(const pValue: TDBXValue): Double;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToDouble;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd.ToString.ToDouble;
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToDouble;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a Double field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToDouble;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd.ToString.ToDouble;
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToDouble;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a Double field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToInt16(const pValue: TDBXValue): Int16;
+function TAqDBXDataConverter.DBToInt16(const pValue: TDBXValue): Int16;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToInt16;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := Int32(pValue.AsBcd);
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToInt16;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an Int16 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToInt16;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := Int32(pValue.AsBcd);
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToInt16;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an Int16 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToInt32(const pValue: TDBXValue): Int32;
+function TAqDBXDataConverter.DBToInt32(const pValue: TDBXValue): Int32;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToInt32;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := Int32(pValue.AsBcd);
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToInt32;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an Int32 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToInt32;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := Int32(pValue.AsBcd);
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToInt32;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an Int32 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToInt64(const pValue: TDBXValue): Int64;
+function TAqDBXDataConverter.DBToInt64(const pValue: TDBXValue): Int64;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToInt64;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd.ToString.ToDouble.Trunc;
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToInt64;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an Int64 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToInt64;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd.ToString.ToDouble.Trunc;
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToInt64;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an Int64 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToInt8(const pValue: TDBXValue): Int8;
+function TAqDBXDataConverter.DBToInt8(const pValue: TDBXValue): Int8;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToInt8;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := Int32(pValue.AsBcd);
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToInt8;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an Int8 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToInt8;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := Int32(pValue.AsBcd);
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToInt8;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an Int8 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToSingle(const pValue: TDBXValue): Single;
+function TAqDBXDataConverter.DBToSingle(const pValue: TDBXValue): Single;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToDouble;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd.ToString.ToDouble;
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToDouble;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a Single field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToDouble;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd.ToString.ToDouble;
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToDouble;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a Single field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToString(const pValue: TDBXValue): string;
+function TAqDBXDataConverter.DBToString(const pValue: TDBXValue): string;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString);
-    TDBXDataTypes.BlobType:
-      Result := pValue.AsString;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToString;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16.ToString;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32.ToString;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.ToString;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd.ToString;
-    TDBXDataTypes.DateTimeType:
-      Result := pValue.AsDateTime.ToString;
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16.ToString;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64.ToString;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.ToString;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8.ToString;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8.ToString;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a string field.');
+  if pValue.IsNull then
+  begin
+    Result := '';
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString);
+      TDBXDataTypes.BlobType:
+        Result := pValue.AsString;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToString;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16.ToString;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32.ToString;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.ToString;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd.ToString;
+      TDBXDataTypes.DateTimeType:
+        Result := pValue.AsDateTime.ToString;
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16.ToString;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64.ToString;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.ToString;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8.ToString;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8.ToString;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a string field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToTime(const pValue: TDBXValue): TTime;
+function TAqDBXDataConverter.DBToTime(const pValue: TDBXValue): TTime;
 var
   lTimeStamp: TSQLTimeStamp;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToTime;
-    TDBXDataTypes.DoubleType:
-      Result := TimeOf(pValue.AsDouble);
-    TDBXDataTypes.TimeType:
-      Result := pValue.AsDateTime.TimeOf;
-    TDBXDataTypes.DateTimeType:
-      Result := pValue.AsDateTime.TimeOf;
-    TDBXDataTypes.TimeStampType:
-      begin
-        lTimeStamp := pValue.AsTimeStamp;
-        Result := TTime.EncodeTime(lTimeStamp.Hour, lTimeStamp.Minute, lTimeStamp.Second, lTimeStamp.Fractions);
-      end;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToTime;
-    TDBXDataTypes.SingleType:
-      Result := TimeOf(pValue.AsSingle);
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain a time field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToTime;
+      TDBXDataTypes.DoubleType:
+        Result := TimeOf(pValue.AsDouble);
+      TDBXDataTypes.TimeType:
+        Result := pValue.AsDateTime.TimeOf;
+      TDBXDataTypes.DateTimeType:
+        Result := pValue.AsDateTime.TimeOf;
+      TDBXDataTypes.TimeStampType:
+        begin
+          lTimeStamp := pValue.AsTimeStamp;
+          Result := TTime.EncodeTime(lTimeStamp.Hour, lTimeStamp.Minute, lTimeStamp.Second, lTimeStamp.Fractions);
+        end;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToTime;
+      TDBXDataTypes.SingleType:
+        Result := TimeOf(pValue.AsSingle);
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain a time field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToTimeStamp(const pValue: TDBXValue): TSQLTimeStamp;
+function TAqDBXDataConverter.DBToTimeStamp(const pValue: TDBXValue): TSQLTimeStamp;
 begin
   case pValue.ValueType.DataType of
     TDBXDataTypes.AnsiStringType:
@@ -1725,7 +1830,7 @@ begin
   end;
 end;
 
-function TAqDBXMapper.DBToTimeStampOffset(const pValue: TDBXValue): TSQLTimeStampOffset;
+function TAqDBXDataConverter.DBToTimeStampOffset(const pValue: TDBXValue): TSQLTimeStampOffset;
 begin
   case pValue.ValueType.DataType of
     TDBXDataTypes.TimeStampOffsetType:
@@ -1735,235 +1840,255 @@ begin
   end;
 end;
 
-function TAqDBXMapper.DBToUInt16(const pValue: TDBXValue): UInt16;
+function TAqDBXDataConverter.DBToUInt16(const pValue: TDBXValue): UInt16;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToUInt16;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := Int32(pValue.AsBcd);
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToUInt16;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt16 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToUInt16;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := Int32(pValue.AsBcd);
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToUInt16;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt16 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToUInt32(const pValue: TDBXValue): UInt32;
+function TAqDBXDataConverter.DBToUInt32(const pValue: TDBXValue): UInt32;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToUInt32;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := Int32(pValue.AsBcd);
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToUInt32;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt32 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToUInt32;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := Int32(pValue.AsBcd);
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToUInt32;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt32 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToUInt64(const pValue: TDBXValue): UInt64;
+function TAqDBXDataConverter.DBToUInt64(const pValue: TDBXValue): UInt64;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToUInt64;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := pValue.AsBcd.ToString.ToDouble.Trunc;
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToUInt64;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt64 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToUInt64;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := pValue.AsBcd.ToString.ToDouble.Trunc;
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToUInt64;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt64 field.');
+    end;
   end;
 end;
 
-function TAqDBXMapper.DBToUInt8(const pValue: TDBXValue): UInt8;
+function TAqDBXDataConverter.DBToUInt8(const pValue: TDBXValue): UInt8;
 begin
-  case pValue.ValueType.DataType of
-    TDBXDataTypes.AnsiStringType:
-      Result := string(pValue.GetAnsiString).ToUInt8;
-    TDBXDataTypes.BooleanType:
-      Result := pValue.AsBoolean.ToInt8;
-    TDBXDataTypes.Int16Type:
-      Result := pValue.AsInt16;
-    TDBXDataTypes.Int32Type:
-      Result := pValue.AsInt32;
-    TDBXDataTypes.DoubleType:
-      Result := pValue.AsDouble.Trunc;
-    TDBXDataTypes.BcdType:
-      Result := Int32(pValue.AsBcd);
-    TDBXDataTypes.UInt16Type:
-      Result := pValue.AsUInt16;
-    TDBXDataTypes.Int64Type:
-      Result := pValue.AsInt64;
-    TDBXDataTypes.WideStringType:
-      Result := pValue.AsString.ToUInt8;
-    TDBXDataTypes.SingleType:
-      Result := pValue.AsSingle.Trunc;
-    TDBXDataTypes.Int8Type:
-      Result := pValue.AsInt8;
-    TDBXDataTypes.UInt8Type:
-      Result := pValue.AsUInt8;
-  else
-    raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt8 field.');
+  if pValue.IsNull then
+  begin
+    Result := 0;
+  end else begin
+    case pValue.ValueType.DataType of
+      TDBXDataTypes.AnsiStringType:
+        Result := string(pValue.GetAnsiString).ToUInt8;
+      TDBXDataTypes.BooleanType:
+        Result := pValue.AsBoolean.ToInt8;
+      TDBXDataTypes.Int16Type:
+        Result := pValue.AsInt16;
+      TDBXDataTypes.Int32Type:
+        Result := pValue.AsInt32;
+      TDBXDataTypes.DoubleType:
+        Result := pValue.AsDouble.Trunc;
+      TDBXDataTypes.BcdType:
+        Result := Int32(pValue.AsBcd);
+      TDBXDataTypes.UInt16Type:
+        Result := pValue.AsUInt16;
+      TDBXDataTypes.Int64Type:
+        Result := pValue.AsInt64;
+      TDBXDataTypes.WideStringType:
+        Result := pValue.AsString.ToUInt8;
+      TDBXDataTypes.SingleType:
+        Result := pValue.AsSingle.Trunc;
+      TDBXDataTypes.Int8Type:
+        Result := pValue.AsInt8;
+      TDBXDataTypes.UInt8Type:
+        Result := pValue.AsUInt8;
+    else
+      raise EAqInternal.Create('Unexpectet type when trying to obtain an UInt8 field.');
+    end;
   end;
 end;
 
-procedure TAqDBXMapper.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
+procedure TAqDBXDataConverter.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
 begin
   pParameter.DataType := TDBXDataTypes.BooleanType;
   pParameter.Value.SetBoolean(pValue);
 end;
 
-procedure TAqDBXMapper.CurrencyToParameter(const pParameter: TDBXParameter; const pValue: Currency);
+procedure TAqDBXDataConverter.CurrencyToParameter(const pParameter: TDBXParameter; const pValue: Currency);
 begin
   BCDToParameter(pParameter, pValue.ToBcd);
 end;
 
-procedure TAqDBXMapper.DateToParameter(const pParameter: TDBXParameter; const pValue: TDate);
+procedure TAqDBXDataConverter.DateToParameter(const pParameter: TDBXParameter; const pValue: TDate);
 begin
   pParameter.DataType := TDBXDataTypes.DateType;
   pParameter.Value.AsDateTime := DateOf(pValue);
 end;
 
-procedure TAqDBXMapper.DateTimeToParameter(const pParameter: TDBXParameter; const pValue: TDateTime);
+procedure TAqDBXDataConverter.DateTimeToParameter(const pParameter: TDBXParameter; const pValue: TDateTime);
 begin
   pParameter.DataType := TDBXDataTypes.TimeStampType;
   pParameter.Value.AsDateTime := pValue;
 end;
 
-procedure TAqDBXMapper.DoubleToParameter(const pParameter: TDBXParameter; const pValue: Double);
+procedure TAqDBXDataConverter.DoubleToParameter(const pParameter: TDBXParameter; const pValue: Double);
 begin
   pParameter.DataType := TDBXDataTypes.DoubleType;
   pParameter.Value.SetDouble(pValue);
 end;
 
-procedure TAqDBXMapper.Int16ToParameter(const pParameter: TDBXParameter; const pValue: Int16);
+procedure TAqDBXDataConverter.Int16ToParameter(const pParameter: TDBXParameter; const pValue: Int16);
 begin
   pParameter.DataType := TDBXDataTypes.Int16Type;
   pParameter.Value.SetInt16(pValue);
 end;
 
-procedure TAqDBXMapper.Int32ToParameter(const pParameter: TDBXParameter; const pValue: Int32);
+procedure TAqDBXDataConverter.Int32ToParameter(const pParameter: TDBXParameter; const pValue: Int32);
 begin
   pParameter.DataType := TDBXDataTypes.Int32Type;
   pParameter.Value.SetInt32(pValue);
 end;
 
-procedure TAqDBXMapper.Int64ToParameter(const pParameter: TDBXParameter; const pValue: Int64);
+procedure TAqDBXDataConverter.Int64ToParameter(const pParameter: TDBXParameter; const pValue: Int64);
 begin
   pParameter.DataType := TDBXDataTypes.Int64Type;
   pParameter.Value.SetInt64(pValue);
 end;
 
-procedure TAqDBXMapper.Int8ToParameter(const pParameter: TDBXParameter; const pValue: Int8);
+procedure TAqDBXDataConverter.Int8ToParameter(const pParameter: TDBXParameter; const pValue: Int8);
 begin
-  pParameter.DataType := TDBXDataTypes.Int8Type;
-  pParameter.Value.SetInt8(pValue);
+  pParameter.DataType := TDBXDataTypes.Int32Type;
+  pParameter.Value.SetInt32(pValue);
 end;
 
-procedure TAqDBXMapper.SingleToParameter(const pParameter: TDBXParameter; const pValue: Single);
+procedure TAqDBXDataConverter.SingleToParameter(const pParameter: TDBXParameter; const pValue: Single);
 begin
   raise EAqInternal.Create('The type Single wasn''t mapped in the DBX Framework.');
 end;
 
-procedure TAqDBXMapper.StringToParameter(const pParameter: TDBXParameter; const pValue: string);
+procedure TAqDBXDataConverter.StringToParameter(const pParameter: TDBXParameter; const pValue: string);
 begin
   pParameter.DataType := TDBXDataTypes.WideStringType;
   pParameter.Value.SetString(pValue);
 end;
 
-procedure TAqDBXMapper.TimeToParameter(const pParameter: TDBXParameter; const pValue: TTime);
+procedure TAqDBXDataConverter.TimeToParameter(const pParameter: TDBXParameter; const pValue: TTime);
 begin
   pParameter.DataType := TDBXDataTypes.TimeType;
   pParameter.Value.AsDateTime := TimeOf(pValue);
 end;
 
-procedure TAqDBXMapper.TimeStampOffsetToParameter(const pParameter: TDBXParameter;
+procedure TAqDBXDataConverter.TimeStampOffsetToParameter(const pParameter: TDBXParameter;
   const pValue: TSQLTimeStampOffset);
 begin
   pParameter.DataType := TDBXDataTypes.TimeStampOffsetType;
   pParameter.Value.SetTimeStampOffset(pValue);
 end;
 
-procedure TAqDBXMapper.TimeStampToParameter(const pParameter: TDBXParameter; const pValue: TSQLTimeStamp);
+procedure TAqDBXDataConverter.TimeStampToParameter(const pParameter: TDBXParameter; const pValue: TSQLTimeStamp);
 begin
   pParameter.DataType := TDBXDataTypes.TimeStampType;
   pParameter.Value.SetTimeStamp(pValue);
 end;
 
-procedure TAqDBXMapper.UInt16ToParameter(const pParameter: TDBXParameter; const pValue: UInt16);
+procedure TAqDBXDataConverter.UInt16ToParameter(const pParameter: TDBXParameter; const pValue: UInt16);
 begin
   pParameter.DataType := TDBXDataTypes.UInt16Type;
   pParameter.Value.SetUInt16(pValue);
 end;
 
-procedure TAqDBXMapper.UInt32ToParameter(const pParameter: TDBXParameter; const pValue: UInt32);
+procedure TAqDBXDataConverter.UInt32ToParameter(const pParameter: TDBXParameter; const pValue: UInt32);
 begin
   pParameter.DataType := TDBXDataTypes.Int64Type;
   pParameter.Value.SetInt64(pValue);
 end;
 
-procedure TAqDBXMapper.UInt64ToParameter(const pParameter: TDBXParameter; const pValue: UInt64);
+procedure TAqDBXDataConverter.UInt64ToParameter(const pParameter: TDBXParameter; const pValue: UInt64);
 begin
   raise EAqInternal.Create('Type UInt64 wasn''t mapped in the DBX Framework.');
 end;
 
-procedure TAqDBXMapper.UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8);
+procedure TAqDBXDataConverter.UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8);
 begin
   pParameter.DataType := TDBXDataTypes.UInt8Type;
   pParameter.Value.SetUInt8(pValue);
@@ -1971,7 +2096,7 @@ end;
 
 { TAqDBXCommand }
 
-function TAqDBXCommand.Abrir(const pParametersHandler: TAqDBParametersHandlerMethod): TAqDBXReader;
+function TAqDBXCommand.Open(const pParametersHandler: TAqDBParametersHandlerMethod): TAqDBXReader;
 begin
   if Assigned(pParametersHandler) then
   begin
@@ -2007,21 +2132,58 @@ begin
   Result := FDBXCommand.RowsAffected;
 end;
 
-procedure TAqDBXCommand.Prepare;
+procedure TAqDBXCommand.Prepare(const pParametersInitializer: TAqDBParametersHandlerMethod);
 begin
+  if Assigned(pParametersInitializer) then
+  begin
+    pParametersInitializer(FParameters);
+  end;
+
   FPrepared := True;
 end;
 
 { TAqDBXConnection }
 
-function TAqDBXConnection.GetAutoIncrement(const pGenerator: string): Int64;
+function TAqDBXConnection.GetAutoIncrement(const pGeneratorName: string): Int64;
 begin
   if Assigned(FGetterAutoIncrement) then
   begin
     Result := FGetterAutoIncrement;
   end else begin
-    Result := 0;
+    Result := inherited;
   end;
+end;
+
+{ TAqDBXAdapter }
+
+constructor TAqDBXAdapter.Create;
+begin
+  inherited;
+
+  SetDBXConverter(CreateConverter);
+end;
+
+function TAqDBXAdapter.CreateConverter: TAqDBXDataConverter;
+begin
+  Result := GetDefaultConverter.Create;
+end;
+
+destructor TAqDBXAdapter.Destroy;
+begin
+  FDBXConverter.Free;
+
+  inherited;
+end;
+
+class function TAqDBXAdapter.GetDefaultConverter: TAqDBXDataConverterClass;
+begin
+  Result := TAqDBXDataConverter;
+end;
+
+procedure TAqDBXAdapter.SetDBXConverter(const pValue: TAqDBXDataConverter);
+begin
+  FreeAndNil(FDBXConverter);
+  FDBXConverter := pValue;
 end;
 
 end.

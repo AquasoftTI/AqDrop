@@ -9,7 +9,7 @@ type
   TAqDBSQLCommandType = (ctSelect, ctInsert, ctUpdate, ctDelete);
   TAqDBSQLSourceType = (stTable, stSelect);
   TAqDBSQLValueType = (vtColumn, vtOperation, vtSubselect, vtConstant, vtParameter);
-  TAqDBSQLConstantValueType = (cvText, cvInt, cvDouble, cvCurrency, cvDateTime, cvDate, cvTime, cvBoolean);
+  TAqDBSQLConstantValueType = (cvText, cvInt, cvDouble, cvCurrency, cvDateTime, cvDate, cvTime, cvBoolean, cvUInt);
   TAqDBSQLAggregatorType = (atNone, atCount, atSum, atAvg, atMax, atMin);
   TAqDBSQLConditionType = (ctComparison, ctValueIsNull, ctComposed, ctBetween);
   TAqDBSQLOperator = (opSum, opSubtraction, opMultiplication, opDivision, opDiv, opMod);
@@ -33,6 +33,7 @@ type
 
   IAqDBSQLTextConstant = interface;
   IAqDBSQLIntConstant = interface;
+  IAqDBSQLUIntConstant = interface;
   IAqDBSQLDoubleConstant = interface;
   IAqDBSQLCurrencyConstant = interface;
   IAqDBSQLDateTimeConstant = interface;
@@ -111,6 +112,7 @@ type
     function GetAsDateConstant: IAqDBSQLDateConstant;
     function GetAsTimeConstant: IAqDBSQLTimeConstant;
     function GetAsBooleanConstant: IAqDBSQLBooleanConstant;
+    function GetAsUIntConstant: IAqDBSQLUIntConstant;
   end;
 
   IAqDBSQLTextConstant = interface(IAqDBSQLConstant)
@@ -127,6 +129,14 @@ type
     function GetValue: Int64;
 
     property Value: Int64 read GetValue;
+  end;
+
+  IAqDBSQLUIntConstant = interface(IAqDBSQLConstant)
+    ['{B70B8502-A9E6-4785-98A6-B8E7884DD72A}']
+
+    function GetValue: UInt64;
+
+    property Value: UInt64 read GetValue;
   end;
 
   IAqDBSQLDoubleConstant = interface(IAqDBSQLConstant)
@@ -228,9 +238,13 @@ type
     function GetComparison: TAqDBSQLComparison;
     function GetRightValue: IAqDBSQLValue;
 
-    property LeftValue: IAqDBSQLValue read GetLeftValue;
-    property Comparison: TAqDBSQLComparison read GetComparison;
-    property RightValue: IAqDBSQLValue read GetRightValue;
+    procedure SetLeftValue(pValue: IAqDBSQLValue);
+    procedure SetRightValue(pValue: IAqDBSQLValue);
+    procedure SetComparison(const pComparison: TAqDBSQLComparison);
+
+    property LeftValue: IAqDBSQLValue read GetLeftValue write SetLeftValue;
+    property Comparison: TAqDBSQLComparison read GetComparison write SetComparison;
+    property RightValue: IAqDBSQLValue read GetRightValue write SetRightValue;
   end;
 
   IAqDBSQLValueIsNullCondition = interface(IAqDBSQLCondition)
@@ -270,6 +284,12 @@ type
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
     function AddColumnEqual(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: UInt64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: UInt64;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
     function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Double;
@@ -582,14 +602,27 @@ type
     function GetCondition: IAqDBSQLCondition;
     function GetJoinType: TAqDBSQLJoinType;
 
+    function &On(const pColumnName: string): IAqDBSQLJoin;
+    function EqualsTo(const pColumnName: string): IAqDBSQLJoin;
+
     property JoinType: TAqDBSQLJoinType read GetJoinType;
     property Source: IAqDBSQLSource read GetSource;
     property Condition: IAqDBSQLCondition read GetCondition;
   end;
 
+  IAqDBSQLOrderByItem = interface
+    ['{CBBDA2D1-FF3B-4C65-942A-D030AE76A572}']
+    function GetValue: IAqDBSQLValue;
+    function GetDesc: Boolean;
+
+    property Value: IAqDBSQLValue read GetValue;
+    property Desc: Boolean read GetDesc;
+  end;
+
   IAqDBSQLSelect = interface(IAqDBSQLSource)
     ['{05EED8D5-FD87-4157-89D8-F295B921FC4E}']
     function GetColumns: IAqReadList<IAqDBSQLValue>;
+    function GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
     function GetSource: IAqDBSQLSource;
 
     function GetHasJoins: Boolean;
@@ -606,8 +639,8 @@ type
     procedure UnsetLimit;
 
     function GetIsOrderByDefined: Boolean;
-    function GetOrderBy: IAqReadList<IAqDBSQLValue>;
-    function AddOrderBy(pValue: IAqDBSQLValue): Int32;
+    function GetOrderBy: IAqReadList<IAqDBSQLOrderByItem>;
+    function AddOrderBy(pValue: IAqDBSQLValue; const pDesc: Boolean = False): Int32;
 
     function AddColumn(pValue: IAqDBSQLValue): Int32; overload;
     function AddColumn(const pExpression: string; const pAlias: string = ''; pSource: IAqDBSQLSource = nil;
@@ -615,6 +648,7 @@ type
 
     function AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
       pCondition: IAqDBSQLCondition): IAqDBSQLJoin;
+    function InnerJoin(const pTableName: string): IAqDBSQLJoin;
 
     property Columns: IAqReadList<IAqDBSQLValue> read GetColumns;
     property Source: IAqDBSQLSource read GetSource;
@@ -629,7 +663,7 @@ type
     property Limit: UInt32 read GetLimit write SetLimit;
 
     property IsOrderByDefined: Boolean read GetIsOrderByDefined;
-    property OrderBy: IAqReadList<IAqDBSQLValue> read GetOrderBy;
+    property OrderBy: IAqReadList<IAqDBSQLOrderByItem> read GetOrderBy;
   end;
 
   IAqDBSQLAssignment = interface
@@ -667,7 +701,7 @@ type
     property Assignments: IAqReadList<IAqDBSQLAssignment> read GetAssignments;
   end;
 
-  IAqDBSQLUpdate = interface
+  IAqDBSQLUpdate = interface(IAqDBSQLCommand)
     ['{A8E24816-1545-4291-B598-FC7872CBB6B7}']
 
     function GetTable: IAqDBSQLTable;
@@ -680,13 +714,15 @@ type
     function AddAssignment(pAssignment: IAqDBSQLAssignment): Int32; overload;
     function AddAssignment(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue): IAqDBSQLAssignment; overload;
 
+    function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
+
     property Table: IAqDBSQLTable read GetTable;
     property Assignments: IAqReadList<IAqDBSQLAssignment> read GetAssignments;
     property IsConditionDefined: Boolean read GetIsConditionDefined;
     property Condition: IAqDBSQLCondition read GetCondition write SetCondition;
   end;
 
-  IAqDBSQLDelete = interface
+  IAqDBSQLDelete = interface(IAqDBSQLCommand)
     ['{5CECF01F-FF67-43C6-895E-93E224150D71}']
 
     function GetTable: IAqDBSQLTable;
@@ -694,6 +730,8 @@ type
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
     procedure SetCondition(pValue: IAqDBSQLCondition);
+
+    function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
 
     property Table: IAqDBSQLTable read GetTable;
 

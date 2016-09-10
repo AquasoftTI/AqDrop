@@ -11,6 +11,9 @@ type
   ///     Classe base para objetos que devem implementar IInterface.
   /// </summary>
   /// ------------------------------------------------------------------------------------------------------------------
+{$IFDEF AUTOREFCOUNT}
+  TAqInterfacedObject = class(TInterfacedObject)
+{$ELSE}
   TAqInterfacedObject = class(TObject, IInterface)
   strict private
     FReferences: Int32;
@@ -27,11 +30,13 @@ type
     procedure BeforeDestruction; override;
 
     class function NewInstance: TObject; override;
+{$ENDIF}
   end;
 
 
 implementation
 
+{$IFNDEF AUTOREFCOUNT}
 uses
   System.SyncObjs;
 
@@ -110,6 +115,8 @@ begin
     Result := 0;
   end;
 end;
+
+{$ENDIF}
 
 end.
 

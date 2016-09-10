@@ -1,6 +1,6 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{96824E55-9D99-45B9-8F0D-99A349926A9C}</ProjectGuid>
+        <ProjectGuid>{B8A46A82-6B73-42C2-8497-B061947A135C}</ProjectGuid>
         <MainSource>AqDrop.DB.DXE6.dpk</MainSource>
         <ProjectVersion>15.4</ProjectVersion>
         <FrameworkType>None</FrameworkType>
@@ -57,11 +57,13 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
-        <SanitizedProjectName>AqDrop_DB_DXE6</SanitizedProjectName>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_Locale>1046</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <DCC_Description>Aquasoft Drop - DB Library</DCC_Description>
         <GenDll>true</GenDll>
-        <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
+        <SanitizedProjectName>AqDrop_DB_DXE6</SanitizedProjectName>
         <GenPackage>true</GenPackage>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
         <DCC_E>false</DCC_E>
@@ -80,10 +82,10 @@
         <DCC_CBuilderOutput>None</DCC_CBuilderOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
-        <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -97,6 +99,9 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.2.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.2.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_MinorVer>2</VerInfo_MinorVer>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
@@ -104,10 +109,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.1.0;Comments=</VerInfo_Keys>
-        <DCC_Description>Aquasoft Drop - DB</DCC_Description>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -115,18 +117,18 @@
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="AqDrop.Core.DXE6.dcp"/>
-        <DCCReference Include="DbxCommonDriver.dcp"/>
-        <DCCReference Include="DBXMySQLDriver.dcp"/>
-        <DCCReference Include="DBXFirebirdDriver.dcp"/>
-        <DCCReference Include="DBXMSSQLDriver.dcp"/>
+        <DCCReference Include="..\AqDrop.DB.Adapter.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Base.Exceptions.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Base.pas"/>
         <DCCReference Include="..\AqDrop.DB.Connection.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.FB.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.MSSQL.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.MySQL.pas"/>
-        <DCCReference Include="..\AqDrop.DB.DBX.pas"/>
+        <DCCReference Include="..\AqDrop.DB.FB.pas"/>
+        <DCCReference Include="..\AqDrop.DB.MSSQL.pas"/>
+        <DCCReference Include="..\AqDrop.DB.MySQL.pas"/>
+        <DCCReference Include="..\AqDrop.DB.Ora.pas"/>
         <DCCReference Include="..\AqDrop.DB.ORM.Attributes.pas"/>
         <DCCReference Include="..\AqDrop.DB.ORM.Manager.pas"/>
         <DCCReference Include="..\AqDrop.DB.ORM.Reader.pas"/>
+        <DCCReference Include="..\AqDrop.DB.PG.pas"/>
         <DCCReference Include="..\AqDrop.DB.SQL.Intf.pas"/>
         <DCCReference Include="..\AqDrop.DB.SQL.pas"/>
         <DCCReference Include="..\AqDrop.DB.Tokenizer.pas"/>
