@@ -16,6 +16,7 @@ Para Instalar o DROP:
   - Instale o pacote Register.
 
 NOTAS IMPORTANTES:
+  - O Drop é disponibilizado na modalidade 'As Is', isto significa que a Aquasoft não se responsabiliza por eventuais problemas decorrentes da utilização do Drop, bem como não é obrigada a implementar / modificar a ferramenta para se adaptar ao cenário de qualquer usuário do Drop;
   - Os warnings levantados durante a compilação dos pacotes devem ser desconsiderados, pois não acontecem quando as classes são utilizadas em DPRs;
   - O Drop é não é compatível com versões anteriores ao Delphi XE3;
   - O Drop contempla classes especializadas para conexões com MSSQL, MySQL e Firebird. No entanto, o Drop conecta com qualquer SGBD suportado pelo DBX;
@@ -34,3 +35,16 @@ www.aquasoft.com.br
 twitter.com/AquasoftTI
 facebook.com/AquasoftTI
 Fone: +55 (51) 3022-3188
+
+HISTÓRICO DE VERSÕES:
+----------------------------------------
+2014.04.16: Versão 1.0.1 do Drop:
+- Suporte a bindings para listas de resultados;
+- Padronização de algumas units;
+- Criação de novos métodos em interfaces e suas classes correspondentes;
+- Pequenas melhorias e correções;
+- Adição do demo MappingAndBinding;
+- Adição de pacotes para o Delphi XE6;
+----------------------------------------
+2014.04.02: Versão 1.0.0 do Drop!
+----------------------------------------

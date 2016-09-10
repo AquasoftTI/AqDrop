@@ -5,7 +5,7 @@
         <ProjectVersion>14.3</ProjectVersion>
         <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Debug</Config>
+        <Config Condition="'$(Config)'==''">Release</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Package</AppType>
@@ -42,6 +42,12 @@
     <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
+        <Cfg_2_Win32>true</Cfg_2_Win32>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
@@ -92,6 +98,13 @@
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
         <DCC_DebugInformation>false</DCC_DebugInformation>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <DCC_Description>Aquasoft Drop</DCC_Description>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.1.0;Comments=</VerInfo_Keys>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Release>1</VerInfo_Release>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+    </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
@@ -100,13 +113,13 @@
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="..\AqDrop.Register.AboutBox.pas"/>
         <DCCReference Include="..\AqDrop.Register.Splash.pas"/>
-        <RcItem Include="..\Resources\Drop_Icone_24x24.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>BMP_DROP_24</ResourceId>
-        </RcItem>
         <RcItem Include="..\Resources\Drop_Icone_32x32.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>BMP_DROP_32</ResourceId>
+        </RcItem>
+        <RcItem Include="..\Resources\Dop_Icone_fp_24x24.bmp">
+            <ResourceType>BITMAP</ResourceType>
+            <ResourceId>BMP_DROP_24</ResourceId>
         </RcItem>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

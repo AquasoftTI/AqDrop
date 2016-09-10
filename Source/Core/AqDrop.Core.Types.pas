@@ -9,6 +9,9 @@ type
     adtUInt64, adtInt64, adtCurrency, adtDouble, adtSingle, adtDatetime, adtDate, adtTime, adtAnsiChar, adtChar,
     adtAnsiString, adtString, adtWideString, adtSet, adtClass, adtMethod, adtVariant, adtRecord, adtInterface);
 
+const
+  adtIntTypes = [adtUInt8..adtInt64];
+
 implementation
 
 end.

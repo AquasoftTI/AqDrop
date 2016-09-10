@@ -103,9 +103,10 @@
         <DCC_DebugInformation>false</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_MajorVer>1</VerInfo_MajorVer>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.1.0;Comments=</VerInfo_Keys>
         <VerInfo_MinorVer>0</VerInfo_MinorVer>
     </PropertyGroup>
     <ItemGroup>
@@ -114,6 +115,8 @@
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="dbrtl.dcp"/>
+        <DCCReference Include="bindengine.dcp"/>
+        <DCCReference Include="bindcomp.dcp"/>
         <DCCReference Include="..\AqDrop.Core.AnonymousMethods.pas"/>
         <DCCReference Include="..\AqDrop.Core.Attributes.pas"/>
         <DCCReference Include="..\AqDrop.Core.Automaton.pas"/>
@@ -133,6 +136,7 @@
         <DCCReference Include="..\AqDrop.Core.Tokenizer.pas"/>
         <DCCReference Include="..\AqDrop.Core.Types.pas"/>
         <DCCReference Include="..\AqDrop.Core.Helpers.pas"/>
+        <DCCReference Include="..\AqDrop.Core.Bindings.pas"/>
         <None Include="..\AqDrop.Core.FullRTTIForMethods.inc"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

@@ -19,6 +19,7 @@ To install the DROP:
   - Install the Register package.
 
 IMPORTANT NOTES:
+  - The Drop is provided 'As Is', it means that Aquasoft is not responsible for any problems arising from the use of Drop, and has no obligations to implement / modify the tool to adapt it to any user scenario;
   - The warnings raised during the compilation of the packages should be
 disregarded, because it does not happen when the classes are used in DPRs;
   - The Drop is not compatible with earlier versions than Delphi XE3;
@@ -41,3 +42,17 @@ www.aquasoft.com.br
 twitter.com/AquasoftTI
 facebook.com/AquasoftTI
 Phone: +55 (51) 3022-3188
+
+
+VERSION HISTORY:
+----------------------------------------
+2014.04.16: Drop 1.0.1:
+- Binding support for result lists;
+- Some uints were revised and standardized;
+- New methods in interfaces and it respectives classes;
+- Small improvments and bug fixes;
+- Added demo MappingAndBinding;
+- Added packages to support Delphi XE6;
+----------------------------------------
+2014.04.02: Drop 1.0.1!
+----------------------------------------

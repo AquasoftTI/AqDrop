@@ -99,85 +99,72 @@ type
     function GetValueType: TAqDBSQLValueType; override;
     function GetAsConstant: IAqDBSQLConstant; override;
 
-
     function GetConstantType: TAqDBSQLConstantValueType; virtual; abstract;
     function GetAsTextConstant: IAqDBSQLTextConstant; virtual;
-    function GetAsNumericConstant: IAqDBSQLNumericConstant; virtual;
+    function GetAsIntConstant: IAqDBSQLIntConstant; virtual;
+    function GetAsDoubleConstant: IAqDBSQLDoubleConstant; virtual;
+    function GetAsCurrencyConstant: IAqDBSQLCurrencyConstant; virtual;
     function GetAsDateTimeConstant: IAqDBSQLDateTimeConstant; virtual;
     function GetAsDateConstant: IAqDBSQLDateConstant; virtual;
     function GetAsTimeConstant: IAqDBSQLTimeConstant; virtual;
     function GetAsBooleanConstant: IAqDBSQLBooleanConstant; virtual;
   end;
 
-  TAqDBSQLTextConstant = class(TAqDBSQLConstant, IAqDBSQLTextConstant)
+  TAqDBSQLGenericConstant<T> = class(TAqDBSQLConstant)
   strict private
-    FValue: string;
-    function GetValue: string;
+    FValue: T;
+  public
+    constructor Create(const pValue: T; const pAlias: string = '';
+      const pAggregator: TAqDBSQLAggregatorType = atNone);
+    function GetValue: T;
+  end;
+
+  TAqDBSQLTextConstant = class(TAqDBSQLGenericConstant<string>, IAqDBSQLTextConstant)
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
     function GetAsTextConstant: IAqDBSQLTextConstant; override;
-  public
-    constructor Create(const pValue: string; const pAlias: string = '';
-      const pAggregator: TAqDBSQLAggregatorType = atNone);
   end;
 
-  TAqDBSQLNumericConstant = class(TAqDBSQLConstant, IAqDBSQLNumericConstant)
-  strict private
-    FValue: Double;
-    function GetValue: Double;
+  TAqDBSQLIntConstant = class(TAqDBSQLGenericConstant<Int64>, IAqDBSQLIntConstant)
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
-    function GetAsNumericConstant: IAqDBSQLNumericConstant; override;
-  public
-    constructor Create(const pValue: Double; const pAlias: string = '';
-      const pAggregator: TAqDBSQLAggregatorType = atNone);
+    function GetAsIntConstant: IAqDBSQLIntConstant; override;
   end;
 
-  TAqDBSQLDateTimeConstant = class(TAqDBSQLConstant, IAqDBSQLDateTimeConstant)
-  strict private
-    FValue: TDateTime;
-    function GetValue: TDateTime;
+  TAqDBSQLDoubleConstant = class(TAqDBSQLGenericConstant<Double>, IAqDBSQLDoubleConstant)
+  strict protected
+    function GetConstantType: TAqDBSQLConstantValueType; override;
+    function GetAsDoubleConstant: IAqDBSQLDoubleConstant; override;
+  end;
+
+  TAqDBSQLCurrencyConstant = class(TAqDBSQLGenericConstant<Currency>, IAqDBSQLCurrencyConstant)
+  strict protected
+    function GetConstantType: TAqDBSQLConstantValueType; override;
+    function GetAsCurrencyConstant: IAqDBSQLCurrencyConstant; override;
+  end;
+
+  TAqDBSQLDateTimeConstant = class(TAqDBSQLGenericConstant<TDateTime>, IAqDBSQLDateTimeConstant)
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
     function GetAsDateTimeConstant: IAqDBSQLDateTimeConstant; override;
-  public
-    constructor Create(const pValue: TDateTime; const pAlias: string = '';
-      const pAggregator: TAqDBSQLAggregatorType = atNone);
   end;
 
-  TAqDBSQLDateConstant = class(TAqDBSQLConstant, IAqDBSQLDateConstant)
-  strict private
-    FValue: TDate;
-    function GetValue: TDate;
+  TAqDBSQLDateConstant = class(TAqDBSQLGenericConstant<TDate>, IAqDBSQLDateConstant)
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
     function GetAsDateConstant: IAqDBSQLDateConstant; override;
-  public
-    constructor Create(const pValue: TDate; const pAlias: string = '';
-      const pAggregator: TAqDBSQLAggregatorType = atNone);
   end;
 
-  TAqDBSQLTimeConstant = class(TAqDBSQLConstant, IAqDBSQLTimeConstant)
-  strict private
-    FValue: TTime;
-    function GetValue: TTime;
+  TAqDBSQLTimeConstant = class(TAqDBSQLGenericConstant<TTime>, IAqDBSQLTimeConstant)
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
     function GetAsTimeConstant: IAqDBSQLTimeConstant; override;
-  public
-    constructor Create(const pValue: TTime);
   end;
 
-  TAqDBSQLBooleanConstant = class(TAqDBSQLConstant, IAqDBSQLBooleanConstant)
-  strict private
-    FValue: Boolean;
-    function GetValue: Boolean;
+  TAqDBSQLBooleanConstant = class(TAqDBSQLGenericConstant<Boolean>, IAqDBSQLBooleanConstant)
   strict protected
     function GetConstantType: TAqDBSQLConstantValueType; override;
     function GetAsBooleanConstant: IAqDBSQLBooleanConstant; override;
-  public
-    constructor Create(const pValue: Boolean; const pAlias: string = '';
-      const pAggregator: TAqDBSQLAggregatorType = atNone);
   end;
 
   TAqDBSQLParameter = class(TAqDBSQLValue, IAqDBSQLParameter)
@@ -261,13 +248,322 @@ type
     function GetConditionType: TAqDBSQLConditionType; override;
     function GetAsComposed: IAqDBSQLComposedCondition; override;
   public
-    constructor Create(const pInitialCondition: IAqDBSQLCondition);
+    constructor Create(pInitialCondition: IAqDBSQLCondition = nil);
     destructor Destroy; override;
 
+    function GetIsInitialized: Boolean;
+
     function AddCondition(const pLinkOperator: TAqDBSQLBooleanOperator; pCondition: IAqDBSQLCondition): Int32;
-    function AddAnd(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
-    function AddOr(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
-    function AddXor(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function AddAnd(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function AddOr(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function AddXor(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnIsNull(pColumn: IAqDBSQLColumn;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnIsNull(const pColumnName: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
   end;
 
   TAqDBSQLBetweenCondition = class(TAqDBSQLCondition, IAqDBSQLBetweenCondition)
@@ -319,7 +615,7 @@ type
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
     procedure SetCondition(pValue: IAqDBSQLCondition);
-    function CustomizeCondition(const pNewCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
 
     function GetIsLimitDefined: Boolean;
     function GetLimit: UInt32;
@@ -536,15 +832,20 @@ begin
   FSource := TAqDBSQLTable.Create(pSourceTable);
 end;
 
-function TAqDBSQLSelect.CustomizeCondition(const pNewCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+function TAqDBSQLSelect.CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
 begin
   if GetIsConditionDefined then
   begin
     Result := TAqDBSQLComposedCondition.Create(FCondition);
-    Result.AddAnd(pNewCondition)
+    if Assigned(pNewCondition) then
+    begin
+      Result.AddAnd(pNewCondition);
+    end;
   end else begin
     Result := TAqDBSQLComposedCondition.Create(pNewCondition);
   end;
+
+  FCondition := Result;
 end;
 
 function TAqDBSQLSelect.AddColumn(const pExpression: string; const pAlias: string; pSource: IAqDBSQLSource;
@@ -894,36 +1195,778 @@ end;
 
 { TAqDBSQLComposedCondition }
 
-function TAqDBSQLComposedCondition.AddAnd(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+function TAqDBSQLComposedCondition.AddAnd(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
 begin
   AddCondition(TAqDBSQLBooleanOperator.boAnd, pCondition);
   Result := Self;
 end;
 
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLDateTimeConstant.Create(pRangeBegin), TAqDBSQLDateTimeConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLCurrencyConstant.Create(pRangeBegin), TAqDBSQLCurrencyConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLTimeConstant.Create(pRangeBegin), TAqDBSQLTimeConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLDateConstant.Create(pRangeBegin), TAqDBSQLDateConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLTextConstant.Create(pRangeBegin), TAqDBSQLTextConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName, pRangeBegin, pRangeEnd: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin,
+  pRangeEnd: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn, pRangeBegin, pRangeEnd));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin,
+  pRangeEnd: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLDoubleConstant.Create(pRangeBegin), TAqDBSQLDoubleConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
+    TAqDBSQLIntConstant.Create(pRangeBegin), TAqDBSQLIntConstant.Create(pRangeEnd)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLDateConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLDateTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Boolean;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLBooleanConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: Boolean;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLTextConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual, pValue));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLCurrencyConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnEqual(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpEqual,
+    TAqDBSQLDoubleConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLDateTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLCurrencyConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLDateConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLTextConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual, pValue));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLDoubleConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterEqual,
+    TAqDBSQLIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterEqualThan(const pColumnName: string; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLDoubleConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLCurrencyConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan, pValue));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLTextConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLDateConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpGreaterThan,
+    TAqDBSQLDateTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnGreaterThan(const pColumnName: string; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnGreaterThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnIsNull(const pColumnName: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnIsNull(TAqDBSQLColumn.Create(pColumnName), pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnIsNull(pColumn: IAqDBSQLColumn;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLValueIsNullCondition.Create(pColumn));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLDoubleConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual, pValue));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLTextConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLDateConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLCurrencyConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessEqual,
+    TAqDBSQLDateTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLDateTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: TDateTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLCurrencyConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: Currency;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: TTime;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLDateConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: TDate;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLTextConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan, pValue));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLDoubleConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: Double;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, TAqDBSQLComparison.cpLessThan,
+    TAqDBSQLIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; pValue: Int64;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
 function TAqDBSQLComposedCondition.AddCondition(const pLinkOperator: TAqDBSQLBooleanOperator;
   pCondition: IAqDBSQLCondition): Int32;
 begin
-  FOperators.Add(pLinkOperator);
+  if GetIsInitialized then
+  begin
+    FOperators.Add(pLinkOperator);
+  end;
+
   Result := FConditions.Add(pCondition);
 end;
 
-function TAqDBSQLComposedCondition.AddOr(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+function TAqDBSQLComposedCondition.AddOr(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
 begin
   AddCondition(TAqDBSQLBooleanOperator.boOr, pCondition);
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddXor(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+function TAqDBSQLComposedCondition.AddXor(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
 begin
   AddCondition(TAqDBSQLBooleanOperator.boXor, pCondition);
   Result := Self;
 end;
 
-constructor TAqDBSQLComposedCondition.Create(const pInitialCondition: IAqDBSQLCondition);
+constructor TAqDBSQLComposedCondition.Create(pInitialCondition: IAqDBSQLCondition);
 begin
   FConditions := TAqList<IAqDBSQLCondition>.Create;
   FOperators := TAqList<TAqDBSQLBooleanOperator>.Create;
-  FConditions.Add(pInitialCondition);
+
+  if Assigned(pInitialCondition) then
+  begin
+    FConditions.Add(pInitialCondition);
+  end;
 end;
 
 destructor TAqDBSQLComposedCondition.Destroy;
@@ -947,6 +1990,11 @@ end;
 function TAqDBSQLComposedCondition.GetConditionType: TAqDBSQLConditionType;
 begin
   Result := TAqDBSQLConditionType.ctComposed;
+end;
+
+function TAqDBSQLComposedCondition.GetIsInitialized: Boolean;
+begin
+  Result := FConditions.Count > 0;
 end;
 
 function TAqDBSQLComposedCondition.GetLinkOperators: IAqReadList<AqDrop.DB.SQL.Intf.TAqDBSQLBooleanOperator>;
@@ -1139,6 +2187,11 @@ begin
   Result := Self;
 end;
 
+function TAqDBSQLConstant.GetAsCurrencyConstant: IAqDBSQLCurrencyConstant;
+begin
+  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLCurrencyConstant.');
+end;
+
 function TAqDBSQLConstant.GetAsDateConstant: IAqDBSQLDateConstant;
 begin
   raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDateConstant.');
@@ -1149,9 +2202,14 @@ begin
   raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDateTimeConstant.');
 end;
 
-function TAqDBSQLConstant.GetAsNumericConstant: IAqDBSQLNumericConstant;
+function TAqDBSQLConstant.GetAsDoubleConstant: IAqDBSQLDoubleConstant;
 begin
-  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLNumericConstant.');
+  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLDoubleConstant.');
+end;
+
+function TAqDBSQLConstant.GetAsIntConstant: IAqDBSQLIntConstant;
+begin
+  raise EAqInternal.Create('Objects of type ' + Self.ClassName + ' cannot be consumed as IAqDBSQLIntConstant.');
 end;
 
 function TAqDBSQLConstant.GetAsTextConstant: IAqDBSQLTextConstant;
@@ -1171,14 +2229,6 @@ end;
 
 { TAqDBSQLTextConstant }
 
-constructor TAqDBSQLTextConstant.Create(const pValue: string; const pAlias: string = '';
-  const pAggregator: TAqDBSQLAggregatorType = atNone);
-begin
-  inherited Create(pAlias, pAggregator);
-
-  FValue := pValue;
-end;
-
 function TAqDBSQLTextConstant.GetAsTextConstant: IAqDBSQLTextConstant;
 begin
   Result := Self;
@@ -1189,45 +2239,7 @@ begin
   Result := TAqDBSQLConstantValueType.cvText;
 end;
 
-function TAqDBSQLTextConstant.GetValue: string;
-begin
-  Result := FValue;
-end;
-
-{ TAqDBSQLNumericConstant }
-
-constructor TAqDBSQLNumericConstant.Create(const pValue: Double; const pAlias: string = '';
-  const pAggregator: TAqDBSQLAggregatorType = atNone);
-begin
-  inherited Create(pAlias, pAggregator);
-
-  FValue := pValue;
-end;
-
-function TAqDBSQLNumericConstant.GetAsNumericConstant: IAqDBSQLNumericConstant;
-begin
-  Result := Self;
-end;
-
-function TAqDBSQLNumericConstant.GetConstantType: TAqDBSQLConstantValueType;
-begin
-  Result := TAqDBSQLConstantValueType.cvNumeric;
-end;
-
-function TAqDBSQLNumericConstant.GetValue: Double;
-begin
-  Result := FValue;
-end;
-
 { TAqDBSQLDateTimeConstant }
-
-constructor TAqDBSQLDateTimeConstant.Create(const pValue: TDateTime; const pAlias: string = '';
-  const pAggregator: TAqDBSQLAggregatorType = atNone);
-begin
-  inherited Create(pAlias, pAggregator);
-
-  FValue := pValue;
-end;
 
 function TAqDBSQLDateTimeConstant.GetAsDateTimeConstant: IAqDBSQLDateTimeConstant;
 begin
@@ -1239,20 +2251,7 @@ begin
   Result := TAqDBSQLConstantValueType.cvDateTime;
 end;
 
-function TAqDBSQLDateTimeConstant.GetValue: TDateTime;
-begin
-  Result := FValue;
-end;
-
 { TAqDBSQLBooleanConstant }
-
-constructor TAqDBSQLBooleanConstant.Create(const pValue: Boolean; const pAlias: string = '';
-  const pAggregator: TAqDBSQLAggregatorType = atNone);
-begin
-  inherited Create(pAlias, pAggregator);
-
-  FValue := pValue;
-end;
 
 function TAqDBSQLBooleanConstant.GetAsBooleanConstant: IAqDBSQLBooleanConstant;
 begin
@@ -1264,20 +2263,7 @@ begin
   Result := TAqDBSQLConstantValueType.cvBoolean;
 end;
 
-function TAqDBSQLBooleanConstant.GetValue: Boolean;
-begin
-  Result := FValue;
-end;
-
 { TAqDBSQLDateConstant }
-
-constructor TAqDBSQLDateConstant.Create(const pValue: TDate; const pAlias: string = '';
-  const pAggregator: TAqDBSQLAggregatorType = atNone);
-begin
-  inherited Create(pAlias, pAggregator);
-
-  FValue := pValue;
-end;
 
 function TAqDBSQLDateConstant.GetAsDateConstant: IAqDBSQLDateConstant;
 begin
@@ -1289,17 +2275,7 @@ begin
   Result := TAqDBSQLConstantValueType.cvDate;
 end;
 
-function TAqDBSQLDateConstant.GetValue: TDate;
-begin
-  Result := FValue;
-end;
-
 { TAqDBSQLTimeConstant }
-
-constructor TAqDBSQLTimeConstant.Create(const pValue: TTime);
-begin
-  FValue := pValue;
-end;
 
 function TAqDBSQLTimeConstant.GetAsTimeConstant: IAqDBSQLTimeConstant;
 begin
@@ -1309,11 +2285,6 @@ end;
 function TAqDBSQLTimeConstant.GetConstantType: TAqDBSQLConstantValueType;
 begin
   Result := TAqDBSQLConstantValueType.cvTime;
-end;
-
-function TAqDBSQLTimeConstant.GetValue: TTime;
-begin
-  Result := FValue;
 end;
 
 { TAqDBSQLUpdate }
@@ -1422,6 +2393,57 @@ end;
 procedure TAqDBSQLDelete.SetCondition(pValue: IAqDBSQLCondition);
 begin
   FCondition := pValue;
+end;
+
+{ TAqDBSQLGenericConstant<T> }
+
+constructor TAqDBSQLGenericConstant<T>.Create(const pValue: T; const pAlias: string;
+  const pAggregator: TAqDBSQLAggregatorType);
+begin
+  inherited Create(pAlias, pAggregator);
+
+  FValue := pValue;
+end;
+
+function TAqDBSQLGenericConstant<T>.GetValue: T;
+begin
+  Result := FValue;
+end;
+
+{ TAqDBSQLIntConstant }
+
+function TAqDBSQLIntConstant.GetAsIntConstant: IAqDBSQLIntConstant;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLIntConstant.GetConstantType: TAqDBSQLConstantValueType;
+begin
+  Result := TAqDBSQLConstantValueType.cvInt;
+end;
+
+{ TAqDBSQLDoubleConstant }
+
+function TAqDBSQLDoubleConstant.GetAsDoubleConstant: IAqDBSQLDoubleConstant;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLDoubleConstant.GetConstantType: TAqDBSQLConstantValueType;
+begin
+  Result := TAqDBSQLConstantValueType.cvDouble;
+end;
+
+{ TAqDBSQLCurrencyConstant }
+
+function TAqDBSQLCurrencyConstant.GetAsCurrencyConstant: IAqDBSQLCurrencyConstant;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLCurrencyConstant.GetConstantType: TAqDBSQLConstantValueType;
+begin
+  Result := TAqDBSQLConstantValueType.cvCurrency;
 end;
 
 end.

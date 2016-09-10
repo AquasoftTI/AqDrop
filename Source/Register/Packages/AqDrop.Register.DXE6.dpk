@@ -1,4 +1,4 @@
-package AqDrop.Register.DXE4;
+package AqDrop.Register.DXE6;
 
 {$R *.res}
 {$R *.dres}

@@ -1,4 +1,4 @@
-package AqDrop.Core.DXE4;
+package AqDrop.Core.DXE6;
 
 {$R *.res}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
@@ -40,10 +40,12 @@ contains
   AqDrop.Core.Attributes in '..\AqDrop.Core.Attributes.pas',
   AqDrop.Core.Automaton in '..\AqDrop.Core.Automaton.pas',
   AqDrop.Core.Automaton.Text in '..\AqDrop.Core.Automaton.Text.pas',
+  AqDrop.Core.Bindings in '..\AqDrop.Core.Bindings.pas',
   AqDrop.Core.Calendar in '..\AqDrop.Core.Calendar.pas',
   AqDrop.Core.Collections.Intf in '..\AqDrop.Core.Collections.Intf.pas',
   AqDrop.Core.Collections in '..\AqDrop.Core.Collections.pas',
   AqDrop.Core.Exceptions in '..\AqDrop.Core.Exceptions.pas',
+  AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas',
   AqDrop.Core.Helpers.TRttiObject in '..\AqDrop.Core.Helpers.TRttiObject.pas',
   AqDrop.Core.Helpers.TRttiType in '..\AqDrop.Core.Helpers.TRttiType.pas',
   AqDrop.Core.InterfacedObject in '..\AqDrop.Core.InterfacedObject.pas',
@@ -53,8 +55,6 @@ contains
   AqDrop.Core.Observer.Intf in '..\AqDrop.Core.Observer.Intf.pas',
   AqDrop.Core.Observer in '..\AqDrop.Core.Observer.pas',
   AqDrop.Core.Tokenizer in '..\AqDrop.Core.Tokenizer.pas',
-  AqDrop.Core.Types in '..\AqDrop.Core.Types.pas',
-  AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas',
-  AqDrop.Core.Bindings in '..\AqDrop.Core.Bindings.pas';
+  AqDrop.Core.Types in '..\AqDrop.Core.Types.pas';
 
 end.

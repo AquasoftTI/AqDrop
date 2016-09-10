@@ -34,6 +34,7 @@ type
 
     property Attribute: AqColumn read FAttribute;
     property Name: string read GetName;
+    property &Type: TAqDataType read GetType;
   end;
 
   TAqDBORMColumnField = class(TAqDBORMColumn)
@@ -130,6 +131,7 @@ type
 
     function GetTable(const pName: string; out pTable: TAqDBORMTable): Boolean;
     function GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean;
+    function GetPrimaryKeys: IAqResultList<TAqDBORMColumn>;
 
     property Initialized: Boolean read GetInitialized;
     property MainTable: TAqDBORMTable<AqTable> read FMainTable;
@@ -456,6 +458,44 @@ end;
 function TAqDBORM.GetInitialized: Boolean;
 begin
   Result := Assigned(FMainTable.Attribute);
+end;
+
+function TAqDBORM.GetPrimaryKeys: IAqResultList<TAqDBORMColumn>;
+var
+  lResult: TAqResultList<TAqDBORMColumn>;
+  lSpecialization: TAqDBORMTable;
+
+  procedure AddPrimaryKeys(const pTable: TAqDBORMTable);
+  var
+    lColumn: TAqDBORMColumn;
+  begin
+    for lColumn in pTable.Columns do
+    begin
+      if Assigned(lColumn.Attribute) and (lColumn.Attribute.PrimaryKey) then
+      begin
+        lResult.Add(lColumn);
+      end;
+    end;
+  end;
+begin
+  lResult := TAqResultList<TAqDBORMCOlumn>.Create(False);
+
+  try
+    AddPrimaryKeys(FMainTable);
+
+    if HasSpecializations then
+    begin
+      for lSpecialization in FSpecializations do
+      begin
+        AddPrimaryKeys(lSpecialization);
+      end;
+    end;
+  except
+    lResult.Free;
+    raise;
+  end;
+
+  Result := lResult;
 end;
 
 function TAqDBORM.GetHasSpecializations: Boolean;

@@ -9,7 +9,7 @@ type
   TAqDBSQLCommandType = (ctSelect, ctInsert, ctUpdate, ctDelete);
   TAqDBSQLSourceType = (stTable, stSelect);
   TAqDBSQLValueType = (vtColumn, vtOperation, vtSubselect, vtConstant, vtParameter);
-  TAqDBSQLConstantValueType = (cvText, cvNumeric, cvDateTime, cvDate, cvTime, cvBoolean);
+  TAqDBSQLConstantValueType = (cvText, cvInt, cvDouble, cvCurrency, cvDateTime, cvDate, cvTime, cvBoolean);
   TAqDBSQLAggregatorType = (atNone, atCount, atSum, atAvg, atMax, atMin);
   TAqDBSQLConditionType = (ctComparison, ctValueIsNull, ctComposed, ctBetween);
   TAqDBSQLOperator = (opSum, opSubtraction, opMultiplication, opDivision, opDiv, opMod);
@@ -32,7 +32,9 @@ type
   IAqDBSQLBetweenCondition = interface;
 
   IAqDBSQLTextConstant = interface;
-  IAqDBSQLNumericConstant = interface;
+  IAqDBSQLIntConstant = interface;
+  IAqDBSQLDoubleConstant = interface;
+  IAqDBSQLCurrencyConstant = interface;
   IAqDBSQLDateTimeConstant = interface;
   IAqDBSQLDateConstant = interface;
   IAqDBSQLTimeConstant = interface;
@@ -102,7 +104,9 @@ type
     property ConstantType: TAqDBSQLConstantValueType read GetConstantType;
 
     function GetAsTextConstant: IAqDBSQLTextConstant;
-    function GetAsNumericConstant: IAqDBSQLNumericConstant;
+    function GetAsIntConstant: IAqDBSQLIntConstant;
+    function GetAsDoubleConstant: IAqDBSQLDoubleConstant;
+    function GetAsCurrencyConstant: IAqDBSQLCurrencyConstant;
     function GetAsDateTimeConstant: IAqDBSQLDateTimeConstant;
     function GetAsDateConstant: IAqDBSQLDateConstant;
     function GetAsTimeConstant: IAqDBSQLTimeConstant;
@@ -117,12 +121,28 @@ type
     property Value: string read GetValue;
   end;
 
-  IAqDBSQLNumericConstant = interface(IAqDBSQLConstant)
-    ['{383446D8-BA2D-4550-A8B5-970F3EE3CC59}']
+  IAqDBSQLIntConstant = interface(IAqDBSQLConstant)
+    ['{295A5BBB-BBF1-4116-AF2D-065AB1ACB319}']
+
+    function GetValue: Int64;
+
+    property Value: Int64 read GetValue;
+  end;
+
+  IAqDBSQLDoubleConstant = interface(IAqDBSQLConstant)
+    ['{5A58062E-E2D2-4D01-A766-6C1D8B5D67FF}']
 
     function GetValue: Double;
 
     property Value: Double read GetValue;
+  end;
+
+  IAqDBSQLCurrencyConstant = interface(IAqDBSQLConstant)
+    ['{C67AD516-8976-45C0-8201-0D46787E5DCA}']
+
+    function GetValue: Currency;
+
+    property Value: Currency read GetValue;
   end;
 
   IAqDBSQLDateTimeConstant = interface(IAqDBSQLConstant)
@@ -226,14 +246,324 @@ type
 
     function GetConditions: IAqReadList<IAqDBSQLCondition>;
     function GetLinkOperators: IAqReadList<TAqDBSQLBooleanOperator>;
+    function GetIsInitialized: Boolean;
 
     function AddCondition(const pLinkOperator: TAqDBSQLBooleanOperator; pCondition: IAqDBSQLCondition): Int32;
-    function AddAnd(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
-    function AddOr(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
-    function AddXor(const pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+
+    function AddAnd(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function AddOr(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function AddXor(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnGreaterEqualThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLessEqualThan(const pColumnName: string; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnIsNull(pColumn: IAqDBSQLColumn;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnIsNull(const pColumnName: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
 
     property Conditions: IAqReadList<IAqDBSQLCondition> read GetConditions;
     property LinkOperators: IAqReadList<TAqDBSQLBooleanOperator> read GetLinkOperators;
+    property IsInitialized: Boolean read GetIsInitialized;
   end;
 
   IAqDBSQLBetweenCondition = interface(IAqDBSQLCondition)
@@ -268,7 +598,7 @@ type
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
     procedure SetCondition(pValue: IAqDBSQLCondition);
-    function CustomizeCondition(const pNewCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+    function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
 
     function GetIsLimitDefined: Boolean;
     function GetLimit: UInt32;

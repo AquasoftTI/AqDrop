@@ -61,6 +61,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
+        <DesignOnlyPackage>true</DesignOnlyPackage>
         <VerInfo_MinorVer>9</VerInfo_MinorVer>
         <DCC_Description>Aquasoft Drop</DCC_Description>
         <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
@@ -118,9 +119,10 @@
         <DCC_DebugInformation>false</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_MajorVer>1</VerInfo_MajorVer>
         <VerInfo_MinorVer>0</VerInfo_MinorVer>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.0.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.1.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
@@ -131,13 +133,13 @@
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="..\AqDrop.Register.AboutBox.pas"/>
         <DCCReference Include="..\AqDrop.Register.Splash.pas"/>
-        <RcItem Include="..\Resources\Drop_Icone_24x24.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>BMP_DROP_24</ResourceId>
-        </RcItem>
         <RcItem Include="..\Resources\Drop_Icone_32x32.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>BMP_DROP_32</ResourceId>
+        </RcItem>
+        <RcItem Include="..\Resources\Dop_Icone_fp_24x24.bmp">
+            <ResourceType>BITMAP</ResourceType>
+            <ResourceId>BMP_DROP_24</ResourceId>
         </RcItem>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

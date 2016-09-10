@@ -217,7 +217,7 @@ type
 
     property Chars[Index: Int32]: Char read GetChar;
     property Length: Int32 read GetLength;
-end;
+  end;
 
   TAqDoubleHelper = record helper for Double
   public
@@ -892,7 +892,7 @@ end;
 
 function TAqStringHelper.ToBoolean: Boolean;
 begin
-  if (Self = '-1') or (CompareTo('True', True) = 0) then
+  if (Self = '-1') or (Self = '1') or (CompareTo('True', True) = 0) then
   begin
     Result := True;
   end else if (Self = '0') or (CompareTo('False', True) = 0) then

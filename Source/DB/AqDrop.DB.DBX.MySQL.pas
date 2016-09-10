@@ -13,6 +13,7 @@ type
   TAqDBXMySQLMapper = class(TAqDBXMapper)
   strict protected
     function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
+    function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
   public
     procedure BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean); override;
     procedure UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8); override;
@@ -48,6 +49,16 @@ procedure TAqDBXMySQLMapper.BooleanToParameter(const pParameter: TDBXParameter; 
 begin
   pParameter.DataType := TDBXDataTypes.Int8Type;
   pParameter.Value.SetInt8(pValue.ToInt8);
+end;
+
+function TAqDBXMySQLMapper.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
+begin
+  if pConstant.Value then
+  begin
+    Result := 'True';
+  end else begin
+    Result := 'False';
+  end;
 end;
 
 function TAqDBXMySQLMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;

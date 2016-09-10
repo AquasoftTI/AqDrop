@@ -31,7 +31,9 @@ package AqDrop.Core.DXE5;
 
 requires
   rtl,
-  dbrtl;
+  dbrtl,
+  bindengine,
+  bindcomp;
 
 contains
   AqDrop.Core.AnonymousMethods in '..\AqDrop.Core.AnonymousMethods.pas',
@@ -52,6 +54,7 @@ contains
   AqDrop.Core.Observer in '..\AqDrop.Core.Observer.pas',
   AqDrop.Core.Tokenizer in '..\AqDrop.Core.Tokenizer.pas',
   AqDrop.Core.Types in '..\AqDrop.Core.Types.pas',
-  AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas';
+  AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas',
+  AqDrop.Core.Bindings in '..\AqDrop.Core.Bindings.pas';
 
 end.

@@ -3,8 +3,13 @@ unit AqDrop.Core.Collections;
 interface
 
 uses
-  System.Generics.Defaults, System.Generics.Collections, System.SyncObjs,
-  AqDrop.Core.Collections.Intf, AqDrop.Core.InterfacedObject, AqDrop.Core.AnonymousMethods, AqDrop.Core.Types;
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  System.SyncObjs,
+  AqDrop.Core.Types,
+  AqDrop.Core.AnonymousMethods,
+  AqDrop.Core.Collections.Intf,
+  AqDrop.Core.InterfacedObject;
 
 type
   TAqID = NativeUInt;
@@ -143,7 +148,7 @@ type
   ///     Classe base para listas nos pacotes Aquasoft.
   ///</summary>
   /// ------------------------------------------------------------------------------------------------------------------
-  TAqList<T> = class(TAqReadList<T>)
+  TAqList<T> = class(TAqReadList<T>, IAqList<T>)
   strict private
     FList: TList<T>;
     FReadList: TAqReadList<T>;
@@ -151,9 +156,12 @@ type
 
     procedure ListNotifier(Sender: TObject; const Item: T; Action: TCollectionNotification);
 
-    procedure ExecWithReleaseOff(const pMethod: TAqMethod);
   private
    { Private declarations }
+  strict protected
+    procedure ExecWithReleaseOff(const pMethod: TAqMethod);
+
+    property FreeObjects: Boolean read FFreeObjects write FFReeObjects;
   public
     /// <summary>
     ///   EN-US:
@@ -287,8 +295,15 @@ type
   /// </summary>
   /// ------------------------------------------------------------------------------------------------------------------
   TAqResultList<T> = class(TAqList<T>, IAqResultList<T>)
+  strict private
+    function GetOnwsResults: Boolean;
+    procedure SetOnwsResults(const pValue: Boolean);
   strict protected
     class function MustCountReferences: Boolean; override;
+  public
+    function Extract(const pIndex: UInt32 = 0): T;
+    procedure ExtractAllTo(const pList: TList<T>);
+    function ExtractAll: TList<T>;
   end;
 
 
@@ -725,6 +740,9 @@ resourcestring
   StrCouldNotAddTheValueToTheTree = 'Could not add the value to the tree.';
   StrFailedWhenTryingToFindAValueInTheTree = 'Failed when trying to find a value in the tree.';
   StrFailedWhenTryingToDeleteAValueInTheTree = 'Failed when trying to delete a value in the tree.';
+  StrThisListDoesntHaveALocker = 'This list doesnt have a locker.';
+  StrFailedWhenGeneratingUniqueID = 'Failed when generating unitque ID.';
+  StrFunctionNotAvailableInTAqFromToList = 'Function not available in TAqFromToList<TFrom, TTo>.';
 
 implementation
 
@@ -856,9 +874,55 @@ end;
 
 { TAqResultList<T> }
 
+function TAqResultList<T>.Extract(const pIndex: UInt32): T;
+var
+  lResult: T;
+begin
+  ExecWithReleaseOff(
+    procedure
+    begin
+      lResult := Items[pIndex];
+      Delete(pIndex);
+    end);
+  Result := lResult;
+end;
+
+function TAqResultList<T>.ExtractAll: TList<T>;
+begin
+  Result := TList<T>.Create;
+
+  try
+    ExtractAllTo(Result);
+  except
+     Result.Free;
+     raise;
+  end;
+end;
+
+procedure TAqResultList<T>.ExtractAllTo(const pList: TList<T>);
+begin
+  FreeObjects := False;
+
+  while Self.Count > 0 do
+  begin
+    pList.Add(Self.First);
+    Self.Delete(0);
+  end;
+end;
+
+function TAqResultList<T>.GetOnwsResults: Boolean;
+begin
+  Result := FreeObjects;
+end;
+
 class function TAqResultList<T>.MustCountReferences: Boolean;
 begin
   Result := True;
+end;
+
+procedure TAqResultList<T>.SetOnwsResults(const pValue: Boolean);
+begin
+  FreeObjects := pValue;
 end;
 
 { TAqReadList<T> }
@@ -918,7 +982,7 @@ procedure TAqReadList<T>.VerifyLocker;
 begin
   if not Assigned(FLocker) then
   begin
-    raise EAqInternal.Create('This list doesn''t have a locker.');
+    raise EAqInternal.Create(StrThisListDoesntHaveALocker);
   end;
 end;
 
@@ -1349,7 +1413,7 @@ procedure TAqCustomAVLTree<TKey, TValue>.VerifyLocker;
 begin
   if not Assigned(FLocker) then
   begin
-    raise EAqInternal.Create('This list doesn''t have a locker.');
+    raise EAqInternal.Create(StrThisListDoesntHaveALocker);
   end;
 end;
 
@@ -1550,7 +1614,7 @@ end;
 
 function TAqFromToList<TFrom, TTo>.IndexOf(const pValue: TTo): Int32;
 begin
-  raise EAqInternal.Create('Função não disponível em TAqFromToList<TFrom, TTo>.Localizar.');
+  raise EAqInternal.Create(StrFunctionNotAvailableInTAqFromToList);
 end;
 
 function TAqFromToList<TFrom, TTo>.Find(
@@ -1637,7 +1701,7 @@ begin
 
     if not FUsedIDs.Add(Result) then
     begin
-      raise EAqInternal.Create('Falha ao gerar ID único.');
+      raise EAqInternal.Create(StrFailedWhenGeneratingUniqueID);
     end;
   finally
     FLocker.Leave;
@@ -1767,7 +1831,7 @@ procedure TAqDictionary<TKey, TValue>.VerifyLocker;
 begin
   if not Assigned(FLocker) then
   begin
-    raise EAqInternal.Create('This list doesn''t have a locker.');
+    raise EAqInternal.Create(StrThisListDoesntHaveALocker);
   end;
 end;
 

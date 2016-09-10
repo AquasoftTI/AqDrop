@@ -9,16 +9,16 @@ uses
 
 type
   TAqDBTokenizerDictionaryID = (diOther, diDigits, diCharacters, diPlus, diMinus, diAsterisk, diSlash, diSharp,
-    idUnderscore, diSemicolon, diComma, diColon, diLeftParenthesis, diRightParenthesis, diSpace, diDot,
-    di10, di13, diSingleQuotes, diDoubleQuotes, diInterrogation, diEqual, diAt);
+    diUnderscore, diSemicolon, diComma, diColon, diLeftParenthesis, diRightParenthesis, diSpace, diDot,
+    di10, di13, diSingleQuotes, diDoubleQuotes, diInterrogation, diEqual, diAt, diDollar);
 
 const
   TAqDBTokenizerDictionaryMin = diOther;
-  TAqDBTokenizerDictionaryMax = diAt;
+  TAqDBTokenizerDictionaryMax = diDollar;
 
   TAqDBTokenizerDicionaries: array[TAqDBTokenizerDictionaryMin..TAqDBTokenizerDictionaryMax] of set of AnsiChar = (
     [#0], ['0'..'9'], ['A'..'Z', 'a'..'z'], ['+'], ['-'], ['*'], ['/'], ['#'], ['_'], [';'], [','], [':'], ['('], [')'],
-    [' '], ['.'], [#10], [#13], [''''], ['"'], ['?'], ['='], ['@']);
+    [' '], ['.'], [#10], [#13], [''''], ['"'], ['?'], ['='], ['@'], ['$']);
 
 type
   TAqDBTokenType = (ttOther, ttWord, ttInteger, ttReal, ttSpace, ttLineBreak, ttComment, ttMultiplication, ttDivision,
@@ -94,10 +94,12 @@ begin
   lFinalStateWord := Automaton.AddFinalState(ttWord);
   lTransition := Automaton.InitialState.AddTransition(lFinalStateWord);
   lTransition.AddDictionary(diCharacters);
+  lTransition.AddDictionary(diDollar);
   lTransition := lFinalStateWord.AddTransition(lFinalStateWord);
   lTransition.AddDictionary(diCharacters);
   lTransition.AddDictionary(diDigits);
-  lTransition.AddDictionary(idUnderscore);
+  lTransition.AddDictionary(diUnderscore);
+  lTransition.AddDictionary(diDollar);
 
   lFinalStateInteger := Automaton.AddFinalState(ttInteger);
   lTransition := Automaton.InitialState.AddTransition(lFinalStateInteger);
@@ -183,7 +185,7 @@ begin
   lTransition := lFinalStateNamedParameter.AddTransition(lFinalStateNamedParameter);
   lTransition.AddDictionary(diCharacters);
   lTransition.AddDictionary(diDigits);
-  lTransition.AddDictionary(idUnderscore);
+  lTransition.AddDictionary(diUnderscore);
 
   lFinalStateParameter := Automaton.AddFinalState(ttParameter);
   Automaton.InitialState.AddTransition(lFinalStateParameter).AddDictionary(diInterrogation);

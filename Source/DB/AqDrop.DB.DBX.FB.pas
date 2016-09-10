@@ -3,6 +3,7 @@ unit AqDrop.DB.DBX.FB;
 interface
 
 uses
+  Data.DBXCommon,
   Data.DBXFirebird,
   AqDrop.DB.Connection,
   AqDrop.DB.DBX,
@@ -12,8 +13,10 @@ type
   TAqDBXFBMapper = class(TAqDBXMapper)
   strict protected
     function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
+    function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
   public
     function SolveSelect(pSelect: IAqDBSQLSelect): string; override;
+    procedure BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean); override;
   end;
 
   TAqDBXFBConnection = class(TAqDBXCustomConnection)
@@ -21,6 +24,7 @@ type
     function GetPropertyValueAsString(const pIndex: Integer): string; override;
     procedure SetPropertyValueAsString(const pIndex: Integer; const pValue: string); override;
     class function GetDefaultMapper: TAqDBMapperClass; override;
+    function GetAutoIncrementType: TAqDBAutoIncrementType; override;
   public
     constructor Create; override;
 
@@ -36,7 +40,6 @@ implementation
 
 uses
   System.SysUtils,
-  Data.DBXCommon,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
   AqDrop.DB.Types;
@@ -65,6 +68,11 @@ begin
   end;
 
   Result := lReader.Values[0].AsInt64;
+end;
+
+function TAqDBXFBConnection.GetAutoIncrementType: TAqDBAutoIncrementType;
+begin
+  Result := TAqDBAutoIncrementType.aiGenerator;
 end;
 
 class function TAqDBXFBConnection.GetDefaultMapper: TAqDBMapperClass;
@@ -101,6 +109,30 @@ begin
 end;
 
 { TAqDBXFBMapper }
+
+procedure TAqDBXFBMapper.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
+begin
+  pParameter.DataType := TDBXDataTypes.AnsiStringType;
+
+  if pValue then
+  begin
+    pParameter.Value.SetAnsiString('1');
+  end else begin
+    pParameter.Value.SetAnsiString('0');
+  end;
+end;
+
+function TAqDBXFBMapper.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
+begin
+  if pConstant.Value then
+  begin
+    Result := '1';
+  end else begin
+    Result := '0';
+  end;
+
+  Result := Result.Quote;
+end;
 
 function TAqDBXFBMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;
 begin

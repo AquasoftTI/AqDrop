@@ -568,7 +568,8 @@ resourcestring
 implementation
 
 uses
-  System.Generics.Defaults, AqDrop.Core.Exceptions;
+  System.Generics.Defaults,
+  AqDrop.Core.Exceptions;
 
 { TAqAutomatonState<TIdentifier, TValue, TOutput> }
 

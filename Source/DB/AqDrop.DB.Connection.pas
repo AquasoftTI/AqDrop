@@ -30,7 +30,9 @@ type
     function SolveConstant(pConstant: IAqDBSQLConstant): string; virtual;
     function SolveParameter(pParameter: IAqDBSQLParameter): string; virtual;
     function SolveTextConstant(pConstant: IAqDBSQLTextConstant): string; virtual;
-    function SolveNumericConstant(pConstant: IAqDBSQLNumericConstant): string; virtual;
+    function SolveIntConstant(pConstant: IAqDBSQLIntConstant): string; virtual;
+    function SolveDoubleConstant(pConstant: IAqDBSQLDoubleConstant): string; virtual;
+    function SolveCurrencyConstant(pConstant: IAqDBSQLCurrencyConstant): string; virtual;
     function SolveDateTimeConstant(pConstant: IAqDBSQLDateTimeConstant): string; virtual;
     function SolveDateConstant(pConstant: IAqDBSQLDateConstant): string; virtual;
     function SolveTimeConstant(pConstant: IAqDBSQLTimeConstant): string; virtual;
@@ -302,7 +304,7 @@ type
 
     property PreparedQueries: TAqIDDictionary<string> read FPreparedQueries;
   public
-    constructor Create(const pConnectionBuilder: TAqAnonymousFunction<TBaseConnection>); reintroduce;
+    constructor Create(const pConnectionBuilder: TAqAnonymousFunction<TBaseConnection>); reintroduce; virtual;
     destructor Destroy; override;
 
     function GetAutoIncrement(const pGeneratorName: string = ''): Int64; override;
@@ -782,15 +784,20 @@ function TAqDBMapper.SolveComposedCondition(pComposedCondition: IAqDBSQLComposed
 var
   lI: Int32;
 begin
-  Result := '(' + SolveCondition(pComposedCondition.Conditions.First);
-
-  for lI := 1 to pComposedCondition.Conditions.Count - 1 do
+  if pComposedCondition.Conditions.Count = 0 then
   begin
-    Result := ' ' + SolveBooleanOperator(pComposedCondition.LinkOperators[lI - 1]) + ' ' +
-      SolveCondition(pComposedCondition.Conditions[lI]);
-  end;
+    Result := '';
+  end else begin
+    Result := '(' + SolveCondition(pComposedCondition.Conditions.First);
 
-  Result := Result + ')';
+    for lI := 1 to pComposedCondition.Conditions.Count - 1 do
+    begin
+      Result := ' ' + SolveBooleanOperator(pComposedCondition.LinkOperators[lI - 1]) + ' ' +
+        SolveCondition(pComposedCondition.Conditions[lI]);
+    end;
+
+    Result := Result + ')';
+  end;
 end;
 
 function TAqDBMapper.SolveCondition(pCondition: IAqDBSQLCondition): string;
@@ -814,13 +821,28 @@ begin
   case pConstant.ConstantType of
     TAqDBSQLConstantValueType.cvText:
       Result := SolveTextConstant(pConstant.GetAsTextConstant);
-    TAqDBSQLConstantValueType.cvNumeric:
-      Result := SolveNumericConstant(pConstant.GetAsNumericConstant);
+    TAqDBSQLConstantValueType.cvInt:
+      Result := SolveIntConstant(pConstant.GetAsIntConstant);
+    TAqDBSQLConstantValueType.cvDouble:
+      Result := SolveDoubleConstant(pConstant.GetAsDoubleConstant);
+    TAqDBSQLConstantValueType.cvCurrency:
+      Result := SolveCurrencyConstant(pConstant.GetAsCurrencyConstant);
     TAqDBSQLConstantValueType.cvDateTime:
       Result := SolveDateTimeConstant(pConstant.GetAsDateTimeConstant);
+    TAqDBSQLConstantValueType.cvDate:
+      Result := SolveDateConstant(pConstant.GetAsDateConstant);
+    TAqDBSQLConstantValueType.cvTime:
+      Result := SolveTimeConstant(pConstant.GetAsTimeConstant);
+    TAqDBSQLConstantValueType.cvBoolean:
+      Result := SolveBooleanConstant(pConstant.GetAsBooleanConstant);
   else
     raise EAqInternal.Create('Constant type not expected.');
   end;
+end;
+
+function TAqDBMapper.SolveCurrencyConstant(pConstant: IAqDBSQLCurrencyConstant): string;
+begin
+  Result := pConstant.Value.ToString;
 end;
 
 function TAqDBMapper.SolveDateConstant(pConstant: IAqDBSQLDateConstant): string;
@@ -859,6 +881,11 @@ begin
   end else begin
     Result := '';
   end;
+end;
+
+function TAqDBMapper.SolveDoubleConstant(pConstant: IAqDBSQLDoubleConstant): string;
+begin
+  Result := pConstant.Value.ToString;
 end;
 
 function TAqDBMapper.SolveFrom(pSource: IAqDBSQLSource): string;
@@ -905,6 +932,11 @@ begin
   end;
 end;
 
+function TAqDBMapper.SolveIntConstant(pConstant: IAqDBSQLIntConstant): string;
+begin
+  Result := pConstant.Value.ToString;
+end;
+
 function TAqDBMapper.SolveJoin(pJoin: IAqDBSQLJoin): string;
 begin
   case pJoin.JoinType of
@@ -939,11 +971,6 @@ end;
 function TAqDBMapper.SolveLimit(pSelect: IAqDBSQLSelect): string;
 begin
   Result := '';
-end;
-
-function TAqDBMapper.SolveNumericConstant(pConstant: IAqDBSQLNumericConstant): string;
-begin
-  Result := pConstant.Value.ToString;
 end;
 
 function TAqDBMapper.SolveOperator(const pOperator: TAqDBSQLOperator): string;
