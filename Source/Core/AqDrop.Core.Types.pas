@@ -5,7 +5,6 @@ interface
 {$I 'AqDrop.Core.Defines.inc'}
 
 type
-
 {$IFNDEF AQMOBILE}
   TAqAnsiCharSet = set of AnsiChar;
 {$ENDIF}
@@ -40,9 +39,11 @@ type
     adtRecord,
     adtInterface);
 
-
 const
   adtIntTypes = [adtUInt8..adtInt64];
+
+type
+  TAqUnixDateTime = type Int64;
 
 implementation
 

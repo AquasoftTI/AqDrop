@@ -1,0 +1,84 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{C34772EF-D674-4431-AF27-ADD530101F22}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Core\Packages\AqDrop.Core.D10Berlin.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DB\Packages\AqDrop.DB.D10Berlin.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DB\Packages\AqDrop.DB.DBX.D10Berlin.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DB\Packages\AqDrop.DB.FD.D10Berlin.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Register\Packages\AqDrop.Register.D10Berlin.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="AqDrop_Core_D10Berlin">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.D10Berlin.dproj"/>
+    </Target>
+    <Target Name="AqDrop_Core_D10Berlin:Clean">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.D10Berlin.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_Core_D10Berlin:Make">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.D10Berlin.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_DB_D10Berlin">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.D10Berlin.dproj"/>
+    </Target>
+    <Target Name="AqDrop_DB_D10Berlin:Clean">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.D10Berlin.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_DB_D10Berlin:Make">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.D10Berlin.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_DB_DBX_D10Berlin">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.DBX.D10Berlin.dproj"/>
+    </Target>
+    <Target Name="AqDrop_DB_DBX_D10Berlin:Clean">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.DBX.D10Berlin.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_DB_DBX_D10Berlin:Make">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.DBX.D10Berlin.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_DB_FD_D10Berlin">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.FD.D10Berlin.dproj"/>
+    </Target>
+    <Target Name="AqDrop_DB_FD_D10Berlin:Clean">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.FD.D10Berlin.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_DB_FD_D10Berlin:Make">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.FD.D10Berlin.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_Register_D10Berlin">
+        <MSBuild Projects="Register\Packages\AqDrop.Register.D10Berlin.dproj"/>
+    </Target>
+    <Target Name="AqDrop_Register_D10Berlin:Clean">
+        <MSBuild Projects="Register\Packages\AqDrop.Register.D10Berlin.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_Register_D10Berlin:Make">
+        <MSBuild Projects="Register\Packages\AqDrop.Register.D10Berlin.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="AqDrop_Core_D10Berlin;AqDrop_DB_D10Berlin;AqDrop_DB_DBX_D10Berlin;AqDrop_DB_FD_D10Berlin;AqDrop_Register_D10Berlin"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="AqDrop_Core_D10Berlin:Clean;AqDrop_DB_D10Berlin:Clean;AqDrop_DB_DBX_D10Berlin:Clean;AqDrop_DB_FD_D10Berlin:Clean;AqDrop_Register_D10Berlin:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="AqDrop_Core_D10Berlin:Make;AqDrop_DB_D10Berlin:Make;AqDrop_DB_DBX_D10Berlin:Make;AqDrop_DB_FD_D10Berlin:Make;AqDrop_Register_D10Berlin:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

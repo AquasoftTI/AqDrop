@@ -11,6 +11,9 @@ uses
   Data.DB,
 {$if CompilerVersion >= 26}
   FireDAC.Stan.Param,
+  FireDAC.Stan.Def,
+  FireDAC.Stan.Async,
+  FireDAC.DApt,
 {$endif}
   AqDrop.Core.Types,
   AqDrop.Core.InterfacedObject,

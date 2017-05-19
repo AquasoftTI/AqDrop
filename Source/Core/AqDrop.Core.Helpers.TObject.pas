@@ -1,11 +1,18 @@
 unit AqDrop.Core.Helpers.TObject;
 
+{$I '..\Core\AqDrop.Core.Defines.Inc'}
+
 interface
 
 uses
   System.Rtti,
   System.SyncObjs,
-  System.Generics.Collections;
+  System.Generics.Collections,
+{$IF CompilerVersion >= 27} // DXE6+
+  System.JSON;
+{$ELSE}
+  Data.DBXJSON;
+{$ENDIF}
 
 type
   TAqFieldMapping = class
@@ -44,9 +51,14 @@ type
   public
     procedure CloneTo(const pObject: TObject); overload;
     function CloneTo<T: class, constructor>: T; overload;
+
+    function ConvertToJSON(const pDestroySource: Boolean = False): TJSONValue;
   end;
 
 implementation
+
+uses
+  Data.DBXJSONReflect;
 
 { TAqObjectHelper }
 
@@ -69,6 +81,33 @@ begin
     end;
   end else begin
     Result := nil;
+  end;
+end;
+
+function TAqObjectHelper.ConvertToJSON(const pDestroySource: Boolean): TJSONValue;
+var
+  lMarshal: TJSONMarshal;
+begin
+  if not Assigned(Self) then
+  begin
+    Result := TJSONNull.Create;
+  end else begin
+    try
+      lMarshal := TJSONMarshal.Create;
+
+      try
+        Result := lMarshal.Marshal(Self);
+      finally
+        lMarshal.Free;
+      end;
+    finally
+{$IFNDEF AQMOBILE}
+      if pDestroySource then
+      begin
+        Free;
+      end;
+{$ENDIF}
+    end;
   end;
 end;
 

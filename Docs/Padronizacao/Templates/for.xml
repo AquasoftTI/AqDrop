@@ -24,8 +24,7 @@
 		</point>
 		<point name="count">
 			<text>
-				High
-			</text>
+				High			</text>
 			<hint>
 				loop high bound
 			</hint>
@@ -39,7 +38,7 @@
 		<script language="Delphi" onenter="false" onleave="true">
 			DeclareVariable(|index|);
 		</script>
-		<code language="Delphi" context="methodbody" delimiter="|"><![CDATA[for |index| := |val| to |count| do
+		<code language="Delphi" context="methodbody" delimiter="|"><![CDATA[for |index| := |val| to |count| - 1 do
 begin
 |selected||*||end|
 end;

@@ -182,7 +182,7 @@ begin
   FRttiContext := TRttiContext.Create;
   FLocker := TCriticalSection.Create;
   FTypes := TAqDictionary<string, TRttiType>.Create;
-  FORMs := TAqDictionary<string, TAqDBORM>.Create([TAqDictionaryContent.adcValue]);
+  FORMs := TAqDictionary<string, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue]);
 end;
 
 class function TAqDBORMReader.CreateNewORM(const pClass: TClass): TAqDBORM;

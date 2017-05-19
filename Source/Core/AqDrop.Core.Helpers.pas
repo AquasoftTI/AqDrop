@@ -8,7 +8,8 @@ uses
   System.SysUtils,
   System.DateUtils,
   Data.FmtBcd,
-  Data.SqlTimSt;
+  Data.SqlTimSt,
+  AqDrop.Core.Types;
 
 type
   TAqBooleanHelper = record helper for Boolean
@@ -300,8 +301,15 @@ type
     function ToString: string; inline;
   end;
 
-  TAqNativeUInt = record helper for NativeUInt
+  TAqNativeUIntHelper = record helper for NativeUInt
     function ToString: string; inline;
+  end;
+
+  TAqUnixDateTimeHelper = record helper for TAqUnixDateTime
+  public
+    class function FromDateTime(const pDateTime: TDateTime): TAqUnixDateTime; static; inline;
+    class function Now: TAqUnixDateTime; static; inline;
+    function ToDateTime: TDateTime;
   end;
 
 implementation
@@ -1384,9 +1392,9 @@ begin
   Result := System.SysUtils.IntToStr(Self);
 end;
 
-{ TAqNativeUInt }
+{ TAqNativeUIntHelper }
 
-function TAqNativeUInt.ToString: string;
+function TAqNativeUIntHelper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
 end;
@@ -1431,6 +1439,26 @@ end;
 function TAqUInt8Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
+end;
+
+{ TAqUnixDateTimeHelper }
+
+class function TAqUnixDateTimeHelper.FromDateTime(const pDateTime: TDateTime): TAqUnixDateTime;
+begin
+  Result := (DateTimeToUnix(pDateTime) * 1000) + pDateTime.MilliSecondOf;
+end;
+
+class function TAqUnixDateTimeHelper.Now: TAqUnixDateTime;
+begin
+  Result := TAqUnixDateTime.FromDateTime(System.SysUtils.Now);
+end;
+
+function TAqUnixDateTimeHelper.ToDateTime: TDateTime;
+var
+  lDoubleValue: Double;
+begin
+  lDoubleValue := Self / 1000;
+  Result := UnixToDateTime(lDoubleValue.Trunc) + TDateTime.EncodeTime(0, 0, 0, Self mod 1000);
 end;
 
 end.

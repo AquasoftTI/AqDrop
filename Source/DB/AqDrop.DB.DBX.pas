@@ -396,8 +396,9 @@ type
 
     property DriverName: string index $00 read GetPropertyValueAsString write SetPropertyValueAsString;
     property VendorLib: string index $01 read GetPropertyValueAsString write SetPropertyValueAsString;
-    property LibraryName: string index $02 read GetPropertyValueAsString write SetPropertyValueAsString;
-    property GetDriverFunc: string index $03 read GetPropertyValueAsString write SetPropertyValueAsString;
+    property VendorLib64: string index $02 read GetPropertyValueAsString write SetPropertyValueAsString;
+    property LibraryName: string index $03 read GetPropertyValueAsString write SetPropertyValueAsString;
+    property GetDriverFunc: string index $04 read GetPropertyValueAsString write SetPropertyValueAsString;
 
     property Properties[Name: string]: string read GetProperty write SetProperty;
   protected
@@ -425,6 +426,7 @@ type
 
     property DriverName;
     property VendorLib;
+    property VendorLib64;
     property LibraryName;
     property GetDriverFunc;
     property Properties;
@@ -526,8 +528,10 @@ begin
     $01:
       Result := FProperties.Values[TDBXPropertyNames.VendorLib];
     $02:
-      Result := FProperties.Values[TDBXPropertyNames.LibraryName];
+      Result := FProperties.Values[TDBXPropertyNames.VendorLibWin64];
     $03:
+      Result := FProperties.Values[TDBXPropertyNames.LibraryName];
+    $04:
       Result := FProperties.Values[TDBXPropertyNames.GetDriverFunc];
   else
     raise EAqInternal.Create('Index not expected in TAqDBXCustomConnection.GetPropertyValueAsString.');
@@ -636,8 +640,10 @@ begin
     $01:
       FProperties.Values[TDBXPropertyNames.VendorLib] := pValue;
     $02:
-      FProperties.Values[TDBXPropertyNames.LibraryName] := pValue;
+      FProperties.Values[TDBXPropertyNames.VendorLibWin64] := pValue;
     $03:
+      FProperties.Values[TDBXPropertyNames.LibraryName] := pValue;
+    $04:
       FProperties.Values[TDBXPropertyNames.GetDriverFunc] := pValue;
   else
     raise EAqInternal.Create('Wrong index for setting connection properties.');

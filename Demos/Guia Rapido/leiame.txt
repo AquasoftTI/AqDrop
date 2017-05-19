@@ -1,0 +1,3 @@
+Este exemplo é um guia rápido de como usar o DROP (foi usado para demonstrar o DROP na Embarcadero Conference 2015).
+
+Nota: O banco utilizado = SQLite.

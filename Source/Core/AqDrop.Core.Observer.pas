@@ -11,42 +11,44 @@ uses
   AqDrop.Core.Collections;
 
 type
-  TAqObserver = class(TAqInterfacedObject, IAqObserver)
+  TAqNotifyEvent<T> = procedure(pMessage: T) of object;
+
+  TAqObserver<T> = class(TAqInterfacedObject, IAqObserver<T>)
   strict protected
 {$IFNDEF AUTOREFCOUNT}
     class function MustCountReferences: Boolean; override;
 {$ENDIF}
   public
-    procedure Notify(const Sender: TObject); virtual; abstract;
+    procedure Notify(const pMessage: T); virtual; abstract;
   end;
 
-  TAqObserverByMethod = class(TAqObserver)
+  TAqObserverByMethod<T> = class(TAqObserver<T>)
   strict private
-    FObserverMethod: TProc<TObject>;
+    FObserverMethod: TProc<T>;
   public
-    constructor Create(const pMethod: TProc<TObject>);
+    constructor Create(const pMethod: TProc<T>);
 
-    procedure Notify(const Sender: TObject); override;
+    procedure Notify(const pMessage: T); override;
   end;
 
-  TAqObserverByEvent = class(TAqObserver)
+  TAqObserverByEvent<T> = class(TAqObserver<T>)
   strict private
-    FObserverEvent: TNotifyEvent;
+    FObserverEvent: TAqNotifyEvent<T>;
   public
-    constructor Create(const pEvent: TNotifyEvent);
+    constructor Create(const pEvent: TAqNotifyEvent<T>);
 
-    procedure Notify(const Sender: TObject); override;
+    procedure Notify(const pMessage: T); override;
   end;
 
-  TAqObserversChannel = class
+  TAqObserversChannel<T> = class
   strict private
-    FObservers: TAqIDDictionary<IAqObserver>;
+    FObservers: TAqIDDictionary<IAqObserver<T>>;
   public
     constructor Create;
     destructor Destroy; override;
 
-    procedure Notify(Sender: TObject);
-    function RegisterObserver(pObserver: IAqObserver): TAqID;
+    procedure Notify(pMessage: T);
+    function RegisterObserver(pObserver: IAqObserver<T>): TAqID;
     procedure UnregisterObserver(const pObserverID: TAqID);
   end;
 
@@ -59,49 +61,49 @@ implementation
 uses
   AqDrop.Core.Exceptions;
 
-{ TAqObserverByMethod }
+{ TAqObserverByMethod<T> }
 
-constructor TAqObserverByMethod.Create(const pMethod: TProc<TObject>);
+constructor TAqObserverByMethod<T>.Create(const pMethod: TProc<T>);
 begin
   inherited Create;
 
   FObserverMethod := pMethod;
 end;
 
-procedure TAqObserverByMethod.Notify(const Sender: TObject);
+procedure TAqObserverByMethod<T>.Notify(const pMessage: T);
 begin
-  FObserverMethod(Sender);
+  FObserverMethod(pMessage);
 end;
 
-{ TAqObserverByEvent }
+{ TAqObserverByEvent<T> }
 
-constructor TAqObserverByEvent.Create(const pEvent: TNotifyEvent);
+constructor TAqObserverByEvent<T>.Create(const pEvent: TAqNotifyEvent<T>);
 begin
   inherited Create;
 
   FObserverEvent := pEvent;
 end;
 
-procedure TAqObserverByEvent.Notify(const Sender: TObject);
+procedure TAqObserverByEvent<T>.Notify(const pMessage: T);
 begin
-  FObserverEvent(Sender);
+  FObserverEvent(pMessage);
 end;
 
-{ TAqObserversChannel }
+{ TAqObserversChannel<T> }
 
-function TAqObserversChannel.RegisterObserver(pObserver: IAqObserver): TAqID;
+function TAqObserversChannel<T>.RegisterObserver(pObserver: IAqObserver<T>): TAqID;
 begin
   Result := FObservers.Add(pObserver);
 end;
 
-constructor TAqObserversChannel.Create;
+constructor TAqObserversChannel<T>.Create;
 begin
   inherited;
 
-  FObservers := TAqIDDictionary<IAqObserver>.Create(False);
+  FObservers := TAqIDDictionary<IAqObserver<T>>.Create(False);
 end;
 
-procedure TAqObserversChannel.UnregisterObserver(const pObserverID: TAqID);
+procedure TAqObserversChannel<T>.UnregisterObserver(const pObserverID: TAqID);
 begin
   if not FObservers.ContainsKey(pObserverID) then
   begin
@@ -111,27 +113,27 @@ begin
   FObservers.Remove(pObserverID);
 end;
 
-destructor TAqObserversChannel.Destroy;
+destructor TAqObserversChannel<T>.Destroy;
 begin
   FObservers.Free;
 
   inherited;
 end;
 
-procedure TAqObserversChannel.Notify(Sender: TObject);
+procedure TAqObserversChannel<T>.Notify(pMessage: T);
 var
-  lObserver: IAqObserver;
+  lObserver: IAqObserver<T>;
 begin
   for lObserver in FObservers.Values do
   begin
-    lObserver.Notify(Sender);
+    lObserver.Notify(pMessage);
   end;
 end;
 
-{ TAqNotificacao }
+{ TAqNotificacao<T> }
 
 {$IFNDEF AUTOREFCOUNT}
-class function TAqObserver.MustCountReferences: Boolean;
+class function TAqObserver<T>.MustCountReferences: Boolean;
 begin
   Result := True;
 end;

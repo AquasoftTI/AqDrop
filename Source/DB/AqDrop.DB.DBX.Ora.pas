@@ -52,14 +52,23 @@ uses
 
 procedure TAqDBXOraDataConverter.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
 begin
+{$IF AQMOBILE}
   pParameter.DataType := TDBXDataTypes.AnsiStringType;
-
+  if pValue then
+  begin
+    pParameter.Value.SetAnsiString('1');
+  end else begin
+    pParameter.Value.SetAnsiString('0');
+  end;
+{$ELSE}
+  pParameter.DataType := TDBXDataTypes.WideStringType;
   if pValue then
   begin
     pParameter.Value.SetString('1');
   end else begin
     pParameter.Value.SetString('0');
   end;
+{$ENDIF}
 end;
 
 procedure TAqDBXOraDataConverter.DateToParameter(const pParameter: TDBXParameter; const pValue: TDate);

@@ -18,7 +18,7 @@ type
 
   TAqObservable = class
   strict private
-    FObserversChannel: TAqObserversChannel;
+    FObserversChannel: TAqObserversChannel<TObject>;
     FUpdating: Boolean;
 
     class var FInterceptors: TAqDictionary<string, TVirtualMethodInterceptor>;
@@ -35,9 +35,9 @@ type
     procedure BeginUpdate; virtual;
     procedure EndUpdate; virtual;
 
-    function RegisterObserver(const pObserverEvent: TNotifyEvent): TAqID; overload;
+    function RegisterObserver(const pObserverEvent: TAqNotifyEvent<TObject>): TAqID; overload;
     function RegisterObserver(const pObserverMethod: TProc<TObject>): TAqID; overload;
-    function RegisterObserver(pObserver: IAqObserver): TAqID; overload;
+    function RegisterObserver(pObserver: IAqObserver<TObject>): TAqID; overload;
     procedure UnregisterObserver(const pObserverID: Int32);
   end;
 
@@ -48,14 +48,14 @@ uses
 
 { TAqObservable }
 
-function TAqObservable.RegisterObserver(const pObserverEvent: TNotifyEvent): TAqID;
+function TAqObservable.RegisterObserver(const pObserverEvent: TAqNotifyEvent<TObject>): TAqID;
 begin
-  Result := FObserversChannel.RegisterObserver(TAqObserverByEvent.Create(pObserverEvent));
+  Result := FObserversChannel.RegisterObserver(TAqObserverByEvent<TObject>.Create(pObserverEvent));
 end;
 
 function TAqObservable.RegisterObserver(const pObserverMethod: TProc<TObject>): TAqID;
 begin
-  Result := FObserversChannel.RegisterObserver(TAqObserverByMethod.Create(pObserverMethod));
+  Result := FObserversChannel.RegisterObserver(TAqObserverByMethod<TObject>.Create(pObserverMethod));
 end;
 
 procedure TAqObservable.BeginUpdate;
@@ -67,7 +67,7 @@ constructor TAqObservable.Create;
 begin
   inherited;
 
-  FObserversChannel := TAqObserversChannel.Create;
+  FObserversChannel := TAqObserversChannel<TObject>.Create;
 
   GetInterceptor.Proxify(Self);
 end;
@@ -103,7 +103,7 @@ class function TAqObservable.GetInterceptor: TVirtualMethodInterceptor;
 begin
   if not Assigned(FInterceptors) then
   begin
-    FInterceptors := TAqDictionary<string, TVirtualMethodInterceptor>.Create([TAqDictionaryContent.adcValue]);
+    FInterceptors := TAqDictionary<string, TVirtualMethodInterceptor>.Create([TAqKeyValueOwnership.kvoValue]);
   end;
 
   if not FInterceptors.TryGetValue(Self.QualifiedClassName, Result) then
@@ -144,7 +144,7 @@ begin
   Notify;
 end;
 
-function TAqObservable.RegisterObserver(pObserver: IAqObserver): TAqID;
+function TAqObservable.RegisterObserver(pObserver: IAqObserver<TObject>): TAqID;
 begin
   Result := FObserversChannel.RegisterObserver(pObserver);
 end;

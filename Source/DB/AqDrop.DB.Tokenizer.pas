@@ -270,7 +270,7 @@ end;
 class constructor TAqDBTokenizerDictionaries.Create;
 begin
   FDictionaries :=
-    TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>.Create([TAqDictionaryContent.adcValue]);
+    TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>.Create([TAqKeyValueOwnership.kvoValue]);
 
   Initialize;
 end;

@@ -7,6 +7,7 @@ uses
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.Collections,
+  AqDrop.Core.Observer,
   AqDrop.DB.Types,
   AqDrop.DB.Connection,
   AqDrop.DB.SQL.Intf,
@@ -35,6 +36,7 @@ type
   strict private
     FConnection: TAqDBConnection;
     FClients: TAqDictionary<string, TAqDBORMManagerClient>;
+    FOnNewClient: TAqObserversChannel<TAqDBORMManagerClient>;
 
     procedure FillParametersWithObjectValues(pParameters: IAqDBParameters; const pObject: TObject);
 
@@ -90,7 +92,6 @@ type
     procedure Update(const pUpdate: IAqDBSQLUpdate; const pObject: TObject); overload;
     procedure Update<T: class>(const pCustomizationMethod: TProc<IAqDBSQLUpdate>); overload;
 
-
     procedure Delete(const pObject: TObject; const pFreeObject: Boolean = True); overload;
     procedure Delete(const pDeletes: IAqReadList<IAqDBSQLDelete>; const pObject: TObject); overload;
     procedure Delete(const pDelete: IAqDBSQLDelete; const pObject: TObject); overload;
@@ -103,6 +104,7 @@ type
     function GetClient<T: TAqDBORMManagerClient>: T;
 
     property Connection: TAqDBConnection read FConnection;
+    property OnNewClient: TAqObserversChannel<TAqDBORMManagerClient> read FOnNewClient;
 
     class property Default: TAqDBORMManager read FDefault write FDefault;
   end;
@@ -124,7 +126,8 @@ constructor TAqDBORMManager.Create(const pConnection: TAqDBConnection);
 begin
   FConnection := pConnection;
   FConnection.AddDependent(Self);
-  FClients := TAqDictionary<string, TAqDBORMManagerClient>.Create([TAqDictionaryContent.adcValue], True);
+  FClients := TAqDictionary<string, TAqDBORMManagerClient>.Create([TAqKeyValueOwnership.kvoValue], True);
+  FOnNewClient := TAqObserversChannel<TAqDBORMManagerClient>.Create;
 end;
 
 function TAqDBORMManager.CreateFilter: IAqDBSQLComposedCondition;
@@ -185,6 +188,7 @@ end;
 
 destructor TAqDBORMManager.Destroy;
 begin
+  FOnNewClient.Free;
   FClients.Free;
   FConnection.RemoveDependent(Self);
 
@@ -998,6 +1002,8 @@ begin
     begin
       lClient := T.CreateNew(Self);
       FClients.Add(T.QualifiedClassName, lClient);
+
+      FOnNewClient.Notify(lClient);
     end;
 
     Result := T(lClient);

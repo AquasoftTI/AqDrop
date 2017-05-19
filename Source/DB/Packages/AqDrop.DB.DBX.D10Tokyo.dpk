@@ -1,0 +1,50 @@
+package AqDrop.DB.DBX.D10Tokyo;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'Aquasoft DROP - DBX Support'}
+{$RUNONLY}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  AqDrop.Core.D10Tokyo,
+  AqDrop.DB.D10Tokyo,
+  DBXSqliteDriver,
+  DBXMySQLDriver,
+  DBXFirebirdDriver,
+  DBXOracleDriver,
+  DBXMSSQLDriver;
+
+contains
+  AqDrop.DB.DBX.FB in '..\AqDrop.DB.DBX.FB.pas',
+  AqDrop.DB.DBX.MSSQL in '..\AqDrop.DB.DBX.MSSQL.pas',
+  AqDrop.DB.DBX.MySQL in '..\AqDrop.DB.DBX.MySQL.pas',
+  AqDrop.DB.DBX.Ora in '..\AqDrop.DB.DBX.Ora.pas',
+  AqDrop.DB.DBX in '..\AqDrop.DB.DBX.pas',
+  AqDrop.DB.DBX.SQLite in '..\AqDrop.DB.DBX.SQLite.pas';
+
+end.

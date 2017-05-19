@@ -15,6 +15,22 @@ uses
 type
   TAqID = NativeUInt;
 
+  TAqKeyValueOwnership = (kvoKey, kvoValue);
+  TAqKeyValueOwnerships = set of TAqKeyValueOwnership;
+
+  TAqKeyValuePair<K, V> = class
+  strict private
+    FOwnerships: TAqKeyValueOwnerships;
+    FKey: K;
+    FValue: V;
+  public
+    constructor Create(const pKey: K; const pValue: V; const pOwnerships: TAqKeyValueOwnerships = []);
+    destructor Destroy; override;
+
+    property Key: K read FKey;
+    property Value: V read FValue;
+  end;
+
   ///-------------------------------------------------------------------------------------------------------------------
   /// TAqComparisonResult
   ///-------------------------------------------------------------------------------------------------------------------
@@ -28,9 +44,6 @@ type
   TAqComparisonResult = (acrEqual, acrGreater, acrLess);
 
   TAqComparerFunction<T> = reference to function(const pValue1, pValue2: T): TAqComparisonResult;
-
-  TAqDictionaryContent = (adcKey, adcValue);
-  TAqDictionaryContents = set of TAqDictionaryContent;
 
   TAqReadList<T> = class(TAqInterfacedObject, IAqReadList<T>)
   strict private
@@ -649,7 +662,7 @@ type
 
     procedure VerifyLocker;
   public
-    constructor Create(const pOwnerships: TAqDictionaryContents = []; const pCreateLocker: Boolean = False);
+    constructor Create(const pOwnerships: TAqKeyValueOwnerships = []; const pCreateLocker: Boolean = False);
     destructor Destroy; override;
 
     procedure Lock;
@@ -1721,18 +1734,18 @@ begin
   end;
 end;
 
-constructor TAqDictionary<TKey, TValue>.Create(const pOwnerships: TAqDictionaryContents; const pCreateLocker: Boolean);
+constructor TAqDictionary<TKey, TValue>.Create(const pOwnerships: TAqKeyValueOwnerships; const pCreateLocker: Boolean);
 var
   lSet: TDictionaryOwnerships;
 begin
   lSet := [];
 
-  if adcKey in pOwnerships then
+  if TAqKeyValueOwnership.kvoKey in pOwnerships then
   begin
     Include(lSet, doOwnsKeys);
   end;
 
-  if adcValue in pOwnerships then
+  if TAqKeyValueOwnership.kvoValue in pOwnerships then
   begin
     Include(lSet, doOwnsValues);
   end;
@@ -1803,6 +1816,30 @@ end;
 constructor TAqComparer<T>.Create(const pComparerFunction: TFunc<T, T, Int32>);
 begin
   FComparerFunction := pComparerFunction;
+end;
+
+{ TAqKeyValuePair<K, V> }
+
+constructor TAqKeyValuePair<K, V>.Create(const pKey: K; const pValue: V; const pOwnerships: TAqKeyValueOwnerships = []);
+begin
+  FOwnerships := pOwnerships;
+  FKey := pKey;
+  FValue := pValue;
+end;
+
+destructor TAqKeyValuePair<K, V>.Destroy;
+begin
+  if TAqKeyValueOwnership.kvoKey in FOwnerships then
+  begin
+    PObject(@FKey)^.Free
+  end;
+
+  if TAqKeyValueOwnership.kvoValue in FOwnerships then
+  begin
+    PObject(@FValue)^.Free
+  end;
+
+  inherited;
 end;
 
 end.

@@ -21,7 +21,7 @@ NOTAS IMPORTANTES:
   - O Drop é disponibilizado na modalidade 'As Is', isto significa que a Aquasoft não se responsabiliza por eventuais problemas decorrentes da utilização do Drop, bem como não é obrigada a implementar / modificar a ferramenta para se adaptar ao cenário de qualquer usuário do Drop;
   - Na teoria, os fontes do projeto são compatíveis com o Delphi XE3, mas a partir da versão 1.2, estamos dando suporte oficial (via testes unitários) somente para versão XE4 e mais recentes;
   - O Drop contempla classes especializadas para conexões com MSSQL, MySQL, Firebird, Oracle, SQLite e Postgres (este último somente via FD). O backlog do Drop prevê a inclusão de classes especializadas para o Interbase, fique à vontade para sugerir outros SGBDs;
-  - Pacotes para o Delphi XE8 foram incluídos na versão 1.2 do DROP, no entanto, algum problema está acontecendo durante a compilação dos pacotes (temos um QC aberto para verificação). Se você não modulariza suas aplicações via BPLs, este problema não lhe causará nenhum efeito, pois a inclusão dos fontes (via projeto ou library path) em executáveis trará o comportamento correto do DROP (garantido via bateria de testes na versão XE8);
+  - Pacotes para o Delphi XE8 foram incluídos na versão 1.2 do DROP, no entanto, uma regressão gerou um problema na compilação dos pacotes, regressão esta que foi corrigida nas versões seguintes da ferramenta. Se você não modulariza suas aplicações via BPLs, este problema não lhe causará nenhum efeito, pois a inclusão dos fontes (via projeto ou library path) em executáveis trará o comportamento correto do DROP (garantido via bateria de testes na versão XE8);
   - Mantenha-se atualizado sobre as novidades do DROP através do nosso twitter e facebook: AquasoftTI;
 
 E, obrigado por utilizar o DROP!
@@ -38,6 +38,11 @@ facebook.com/AquasoftTI
 Fone: +55 (51) 3022-3188
 
 HISTÓRICO DE VERSÕES:
+----------------------------------------
+2017.05.18: Versão 1.3.0 do Drop:
+- Suporte ao Delphi 10 Berlin;
+- Suporte ao Delphi 10 Tokyo;
+- Pequenas correções e melhorias;
 ----------------------------------------
 2015.12.28: Versão 1.2.1 do Drop:
 - Suporte ao Delphi 10 Seattle;

@@ -31,7 +31,7 @@ begin
   try
     lBitmap.LoadFromResourceName(HInstance, 'BMP_DROP_24');
 
-    SplashScreenServices.AddPluginBitmap('DROP 1.2 by Aquasoft', lBitmap.Handle);
+    SplashScreenServices.AddPluginBitmap('DROP 1.3 by Aquasoft', lBitmap.Handle);
   finally
     lBitmap.Free;
   end;

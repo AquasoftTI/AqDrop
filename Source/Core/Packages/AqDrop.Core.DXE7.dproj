@@ -56,8 +56,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
-        <VerInfo_Release>1</VerInfo_Release>
-        <DCC_Description>Aquasoft Drop - Core Library</DCC_Description>
+        <DCC_Description>Aquasoft DROP - Core Library</DCC_Description>
         <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
@@ -65,8 +64,8 @@
         <SanitizedProjectName>AqDrop_Core_DXE7</SanitizedProjectName>
         <GenPackage>true</GenPackage>
         <VerInfo_Locale>1046</VerInfo_Locale>
-        <VerInfo_MinorVer>2</VerInfo_MinorVer>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.2.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.2.1.0;Comments=</VerInfo_Keys>
+        <VerInfo_MinorVer>3</VerInfo_MinorVer>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.3.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.3.0.0;Comments=</VerInfo_Keys>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
         <DCC_E>false</DCC_E>
@@ -108,7 +107,6 @@
         <DCC_DebugInformation>0</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.2.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
@@ -119,6 +117,7 @@
         <DCCReference Include="dbrtl.dcp"/>
         <DCCReference Include="bindengine.dcp"/>
         <DCCReference Include="bindcomp.dcp"/>
+        <DCCReference Include="DbxCommonDriver.dcp"/>
         <DCCReference Include="..\AqDrop.Core.AnonymousMethods.pas"/>
         <DCCReference Include="..\AqDrop.Core.Attributes.pas"/>
         <DCCReference Include="..\AqDrop.Core.Automaton.pas"/>
@@ -169,9 +168,11 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment>
-                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\AqDrop.Core.DXE7.bpl" Configuration="Debug" Class="ProjectOutput">
-                    <Platform Name="Win32">
-                        <RemoteName>AqDrop_Core_DXE7.bpl</RemoteName>
+                <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
+                    <Platform Name="OSX32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                    <Platform Name="iOSSimulator">
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
@@ -181,11 +182,9 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
-                    <Platform Name="OSX32">
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                    <Platform Name="iOSSimulator">
+                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\AqDrop.Core.DXE7.bpl" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>AqDrop_Core_DXE7.bpl</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

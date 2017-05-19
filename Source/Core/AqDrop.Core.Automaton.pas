@@ -913,7 +913,7 @@ end;
 constructor TAqAutomaton<TIdentifier, TValue, TOutput>.Create;
 begin
   FDictionaries :=
-    TAqDictionary<TIdentifier, TAqAutomatonDictionary<TIdentifier, TValue>>.Create([TAqDictionaryContent.adcValue]);
+    TAqDictionary<TIdentifier, TAqAutomatonDictionary<TIdentifier, TValue>>.Create([TAqKeyValueOwnership.kvoValue]);
   FStates := TAqList<TAqAutomatonState<TIdentifier, TValue, TOutput>>.Create(True);
   FStates.Add(TAqAutomatonState<TIdentifier, TValue, TOutput>.Create(Self, 0, TAqAutomatonStateType.astInitial))
 end;

@@ -1,0 +1,64 @@
+package AqDrop.Core.D10Tokyo;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'Aquasoft DROP - Core Library'}
+{$RUNONLY}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  DbxCommonDriver,
+  dbrtl,
+  bindengine,
+  bindcomp;
+
+contains
+  AqDrop.Core.AnonymousMethods in '..\AqDrop.Core.AnonymousMethods.pas',
+  AqDrop.Core.Attributes in '..\AqDrop.Core.Attributes.pas',
+  AqDrop.Core.Automaton in '..\AqDrop.Core.Automaton.pas',
+  AqDrop.Core.Automaton.Text in '..\AqDrop.Core.Automaton.Text.pas',
+  AqDrop.Core.Bindings in '..\AqDrop.Core.Bindings.pas',
+  AqDrop.Core.Calendar in '..\AqDrop.Core.Calendar.pas',
+  AqDrop.Core.Collections.Intf in '..\AqDrop.Core.Collections.Intf.pas',
+  AqDrop.Core.Collections in '..\AqDrop.Core.Collections.pas',
+  AqDrop.Core.Exceptions in '..\AqDrop.Core.Exceptions.pas',
+  AqDrop.Core.Helpers.Exception in '..\AqDrop.Core.Helpers.Exception.pas',
+  AqDrop.Core.Helpers.JSON in '..\AqDrop.Core.Helpers.JSON.pas',
+  AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas',
+  AqDrop.Core.Helpers.TObject in '..\AqDrop.Core.Helpers.TObject.pas',
+  AqDrop.Core.Helpers.TRttiObject in '..\AqDrop.Core.Helpers.TRttiObject.pas',
+  AqDrop.Core.Helpers.TRttiType in '..\AqDrop.Core.Helpers.TRttiType.pas',
+  AqDrop.Core.InterfacedObject in '..\AqDrop.Core.InterfacedObject.pas',
+  AqDrop.Core.Manager.Intf in '..\AqDrop.Core.Manager.Intf.pas',
+  AqDrop.Core.Manager in '..\AqDrop.Core.Manager.pas',
+  AqDrop.Core.Observable in '..\AqDrop.Core.Observable.pas',
+  AqDrop.Core.Observer.Intf in '..\AqDrop.Core.Observer.Intf.pas',
+  AqDrop.Core.Observer in '..\AqDrop.Core.Observer.pas',
+  AqDrop.Core.Tokenizer in '..\AqDrop.Core.Tokenizer.pas',
+  AqDrop.Core.Types in '..\AqDrop.Core.Types.pas';
+
+end.
