@@ -5,11 +5,11 @@ interface
 
 uses
 {$IFNDEF AQMOBILE}
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Phys.MSSQL,
-{$else}
+{$ELSE}
   uADPhysMSSQL,
-{$endif}
+{$ENDIF}
 {$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.FD;

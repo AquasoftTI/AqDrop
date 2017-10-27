@@ -47,6 +47,7 @@ contains
   AqDrop.Core.Collections in '..\AqDrop.Core.Collections.pas',
   AqDrop.Core.Exceptions in '..\AqDrop.Core.Exceptions.pas',
   AqDrop.Core.Helpers.Exception in '..\AqDrop.Core.Helpers.Exception.pas',
+  AqDrop.Core.Helpers.JSON in '..\AqDrop.Core.Helpers.JSON.pas',
   AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas',
   AqDrop.Core.Helpers.TObject in '..\AqDrop.Core.Helpers.TObject.pas',
   AqDrop.Core.Helpers.TRttiObject in '..\AqDrop.Core.Helpers.TRttiObject.pas',

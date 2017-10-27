@@ -57,7 +57,7 @@ type
     function SolveDelete(pDelete: IAqDBSQLDelete): string; virtual;
     function SolveCommand(pCommand: IAqDBSQLCommand): string; virtual;
 
-    function SolveGeneratorName(const pTableName: string): string; virtual;
+    function SolveGeneratorName(const pTableName, pFieldName: string): string; virtual;
 
     function GetAutoIncrementQuery(const pGeneratorName: string): string; virtual;
   end;
@@ -96,7 +96,7 @@ uses
 
 { TAqDBSQLSolver }
 
-function TAqDBSQLSolver.SolveGeneratorName(const pTableName: string): string;
+function TAqDBSQLSolver.SolveGeneratorName(const pTableName, pFieldName: string): string;
 begin
   raise EAqInternal.Create('Function not implemented to this DB.');
 end;

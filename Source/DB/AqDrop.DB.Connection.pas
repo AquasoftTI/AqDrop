@@ -43,6 +43,9 @@ type
 
     class var FConnections: TAqList<TAqDBConnection>;
   private
+    class procedure _Initialize;
+    class procedure _Finalize;
+
     property OnFirstReaderOpened: TProc<TAqDBConnection> read FOnFirstReaderOpened write FOnFirstReaderOpened;
     property OnLastReaderClosed: TProc<TAqDBConnection> read FOnLastReaderClosed write FOnLastReaderClosed;
   strict protected
@@ -91,9 +94,6 @@ type
     procedure IncreaseReaderes;
     procedure DecrementReaders;
   public
-    class constructor Create;
-    class destructor Destroy;
-
     /// <summary>
     ///   EN-US:
     ///     Class copnstructor.
@@ -433,11 +433,6 @@ begin
   end;
 end;
 
-class constructor TAqDBConnection.Create;
-begin
-  FConnections := TAqList<TAqDBConnection>.Create
-end;
-
 procedure TAqDBConnection.Disconnect;
 begin
   if Active then
@@ -449,6 +444,22 @@ end;
 procedure TAqDBConnection.UnprepareCommand(const pCommandID: TAqID);
 begin
   DoUnprepareCommand(pCommandID);
+end;
+
+class procedure TAqDBConnection._Finalize;
+begin
+{$IFNDEF AUTOREFCOUNT}
+  while FConnections.Count > 0 do
+  begin
+    FConnections.Last.Free;
+  end;
+{$ENDIF}
+  FConnections.Free;
+end;
+
+class procedure TAqDBConnection._Initialize;
+begin
+  FConnections := TAqList<TAqDBConnection>.Create
 end;
 
 procedure TAqDBConnection.DecrementReaders;
@@ -663,17 +674,6 @@ begin
 
   FAdapter := pAdapter;
   FOnwsAdapter := pOwnsAdapter;
-end;
-
-class destructor TAqDBConnection.Destroy;
-begin
-{$IFNDEF AUTOREFCOUNT}
-  while FConnections.Count > 0 do
-  begin
-    FConnections.Last.Free;
-  end;
-{$ENDIF}
-  FConnections.Free;
 end;
 
 function TAqDBConnection.ExecuteCommand(const pCommandID: TAqID;
@@ -1260,5 +1260,11 @@ begin
   FSQL := pSQL;
   FParametersInitializer := pParametersInitializer;
 end;
+
+initialization
+  TAqDBConnection._Initialize;
+
+finalization
+  TAqDBConnection._Finalize;
 
 end.

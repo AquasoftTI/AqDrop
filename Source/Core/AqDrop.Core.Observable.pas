@@ -8,6 +8,7 @@ uses
   System.Rtti,
   System.Classes,
   System.SysUtils,
+  System.SyncObjs,
   AqDrop.Core.Attributes,
   AQDrop.Core.Observer.Intf,
   AqDrop.Core.Observer,
@@ -21,14 +22,19 @@ type
     FObserversChannel: TAqObserversChannel<TObject>;
     FUpdating: Boolean;
 
+    class var FLocker: TCriticalSection;
     class var FInterceptors: TAqDictionary<string, TVirtualMethodInterceptor>;
     class function GetInterceptor: TVirtualMethodInterceptor;
+
+    class procedure Proxify(const pInstance: TAqObservable);
+    class procedure Unproxify(const pInstance: TAqObservable);
+  private
+    class procedure _Initialize;
+    class procedure _Finalize;
   strict protected
-    procedure SetAndNotify<T>(var FDestiny: T; const pValue: T);
+    procedure SetAndNotify<T>(var pTarget: T; const pValue: T);
     procedure Notify; virtual;
   public
-    class destructor Destroy;
-
     constructor Create;
     destructor Destroy; override;
 
@@ -69,7 +75,18 @@ begin
 
   FObserversChannel := TAqObserversChannel<TObject>.Create;
 
-  GetInterceptor.Proxify(Self);
+  Proxify(Self);
+end;
+
+class procedure TAqObservable.Unproxify(const pInstance: TAqObservable);
+begin
+  FLocker.Enter;
+
+  try
+    GetInterceptor.Unproxify(pInstance);
+  finally
+    FLocker.Leave;
+  end;
 end;
 
 procedure TAqObservable.UnregisterObserver(const pObserverID: Int32);
@@ -77,14 +94,20 @@ begin
   FObserversChannel.UnregisterObserver(pObserverID);
 end;
 
-class destructor TAqObservable.Destroy;
+class procedure TAqObservable._Finalize;
 begin
   FInterceptors.Free;
+  FLocker.Free;
+end;
+
+class procedure TAqObservable._Initialize;
+begin
+  FLocker := TCriticalSection.Create;
 end;
 
 destructor TAqObservable.Destroy;
 begin
-  GetInterceptor.Unproxify(Self);
+  Unproxify(Self);
   FObserversChannel.Free;
 
   inherited;
@@ -138,9 +161,20 @@ begin
   end;
 end;
 
-procedure TAqObservable.SetAndNotify<T>(var FDestiny: T; const pValue: T);
+class procedure TAqObservable.Proxify(const pInstance: TAqObservable);
 begin
-  FDestiny := pValue;
+  FLocker.Enter;
+
+  try
+    GetInterceptor.Proxify(pInstance);
+  finally
+    FLocker.Leave;
+  end;
+end;
+
+procedure TAqObservable.SetAndNotify<T>(var pTarget: T; const pValue: T);
+begin
+  pTarget := pValue;
   Notify;
 end;
 
@@ -148,5 +182,11 @@ function TAqObservable.RegisterObserver(pObserver: IAqObserver<TObject>): TAqID;
 begin
   Result := FObserversChannel.RegisterObserver(pObserver);
 end;
+
+initialization
+  TAqObservable._Initialize;
+
+finalization
+  TAqObservable._Finalize;
 
 end.

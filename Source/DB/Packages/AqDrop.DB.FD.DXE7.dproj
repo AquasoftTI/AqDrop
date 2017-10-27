@@ -56,6 +56,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
+        <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_MinorVer>3</VerInfo_MinorVer>
         <SanitizedProjectName>AqDrop_DB_FD_DXE7</SanitizedProjectName>
@@ -64,7 +65,7 @@
         <GenPackage>true</GenPackage>
         <VerInfo_Locale>1046</VerInfo_Locale>
         <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.3.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.3.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.3.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.3.1.0;Comments=</VerInfo_Keys>
         <GenDll>true</GenDll>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -107,6 +108,8 @@
         <DCC_DebugInformation>0</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <VerInfo_MinorVer>0</VerInfo_MinorVer>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
@@ -133,6 +136,7 @@
         <DCCReference Include="..\AqDrop.DB.FD.PG.pas"/>
         <DCCReference Include="..\AqDrop.DB.FD.TypeMapping.pas"/>
         <DCCReference Include="..\AqDrop.DB.FD.SQLite.pas"/>
+        <DCCReference Include="..\AqDrop.DB.FD.IB.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

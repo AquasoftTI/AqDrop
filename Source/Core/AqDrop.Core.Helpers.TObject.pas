@@ -35,10 +35,10 @@ type
 
     class var FLocker: TCriticalSection;
     class var FMappings: TObjectDictionary<string, TAqObjectMapping>;
+  private
+    class procedure _Initialize;
+    class procedure _Finalize;
   public
-    class constructor Create;
-    class destructor Destroy;
-
     constructor Create(const pFrom, pTo: TClass);
     destructor Destroy; override;
 
@@ -135,18 +135,6 @@ begin
   lMapping.Execute(pFrom, pTo);
 end;
 
-class constructor TAqObjectMapping.Create;
-begin
-  FLocker := TCriticalSection.Create;
-  FMappings := TObjectDictionary<string, TAqObjectMapping>.Create([doOwnsValues]);
-end;
-
-class destructor TAqObjectMapping.Destroy;
-begin
-  FMappings.Free;
-  FLocker.Free;
-end;
-
 constructor TAqObjectMapping.Create(const pFrom, pTo: TClass);
 var
   lContext: TRttiContext;
@@ -190,6 +178,18 @@ begin
   end;
 end;
 
+class procedure TAqObjectMapping._Finalize;
+begin
+  FMappings.Free;
+  FLocker.Free;
+end;
+
+class procedure TAqObjectMapping._Initialize;
+begin
+  FLocker := TCriticalSection.Create;
+  FMappings := TObjectDictionary<string, TAqObjectMapping>.Create([doOwnsValues]);
+end;
+
 { TAqFieldMapping }
 
 constructor TAqFieldMapping.Create(const pFieldFrom, pFieldTo: TRttiField);
@@ -197,5 +197,11 @@ begin
   FFieldFrom := pFieldFrom;
   FFieldTo := pFieldTo;
 end;
+
+initialization
+  TAqObjectMapping._Initialize;
+
+finalization
+  TAqObjectMapping._Finalize;
 
 end.

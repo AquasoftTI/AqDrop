@@ -675,10 +675,10 @@ type
   strict private
     class var FLocker: TCriticalSection;
     class var FUsedIDs: TAqAVLTree<TAqID>;
+  private
+    class procedure _Initialize;
+    class procedure _Finalize;
   public
-    class constructor Create;
-    class destructor Destroy;
-
     class function Generate: TAqID;
     class procedure Release(const pID: TAqID);
   end;
@@ -1602,18 +1602,6 @@ end;
 
 { TAqIDGenerator }
 
-class constructor TAqIDGenerator.Create;
-begin
-  FLocker := TCriticalSection.Create;
-  FUsedIDs := TAqAVLTree<TAqID>.Create;
-end;
-
-class destructor TAqIDGenerator.Destroy;
-begin
-  FUsedIDs.Free;
-  FLocker.Free;
-end;
-
 class function TAqIDGenerator.Generate: TAqID;
 var
   lGeneretadID: Boolean;
@@ -1669,6 +1657,18 @@ begin
   finally
     FLocker.Leave;
   end;
+end;
+
+class procedure TAqIDGenerator._Finalize;
+begin
+  FUsedIDs.Free;
+  FLocker.Free;
+end;
+
+class procedure TAqIDGenerator._Initialize;
+begin
+  FLocker := TCriticalSection.Create;
+  FUsedIDs := TAqAVLTree<TAqID>.Create;
 end;
 
 { TAqIDDictionary<TValue> }
@@ -1841,5 +1841,11 @@ begin
 
   inherited;
 end;
+
+initialization
+  TAqIDGenerator._Initialize;
+
+finalization
+  TAqIDGenerator._Finalize;
 
 end.

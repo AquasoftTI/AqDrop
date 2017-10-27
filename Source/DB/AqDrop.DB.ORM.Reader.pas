@@ -125,9 +125,9 @@ type
     function GetSpecializations: TAqReadList<TAqDBORMTable<AqSpecialization>>;
 
     class var FTableSeparator: string;
+  private
+    class procedure _Initialize;
   public
-    class constructor Create;
-
     constructor Create;
     destructor Destroy; override;
 
@@ -158,10 +158,10 @@ type
 
     class function GetType(const pClass: TClass): TRttiType;
     class function CreateNewORM(const pClass: TClass): TAqDBORM;
+  private
+    class procedure _Initialize;
+    class procedure _Finalize;
   public
-    class constructor Create;
-    class destructor Destroy;
-
     class function GetORM(const pClass: TClass; const pUsePool: Boolean = True): TAqDBORM;
   end;
 
@@ -176,14 +176,6 @@ uses
   AqDrop.Core.Helpers.TRttiObject;
 
 { TAqDBORMReader }
-
-class constructor TAqDBORMReader.Create;
-begin
-  FRttiContext := TRttiContext.Create;
-  FLocker := TCriticalSection.Create;
-  FTypes := TAqDictionary<string, TRttiType>.Create;
-  FORMs := TAqDictionary<string, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue]);
-end;
 
 class function TAqDBORMReader.CreateNewORM(const pClass: TClass): TAqDBORM;
   procedure ReadClass(pClasse: TClass);
@@ -260,14 +252,6 @@ begin
   end;
 end;
 
-class destructor TAqDBORMReader.Destroy;
-begin
-  FORMs.Free;
-  FTypes.Free;
-  FLocker.Free;
-  FRttiContext.Free;
-end;
-
 class function TAqDBORMReader.GetORM(const pClass: TClass; const pUsePool: Boolean): TAqDBORM;
 begin
   if pUsePool then
@@ -315,6 +299,22 @@ begin
   end;
 end;
 
+class procedure TAqDBORMReader._Finalize;
+begin
+  FORMs.Free;
+  FTypes.Free;
+  FLocker.Free;
+  FRttiContext.Free;
+end;
+
+class procedure TAqDBORMReader._Initialize;
+begin
+  FRttiContext := TRttiContext.Create;
+  FLocker := TCriticalSection.Create;
+  FTypes := TAqDictionary<string, TRttiType>.Create;
+  FORMs := TAqDictionary<string, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue]);
+end;
+
 { TAqDBORM }
 
 procedure TAqDBORM.AddTable(const pTableInfo: AqTable; const pType: TRttiType);
@@ -335,11 +335,6 @@ begin
 
     FSpecializations.Add(TAqDBORMTable<AqSpecialization>.Create(AqSpecialization(pTableInfo), pType));
   end;
-end;
-
-class constructor TAqDBORM.Create;
-begin
-  FTableSeparator := '.';
 end;
 
 constructor TAqDBORM.Create;
@@ -457,6 +452,11 @@ begin
       end;
     end;
   end;
+end;
+
+class procedure TAqDBORM._Initialize;
+begin
+  FTableSeparator := '.';
 end;
 
 function TAqDBORM.GetInitialized: Boolean;
@@ -953,5 +953,12 @@ begin
 
   FProperty.SetValue(pInstance, pValue);
 end;
+
+initialization
+  TAqDBORM._Initialize;
+  TAqDBORMReader._Initialize;
+
+finalization
+  TAqDBORMReader._Finalize;
 
 end.

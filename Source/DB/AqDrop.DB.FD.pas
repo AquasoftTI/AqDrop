@@ -9,12 +9,17 @@ uses
   Data.SqlTimSt,
   Data.FmtBcd,
   Data.DB,
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
   FireDAC.Stan.Def,
   FireDAC.Stan.Async,
   FireDAC.DApt,
-{$endif}
+{$ELSE}
+  uADStanParam,
+  uADStanDef,
+  uADStanAsync,
+  uADDAptManager,
+{$ENDIF}
   AqDrop.Core.Types,
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Collections,
@@ -119,6 +124,8 @@ type
     procedure SingleToParam(const pParameter: TAqFDMappedParam; const pValue: Single); virtual;
     procedure DoubleToParam(const pParameter: TAqFDMappedParam; const pValue: Double); virtual;
     procedure CurrencyToParam(const pParameter: TAqFDMappedParam; const pValue: Currency); virtual;
+
+    function AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType; virtual;
   end;
 
   TAqFDDataConverterClass = class of TAqFDDataConverter;
@@ -348,10 +355,6 @@ implementation
 uses
   System.SysUtils,
   System.DateUtils,
-{$if CompilerVersion >= 26}
-{$else}
-  uADStanParam,
-{$endif}
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers;
 
@@ -845,7 +848,7 @@ end;
 
 procedure TAqFDParameter.SetDataType(const pDataType: TAqDataType);
 begin
-  FParameter.DataType := TAqFDDataTypeMapping[pDataType];
+  FParameter.DataType := FParameters.Connection.FDAdapter.FDDataConverter.AqDataTypeToFieldType(pDataType);
 end;
 
 procedure TAqFDParameter.SetName(const pName: string);
@@ -867,6 +870,11 @@ begin
   pParameter.AsAnsiString := pValue;
 end;
 {$ENDIF}
+
+function TAqFDDataConverter.AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType;
+begin
+  Result :=  TAqFDDataTypeMapping[pDataType];
+end;
 
 procedure TAqFDDataConverter.BCDToParam(const pParameter: TAqFDMappedParam; const pValue: TBcd);
 begin

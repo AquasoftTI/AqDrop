@@ -52,6 +52,7 @@ contains
   AqDrop.DB.FD in '..\AqDrop.DB.FD.pas',
   AqDrop.DB.FD.PG in '..\AqDrop.DB.FD.PG.pas',
   AqDrop.DB.FD.TypeMapping in '..\AqDrop.DB.FD.TypeMapping.pas',
-  AqDrop.DB.FD.SQLite in '..\AqDrop.DB.FD.SQLite.pas';
+  AqDrop.DB.FD.SQLite in '..\AqDrop.DB.FD.SQLite.pas',
+  AqDrop.DB.FD.IB in '..\AqDrop.DB.FD.IB.pas';
 
 end.

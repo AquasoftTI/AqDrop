@@ -1,4 +1,4 @@
-unit AqDrop.DB.PG;
+unit AqDrop.DB.IB;
 
 interface
 
@@ -7,7 +7,7 @@ uses
   AqDrop.DB.SQL.Intf;
 
 type
-  TAqDBPGSQLSolver = class(TAqDBSQLSolver)
+  TAqDBIBSQLSolver = class(TAqDBSQLSolver)
   strict protected
     function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
     function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
@@ -17,46 +17,45 @@ type
     function GetAutoIncrementQuery(const pGeneratorName: string): string; override;
   end;
 
-
 implementation
-
-{ TAqDBPGSQLSolver }
 
 uses
   System.SysUtils,
   AqDrop.Core.Helpers;
 
-function TAqDBPGSQLSolver.GetAutoIncrementQuery(const pGeneratorName: string): string;
+{ TAqDBIBSQLSolver }
+
+function TAqDBIBSQLSolver.GetAutoIncrementQuery(const pGeneratorName: string): string;
 begin
-  Result := Format('select nextval(''%s'')', [pGeneratorName]);
+  Result := Format('select GEN_ID(%s, 1) from RDB$DATABASE', [pGeneratorName]);
 end;
 
-function TAqDBPGSQLSolver.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
+function TAqDBIBSQLSolver.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
 begin
   if pConstant.Value then
   begin
-    Result := 'true';
+    Result := 'True';
   end else begin
-    Result := 'false';
+    Result := 'False';
   end;
 end;
 
-function TAqDBPGSQLSolver.SolveGeneratorName(const pTableName, pFieldName: string): string;
+function TAqDBIBSQLSolver.SolveGeneratorName(const pTableName, pFieldName: string): string;
 begin
-  Result := Format('%s_ID_SEQ', [pTableName]);
+  Result := Format('GEN_%s_%s', [pTableName, pFieldName]);
 end;
 
-function TAqDBPGSQLSolver.SolveLimit(pSelect: IAqDBSQLSelect): string;
+function TAqDBIBSQLSolver.SolveLimit(pSelect: IAqDBSQLSelect): string;
 begin
   if pSelect.IsLimitDefined then
   begin
-    Result := ' limit ' + pSelect.Limit.ToString;
+    Result := ' rows ' + pSelect.Limit.ToString;
   end else begin
     Result := '';
   end;
 end;
 
-function TAqDBPGSQLSolver.SolveSelect(pSelect: IAqDBSQLSelect): string;
+function TAqDBIBSQLSolver.SolveSelect(pSelect: IAqDBSQLSelect): string;
 begin
   Result := inherited + SolveLimit(pSelect);
 end;

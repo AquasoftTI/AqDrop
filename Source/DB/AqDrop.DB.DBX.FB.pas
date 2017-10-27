@@ -42,7 +42,6 @@ type
     property Password: string index $82 read GetPropertyValueAsString write SetPropertyValueAsString;
   end;
 
-
 implementation
 
 uses

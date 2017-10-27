@@ -5,13 +5,15 @@ unit AqDrop.DB.FD.MySQL;
 interface
 
 uses
+  Data.DB,
 {$IFNDEF AQMOBILE}
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Phys.MySQL,
-{$else}
+{$ELSE}
   uADPhysMySQL,
-{$endif}
 {$ENDIF}
+{$ENDIF}
+  AqDrop.Core.Types,
   AqDrop.DB.Adapter,
   AqDrop.DB.FD,
   AqDrop.DB.FD.TypeMapping;
@@ -20,6 +22,8 @@ type
   TAqFDMySQLDataConverter = class(TAqFDDataConverter)
   public
     procedure BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean); override;
+
+    function AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType; override;
   end;
 
   TAqFDMySQLAdapter = class(TAqFDAdapter)
@@ -45,15 +49,25 @@ type
 implementation
 
 uses
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
-{$endif}
+{$ENDIF}
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
   AqDrop.DB.Types,
   AqDrop.DB.MySQL;
 
 { TAqFDMySQLDataConverter }
+
+function TAqFDMySQLDataConverter.AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType;
+begin
+  if pDataType = TAqDataType.adtBoolean then
+  begin
+    Result := TFieldType.ftInteger;
+  end else begin
+    Result := inherited;
+  end;
+end;
 
 procedure TAqFDMySQLDataConverter.BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean);
 begin

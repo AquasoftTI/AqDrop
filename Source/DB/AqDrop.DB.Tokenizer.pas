@@ -24,10 +24,10 @@ type
 
     class procedure Initialize;
     class function GetDictionary(pIndex: TAqDBTokenizerDictionaryID): TDictionaryContent; static;
+  private
+    class procedure _Initialize;
+    class procedure _Finalize;
   public
-    class constructor Create;
-    class destructor Destroy;
-
     class property Dictionary[Index: TAqDBTokenizerDictionaryID]: TDictionaryContent read GetDictionary; default;
   end;
 
@@ -43,8 +43,9 @@ type
   strict private
     class var FInstance: TAqBDTokenizer;
     constructor Create;
+  private
+    class procedure _Finalize;
   public
-    class destructor Destroy;
     class function GetInstance: TAqBDTokenizer;
   end;
 
@@ -250,11 +251,6 @@ begin
   lFinalStateGreaterThan.AddTransition(lFinalStateGreaterEqualThan).AddDictionary(diEqual);
 end;
 
-class destructor TAqBDTokenizer.Destroy;
-begin
-  FInstance.Free;
-end;
-
 class function TAqBDTokenizer.GetInstance: TAqBDTokenizer;
 begin
   if not Assigned(FInstance) then
@@ -265,20 +261,12 @@ begin
   Result := FInstance;
 end;
 
+class procedure TAqBDTokenizer._Finalize;
+begin
+  FInstance.Free;
+end;
+
 { TAqDBTokenizerDictionaries }
-
-class constructor TAqDBTokenizerDictionaries.Create;
-begin
-  FDictionaries :=
-    TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>.Create([TAqKeyValueOwnership.kvoValue]);
-
-  Initialize;
-end;
-
-class destructor TAqDBTokenizerDictionaries.Destroy;
-begin
-  FDictionaries.Free;
-end;
 
 class function TAqDBTokenizerDictionaries.GetDictionary(pIndex: TAqDBTokenizerDictionaryID): TDictionaryContent;
 begin
@@ -341,6 +329,26 @@ begin
   CreateNewContent(diLessThan).Add('<');
   CreateNewContent(diGreaterThan).Add('>');
 end;
+
+class procedure TAqDBTokenizerDictionaries._Finalize;
+begin
+  FDictionaries.Free;
+end;
+
+class procedure TAqDBTokenizerDictionaries._Initialize;
+begin
+  FDictionaries :=
+    TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>.Create([TAqKeyValueOwnership.kvoValue]);
+
+  Initialize;
+end;
+
+initialization
+  TAqDBTokenizerDictionaries._Initialize;
+
+finalization
+  TAqBDTokenizer._Finalize;
+  TAqDBTokenizerDictionaries._Finalize;
 
 end.
 

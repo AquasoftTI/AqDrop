@@ -4,11 +4,11 @@ interface
 
 uses
   Data.DB,
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Phys.SQLite,
-{$else}
+{$ELSE}
   uADPhysSQLite,
-{$endif}
+{$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.SQLite,
   AqDrop.DB.FD,
@@ -24,9 +24,9 @@ type
     function FieldToDateTime(const pField: TField): TDateTime; override;
     function FieldToTime(const pField: TField): TTime; override;
 
-{$if CompilerVersion = 25}
+{$IF CompilerVersion = 25}
     procedure StringToParam(const pParameter: TAqFDMappedParam; const pValue: string); override;
-{$endif}
+{$ENDIF}
   end;
 
   TAqFDSQLiteAdapter = class(TAqFDAdapter)
@@ -63,9 +63,9 @@ type
 implementation
 
 uses
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
-{$endif}
+{$ENDIF}
   AqDrop.Core.Helpers;
 
 { TAqFDSQLiteAdapter }
@@ -147,12 +147,12 @@ begin
   Result := pField.AsFloat.Frac;
 end;
 
-{$if CompilerVersion = 25}
+{$IF CompilerVersion = 25}
 procedure TAqFDSQLiteDataConverter.StringToParam(const pParameter: TAqFDMappedParam; const pValue: string);
 begin
   pParameter.AsString := pValue;
 end;
-{$endif}
+{$ENDIF}
 
 procedure TAqFDSQLiteDataConverter.TimeToParam(const pParameter: TAqFDMappedParam; const pValue: TTime);
 begin

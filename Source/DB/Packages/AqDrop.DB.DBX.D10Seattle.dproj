@@ -61,6 +61,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
+        <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
         <SanitizedProjectName>AqDrop_DB_DBX_D10Seattle</SanitizedProjectName>
@@ -69,7 +70,7 @@
         <VerInfo_MinorVer>3</VerInfo_MinorVer>
         <GenDll>true</GenDll>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
-        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.3.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.3.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Aquasoft TI;FileDescription=;FileVersion=1.3.1.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.3.1.0;Comments=</VerInfo_Keys>
         <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
         <DCC_Description>Aquasoft DROP - DBX Support</DCC_Description>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
@@ -136,12 +137,15 @@
         <DCCReference Include="DBXFirebirdDriver.dcp"/>
         <DCCReference Include="DBXOracleDriver.dcp"/>
         <DCCReference Include="DBXMSSQLDriver.dcp"/>
+        <DCCReference Include="dbexpress.dcp"/>
+        <DCCReference Include="DBXInterBaseDriver.dcp"/>
         <DCCReference Include="..\AqDrop.DB.DBX.FB.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.MSSQL.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.MySQL.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.Ora.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.pas"/>
         <DCCReference Include="..\AqDrop.DB.DBX.SQLite.pas"/>
+        <DCCReference Include="..\AqDrop.DB.DBX.IB.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -195,7 +199,16 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployClass Name="ProjectiOSDeviceResourceRules"/>
+                <DeployClass Name="DependencyModule">
+                    <Platform Name="Win32">
+                        <Operation>0</Operation>
+                        <Extensions>.dll;.bpl</Extensions>
+                    </Platform>
+                    <Platform Name="OSX32">
+                        <Operation>1</Operation>
+                        <Extensions>.dylib</Extensions>
+                    </Platform>
+                </DeployClass>
                 <DeployClass Name="ProjectOSXResource">
                     <Platform Name="OSX32">
                         <RemoteDir>Contents\Resources</RemoteDir>
@@ -509,16 +522,7 @@
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
-                <DeployClass Name="DependencyModule">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                        <Extensions>.dll;.bpl</Extensions>
-                    </Platform>
-                    <Platform Name="OSX32">
-                        <Operation>1</Operation>
-                        <Extensions>.dylib</Extensions>
-                    </Platform>
-                </DeployClass>
+                <DeployClass Name="ProjectiOSDeviceResourceRules"/>
                 <ProjectRoot Platform="iOSDevice64" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>

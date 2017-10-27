@@ -369,6 +369,8 @@ type
     procedure DoConnect; override;
     procedure DoDisconnect; override;
 
+    function GetDBXConnection(const pProperties: TDBXProperties): TDBXConnection; virtual;
+
     function GetPropertyValueAsString(const pIndex: Int32): string; virtual;
     procedure SetPropertyValueAsString(const pIndex: Int32; const pValue: string); virtual;
 
@@ -451,7 +453,7 @@ begin
   inherited;
 
   try
-    FDBXConnection := TDBXConnectionFactory.GetConnectionFactory.GetConnection(FProperties);
+    FDBXConnection := GetDBXConnection(FProperties);
   except
     on E: Exception do
     begin
@@ -513,6 +515,11 @@ end;
 function TAqDBXCustomConnection.GetDBXAdapter: TAqDBXAdapter;
 begin
   Result := TAqDBXAdapter(Adapter);
+end;
+
+function TAqDBXCustomConnection.GetDBXConnection(const pProperties: TDBXProperties): TDBXConnection;
+begin
+  Result := TDBXConnectionFactory.GetConnectionFactory.GetConnection(pProperties);
 end;
 
 class function TAqDBXCustomConnection.GetDefaultAdapter: TAqDBAdapterClass;
@@ -1703,6 +1710,8 @@ begin
       TDBXDataTypes.AnsiStringType:
         Result := string(pValue.DBXValue.GetAnsiString).ToInt32;
 {$ENDIF}
+      TDBXDataTypes.DateType:
+        Result := Double(pValue.DBXValue.AsDateTime).Trunc;
       TDBXDataTypes.BooleanType:
         Result := pValue.DBXValue.AsBoolean.ToInt8;
       TDBXDataTypes.Int16Type:

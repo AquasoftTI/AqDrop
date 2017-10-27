@@ -13,7 +13,7 @@ type
     function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
     function SolveSelectBody(pSelect: IAqDBSQLSelect): string; override;
   public
-    function SolveGeneratorName(const pTableName: string): string; override;
+    function SolveGeneratorName(const pTableName, pFieldName: string): string; override;
     function GetAutoIncrementQuery(const pGeneratorName: string): string; override;
   end;
 
@@ -42,7 +42,7 @@ begin
   Result := Result.Quote;
 end;
 
-function TAqDBOraSQLSolver.SolveGeneratorName(const pTableName: string): string;
+function TAqDBOraSQLSolver.SolveGeneratorName(const pTableName, pFieldName: string): string;
 begin
   Result := Format('%s_SEQ', [pTableName]);
 end;

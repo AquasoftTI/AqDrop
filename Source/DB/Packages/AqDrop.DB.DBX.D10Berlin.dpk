@@ -37,7 +37,9 @@ requires
   DBXMySQLDriver,
   DBXFirebirdDriver,
   DBXOracleDriver,
-  DBXMSSQLDriver;
+  DBXMSSQLDriver,
+  DBXInterBaseDriver,
+  dbexpress;
 
 contains
   AqDrop.DB.DBX.FB in '..\AqDrop.DB.DBX.FB.pas',
@@ -45,6 +47,7 @@ contains
   AqDrop.DB.DBX.MySQL in '..\AqDrop.DB.DBX.MySQL.pas',
   AqDrop.DB.DBX.Ora in '..\AqDrop.DB.DBX.Ora.pas',
   AqDrop.DB.DBX in '..\AqDrop.DB.DBX.pas',
-  AqDrop.DB.DBX.SQLite in '..\AqDrop.DB.DBX.SQLite.pas';
+  AqDrop.DB.DBX.SQLite in '..\AqDrop.DB.DBX.SQLite.pas',
+  AqDrop.DB.DBX.IB in '..\AqDrop.DB.DBX.IB.pas';
 
 end.

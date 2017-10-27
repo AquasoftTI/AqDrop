@@ -17,6 +17,9 @@ uses
 type
   TAqDBXMySQLDataConverter = class(TAqDBXDataConverter)
   public
+{$IFNDEF AQMOBILE}
+    procedure AnsiStringToParameter(const pParameter: TDBXParameter; const pValue: AnsiString); override;
+{$ENDIF}
     procedure BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean); override;
     procedure UInt8ToParameter(const pParameter: TDBXParameter; const pValue: UInt8); override;
     procedure UInt16ToParameter(const pParameter: TDBXParameter; const pValue: UInt16); override;
@@ -53,6 +56,14 @@ uses
   AqDrop.DB.MySQL;
 
 { TAqDBXMySQLDataConverter }
+
+{$IFNDEF AQMOBILE}
+procedure TAqDBXMySQLDataConverter.AnsiStringToParameter(const pParameter: TDBXParameter; const pValue: AnsiString);
+begin
+  pParameter.DataType := TDBXDataTypes.AnsiStringType;
+  pParameter.Value.SetAnsiString(pValue);
+end;
+{$ENDIF}
 
 procedure TAqDBXMySQLDataConverter.BooleanToParameter(const pParameter: TDBXParameter; const pValue: Boolean);
 begin

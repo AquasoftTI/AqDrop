@@ -6,11 +6,11 @@ interface
 
 uses
 {$IFNDEF AQMOBILE}
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Phys.PG,
-{$else}
+{$ELSE}
   uADPhysPG,
-{$endif}
+{$ENDIF}
 {$ENDIF}
   AqDrop.DB.Adapter,
   AqDrop.DB.FD;

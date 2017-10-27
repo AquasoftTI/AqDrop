@@ -43,10 +43,10 @@ end;
 
 class procedure TAqIDEAboutBox.Install;
 begin
-  (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo('DROP 1.3 by Aquasoft',
+  (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo('DROP 1.3.1 by Aquasoft',
     'Developed by Aquasoft TI' + sLineBreak +
     'Porto Alegre - RS - Brazil' + sLineBreak +
-    'www.aquasoft.com.br', GetLogo, False, 'Registered', 'DROP 1.3 by Aquasoft');
+    'www.aquasoft.com.br', GetLogo, False, 'Registered', 'DROP 1.3.1 by Aquasoft');
 end;
 
 class procedure TAqIDEAboutBox.Uninstall;

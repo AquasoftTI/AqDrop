@@ -4,28 +4,28 @@ interface
 
 uses
   System.Classes,
-{$if CompilerVersion >= 28}
+{$IF CompilerVersion >= 28}
   FireDAC.Stan.Intf,
-{$endif}
-{$if CompilerVersion >= 26}
+{$ENDIF}
+{$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
   FireDAC.Comp.Client;
-{$else}
+{$ELSE}
   uADStanParam,
   uADCompClient;
-{$endif}
+{$ENDIF}
 
 
 type
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   TAqFDMappedParam = TFDParam;
   TAqFDMappedQuery = TFDQuery;
   TAqFDMappedConnection = TFDConnection;
-{$else}
+{$ELSE}
   TAqFDMappedParam = TADParam;
   TAqFDMappedQuery = TADQuery;
   TAqFDMappedConnection = TADConnection;
-{$endif}
+{$ENDIF}
 
 {$IF CompilerVersion >= 28}
   TAqFDMappedConnectionParameters = TFDConnectionDefParams;

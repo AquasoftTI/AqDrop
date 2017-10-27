@@ -429,7 +429,7 @@ begin
       begin
         lGeneratorName := AqAutoIncrementColumn(lAutoIncrementColumn.Attribute).GeneratorName;
       end else begin
-        lGeneratorName := SQLSolver.SolveGeneratorName(lTable.Name);
+        lGeneratorName := SQLSolver.SolveGeneratorName(lTable.Name, lAutoIncrementColumn.Name);
       end;
 
       lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(FConnection.GetAutoIncrement(lGeneratorName)));

@@ -864,11 +864,11 @@ end;
 
 function TAqBcdHelper.ToInt64: Int64;
 begin
-{$if CompilerVersion >= 27}
+{$IF CompilerVersion >= 27}
   Result := Data.FmtBcd.BcdToInt64(Self);
-{$else}
+{$ELSE}
   Result := StrToInt64(BcdToStr(Self));
-{$endif}
+{$ENDIF}
 end;
 
 function TAqBcdHelper.ToString: string;

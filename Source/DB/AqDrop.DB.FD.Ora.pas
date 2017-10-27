@@ -5,13 +5,15 @@ unit AqDrop.DB.FD.Ora;
 interface
 
 uses
+  Data.DB,
 {$IFNDEF AQMOBILE}
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Phys.Oracle,
-{$else}
+{$ELSE}
   uADPhysOracle,
-{$endif}
 {$ENDIF}
+{$ENDIF}
+  AqDrop.Core.Types,
   AqDrop.DB.Adapter,
   AqDrop.DB.FD,
   AqDrop.DB.FD.TypeMapping;
@@ -19,7 +21,10 @@ uses
 type
   TAqFDOraDataConverter = class(TAqFDDataConverter)
   public
+    function FieldToBoolean(const pField: TField): Boolean; override;
     procedure BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean); override;
+
+    function AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType; override;
   end;
 
   TAqFDOraAdapter = class(TAqFDAdapter)
@@ -46,9 +51,9 @@ type
 implementation
 
 uses
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
-{$endif}
+{$ENDIF}
   AqDrop.Core.Exceptions,
   AqDrop.DB.Types,
   AqDrop.DB.Ora;
@@ -98,6 +103,16 @@ end;
 
 { TAqFDOraDataConverter }
 
+function TAqFDOraDataConverter.AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType;
+begin
+  if pDataType = TAqDataType.adtBoolean then
+  begin
+    Result := TFieldType.ftWideString;
+  end else begin
+    Result := inherited;
+  end;
+end;
+
 procedure TAqFDOraDataConverter.BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean);
 begin
   if pValue then
@@ -105,6 +120,16 @@ begin
     pParameter.AsString := '1';
   end else begin
     pParameter.AsString := '0';
+  end;
+end;
+
+function TAqFDOraDataConverter.FieldToBoolean(const pField: TField): Boolean;
+begin
+  if pField.IsNull then
+  begin
+    Result := False;
+  end else begin
+    Result := inherited;
   end;
 end;
 

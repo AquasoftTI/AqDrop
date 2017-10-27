@@ -5,9 +5,11 @@ unit AqDrop.DB.DBX.MSSQL;
 interface
 
 uses
+  Data.DBXCommon,
 {$IFNDEF AQMOBILE}
   Data.DBXMSSQL,
 {$ENDIF}
+  Data.SqlExpr,
   AqDrop.DB.SQL.Intf,
   AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
@@ -20,13 +22,18 @@ type
   end;
 
   TAqDBXMSSQLConnection = class(TAqDBXCustomConnection)
+  strict private
+    FSQLConnection: TSQLConnection;
   strict protected
+    function GetDBXConnection(const pProperties: TDBXProperties): TDBXConnection; override;
+
     function GetPropertyValueAsString(const pIndex: Int32): string; override;
     procedure SetPropertyValueAsString(const pIndex: Int32; const pValue: string); override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   public
     constructor Create; override;
+    destructor Destroy; override;
 
     property HostName: string index $80 read GetPropertyValueAsString write SetPropertyValueAsString;
     property DataBase: string index $81 read GetPropertyValueAsString write SetPropertyValueAsString;
@@ -38,10 +45,10 @@ implementation
 
 uses
   System.SysUtils,
-  Data.DBXCommon,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
-  AqDrop.DB.Types, AqDrop.DB.MSSQL;
+  AqDrop.DB.Types,
+  AqDrop.DB.MSSQL;
 
 { TAqDBXMSSQLConnection }
 
@@ -51,8 +58,30 @@ begin
 
   Self.DriverName := 'MSSQL';
   Self.VendorLib := 'sqlncli10.dll';
+  Self.VendorLib64 := 'sqlncli10.dll';
   Self.LibraryName := 'dbxmss.dll';
   Self.GetDriverFunc := 'getSQLDriverMSSQL';
+end;
+
+destructor TAqDBXMSSQLConnection.Destroy;
+begin
+  FSQLConnection.Free;
+
+  inherited;
+end;
+
+function TAqDBXMSSQLConnection.GetDBXConnection(const pProperties: TDBXProperties): TDBXConnection;
+begin
+  FreeAndNil(FSQLConnection);
+
+  FSQLConnection := TSQLConnection.Create(nil);
+  FSQLConnection.DriverName := 'MSSQL';
+  FSQLConnection.Params.Values[TDBXPropertyNames.Database] := 'drop';
+  FSQLConnection.Params.Values[TDBXPropertyNames.HostName] := 'tatu-pc\sqlexpress';
+  FSQLConnection.Params.Values[TDBXPropertyNames.UserName] := 'drop';
+  FSQLConnection.Params.Values[TDBXPropertyNames.Password] := 'drop';
+  FSQLConnection.Open;
+  Result := FSQLConnection.DBXConnection;
 end;
 
 class function TAqDBXMSSQLConnection.GetDefaultAdapter: TAqDBAdapterClass;

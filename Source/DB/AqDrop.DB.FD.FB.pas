@@ -4,11 +4,12 @@ interface
 
 uses
   Data.DB,
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Phys.FB,
-{$else}
+{$ELSE}
   uADPhysIB,
-{$endif}
+{$ENDIF}
+  AqDrop.Core.Types,
   AqDrop.DB.Adapter,
   AqDrop.DB.FB,
   AqDrop.DB.FD,
@@ -17,7 +18,10 @@ uses
 type
   TAqFDFBDataConverter = class(TAqFDDataConverter)
   public
+    function FieldToBoolean(const pField: TField): Boolean; override;
     procedure BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean); override;
+
+    function AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType; override;
   end;
 
   TAqFDFBAdapter = class(TAqFDAdapter)
@@ -45,13 +49,23 @@ type
 implementation
 
 uses
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
-{$endif}
+{$ENDIF}
   AqDrop.Core.Exceptions,
   AqDrop.DB.Types;
 
 { TAqFDFBDataConverter }
+
+function TAqFDFBDataConverter.AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType;
+begin
+  if pDataType = TAqDataType.adtBoolean then
+  begin
+    Result := TFieldType.ftWideString;
+  end else begin
+    Result := inherited;
+  end;
+end;
 
 procedure TAqFDFBDataConverter.BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean);
 begin
@@ -60,6 +74,16 @@ begin
     pParameter.AsString := '1';
   end else begin
     pParameter.AsString := '0';
+  end;
+end;
+
+function TAqFDFBDataConverter.FieldToBoolean(const pField: TField): Boolean;
+begin
+  if pField.IsNull then
+  begin
+    Result := False;
+  end else begin
+    Result := inherited;
   end;
 end;
 
@@ -86,11 +110,11 @@ constructor TAqFDFBConnection.Create;
 begin
   inherited;
 
-{$if CompilerVersion >= 26}
+{$IF CompilerVersion >= 26}
   DriverName := 'FB';
-{$else}
+{$ELSE}
   DriverName := 'IB';
-{$endif}
+{$ENDIF}
 end;
 
 class function TAqFDFBConnection.GetDefaultAdapter: TAqDBAdapterClass;
