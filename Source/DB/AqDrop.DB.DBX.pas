@@ -5,6 +5,7 @@ interface
 {$I '..\Core\AqDrop.Core.Defines.Inc'}
 
 uses
+  System.TypInfo,
   System.Classes,
   System.Rtti,
   System.SysUtils,
@@ -127,7 +128,7 @@ type
   TAqDBXBaseValues = class;
   TAqDBXCustomConnection = class;
 
-  TAqDBXBaseValue = class(TAqInterfacedObject, IAqDBReadValue)
+  TAqDBXBaseValue = class(TAqARCObject, IAqDBReadValue)
   strict private
     [weak]
     FValues: TAqDBXBaseValues;
@@ -163,8 +164,7 @@ type
     function GetAsSingle: Single; virtual;
     function GetAsDouble: Double; virtual;
     function GetAsCurrency: Currency; virtual;
-
-    class function MustCountReferences: Boolean; override;
+    function GetAsTValue(const pAsType: PTypeInfo): TValue;
   public
     constructor Create(const pValues: TAqDBXBaseValues; const pName: string; const pIndex: Int32);
 
@@ -262,6 +262,8 @@ type
     FConnection: TAqDBXCustomConnection;
   strict protected
     function GetByteReader: TDBXByteReader; virtual; abstract;
+
+    class function _EnableARCForClass: Boolean; override;
   public
     constructor Create(const pConnection: TAqDBXCustomConnection);
 
@@ -272,8 +274,6 @@ type
   TAqDBXValues<I: IAqDBReadValue> = class(TAqDBXBaseValues)
   strict private
     FValues: TAqList<I>;
-  strict protected
-    class function MustCountReferences: Boolean; override;
   public
     constructor Create(const pConnection: TAqDBXCustomConnection);
     destructor Destroy; override;
@@ -291,7 +291,7 @@ type
   strict protected
     function GetByteReader: TDBXByteReader; override;
 
-    class function MustCountReferences: Boolean; override;
+    class function _EnableARCForClass: Boolean; override;
   public
     constructor Create(const pConnection: TAqDBXCustomConnection; const pDBXCommand: TDBXCommand);
 
@@ -424,7 +424,7 @@ type
   strict private
     FGetterAutoIncrement: TFunc<Int64>;
   public
-    function GetAutoIncrement(const pGeneratorName: string = ''): Int64; override;
+    function GetAutoIncrementValue(const pGeneratorName: string = ''): Int64; override;
 
     property DriverName;
     property VendorLib;
@@ -443,6 +443,7 @@ uses
   System.DateUtils,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
+  AqDrop.DB.Common,
   AqDrop.DB.Tokenizer;
 
 
@@ -769,11 +770,6 @@ end;
 
 { TAqDBXBaseValue }
 
-class function TAqDBXBaseValue.MustCountReferences: Boolean;
-begin
-  Result := True;
-end;
-
 constructor TAqDBXBaseValue.Create(const pValues: TAqDBXBaseValues; const pName: string; const pIndex: Int32);
 begin
   inherited Create;
@@ -863,6 +859,11 @@ end;
 function TAqDBXBaseValue.GetAsTimeStampOffset: TSQLTimeStampOffset;
 begin
   Result := Values.Connection.DBXAdapter.DBXConverter.DBToTimeStampOffset(Self);
+end;
+
+function TAqDBXBaseValue.GetAsTValue(const pAsType: PTypeInfo): TValue;
+begin
+  Result := TAqDBValueConverter.ConvertToTValue(Self as IAqDBReadValue, pAsType);
 end;
 
 function TAqDBXBaseValue.GetAsUInt16: UInt16;
@@ -1251,11 +1252,6 @@ begin
   FValues.Add(pValue);
 end;
 
-class function TAqDBXValues<I>.MustCountReferences: Boolean;
-begin
-  Result := True;
-end;
-
 constructor TAqDBXValues<I>.Create(const pConnection: TAqDBXCustomConnection);
 begin
   inherited Create(pConnection);
@@ -1346,7 +1342,7 @@ end;
 
 { TAqDBXParameters }
 
-class function TAqDBXParameters.MustCountReferences: Boolean;
+class function TAqDBXParameters._EnableARCForClass: Boolean;
 begin
   Result := False;
 end;
@@ -2227,6 +2223,11 @@ begin
   pParameter.Value.SetUInt8(pValue);
 end;
 
+class function TAqDBXBaseValues._EnableARCForClass: Boolean;
+begin
+  Result := True;
+end;
+
 { TAqDBXCommand }
 
 function TAqDBXCommand.Open(const pParametersHandler: TAqDBParametersHandlerMethod): TAqDBXReader;
@@ -2277,7 +2278,7 @@ end;
 
 { TAqDBXConnection }
 
-function TAqDBXConnection.GetAutoIncrement(const pGeneratorName: string): Int64;
+function TAqDBXConnection.GetAutoIncrementValue(const pGeneratorName: string): Int64;
 begin
   if Assigned(FGetterAutoIncrement) then
   begin

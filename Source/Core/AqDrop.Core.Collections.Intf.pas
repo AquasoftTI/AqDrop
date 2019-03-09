@@ -5,15 +5,51 @@ interface
 uses
   System.SysUtils,
   System.Generics.Defaults,
-  System.Generics.Collections;
+  System.Generics.Collections,
+  AqDrop.Core.Types;
 
 type
-  IAqReadList<T> = interface
+  IAqKeyValuePair<K, V> = interface
+    ['{FF1F3ECB-DE5B-47E5-AB59-B512FB5AE003}']
+
+    function GetKey: K;
+    function GetValue: V;
+
+    property Key: K read GetKey;
+    property Value: V read GetValue;
+  end;
+
+  IAqLocker = interface
+    ['{52F78214-8838-471E-9C75-9AF6BF5FE354}']
+
+    procedure BeginRead;
+    procedure EndRead;
+    procedure BeginWrite;
+    procedure EndWrite;
+  end;
+
+  IAqList<T> = interface;
+
+  {TODO 3 -oTatu -cMelhoria: procurar possíveis pontos do código que podem ter laços baseados em índices e podem ser alterados por iterators}
+  IAqIterator<T> = interface
+    ['{E832C3D8-62FB-414F-A7C7-A01ADC21829B}']
+
+    function MoveToNext: Boolean;
+    function VerifyIfIsFinished: Boolean;
+    procedure Reset;
+    function GetCurrentItem: T;
+
+    property CurrentItem: T read GetCurrentItem;
+    property IsFinished: Boolean read VerifyIfIsFinished;
+  end;
+
+  IAqReadableList<T> = interface
+    ['{9A3301DE-8746-43F4-8E8B-4E46E2C1B771}']
     /// <returns>
     ///   EN-US:
     ///     Returns the items count of the list.
     ///   PT-BR:
-    ///     Retorna a lista de itens da lista.
+    ///     Retorna a quantidade de itens da lista.
     /// </returns>
     function GetCount: Int32;
     /// <summary>
@@ -28,7 +64,7 @@ type
     ///   PT-BR:
     ///     Retorna o item correspondente ao índice informado.
     /// </returns>
-    function GetItem(pIndex: Int32): T;
+    function GetItem(const pIndex: Int32): T;
 
     /// <summary>
     ///   EN-US:
@@ -49,8 +85,11 @@ type
     ///     Retorna o índice do valor procurado na lista. Caso o valor não seja encontrado, a função retornará -1.
     /// </returns>
     function IndexOf(const pValue: T): Int32; overload;
+    function Contains(const pValue: T): Boolean;
 
-    function Find(const pMatchFunction: TFunc<T, Boolean>; out pValue: T): Boolean; overload;
+    function Find(const pMatchFunction: TFunc<T, Boolean>): Boolean; overload;
+    function Find(const pMatchFunction: TFunc<T, Boolean>; out pIndex: Int32): Boolean; overload;
+    function Find(const pItem: T; out pIndex: Int32): Boolean; overload;
 
     /// <summary>
     ///   EN-US:
@@ -79,6 +118,10 @@ type
     /// </returns>
     function GetLast: T;
 
+    function GetItemTypeName: string;
+    function GetEnumerator: TEnumerator<T>;
+    function GetIterator: IAqIterator<T>;
+
     /// <summary>
     ///   EN-US:
     ///     Returns the items count of the list.
@@ -93,138 +136,161 @@ type
     ///   PT-BR:
     ///     Permite o acesso aos itens através de seus respectivos índices.
     /// </summary>
-    property Items[pIndex: Int32]: T read GetItem; default;
+    property Items[const pIndex: Int32]: T read GetItem; default;
 
     property First: T read GetFirst;
     property Last: T read GetLast;
+  end;
 
-    function GetEnumerator: TEnumerator<T>;
+  IAqExtractableList<T> = interface
+    ['{AF93B4F7-071B-4431-8594-051A02C6BBF8}']
+
+    function Extract(const pIndex: Int32 = 0): T;
+    procedure ExtractAllTo(pList: IAqList<T>);
   end;
 
   /// ------------------------------------------------------------------------------------------------------------------
   /// <summary>
   ///   EN-US:
-  ///     Interface for lists returned by methods. Used to automatically release lists by references counting.
+  ///     Interface for read only lists returned by methods, but with some data manipulation methods,
+  ///       like sort and extract.
   ///   PT-BR:
-  ///     Interface para listas retornadas por métodos. Utilizada para liberar listas automaticamente através da
-  ///     contagem de referências de interfaces.
+  ///     Interface para listas somente leitura retornada por métodos, mas com alguns métodos de manipulação dos dados,
+  ///       como ordenar e extrair.
   /// </summary>
   /// ------------------------------------------------------------------------------------------------------------------
-  IAqResultList<T> = interface(IAqReadList<T>)
+  IAqResultList<T> = interface(IAqReadableList<T>)
     ['{1574A9A4-0650-4E43-AF08-5147A6068E35}']
 
     function GetOnwsResults: Boolean;
     procedure SetOnwsResults(const pValue: Boolean);
-
-    function Extract(const pIndex: UInt32 = 0): T;
-    procedure ExtractAllTo(const pList: TList<T>);
-    function ExtractAll: TList<T>;
-
     function GetComparer: IComparer<T>;
     procedure SetComparer(pValue: IComparer<T>);
+
+    function Extract(const pIndex: Int32 = 0): T;
+    procedure ExtractAllTo(pList: IAqList<T>);
 
     procedure Sort; overload;
     procedure Sort(const pComparerFunction: TFunc<T, T, Int32>); overload;
     procedure Sort(pComparer: IComparer<T>); overload;
+
+    function GetExtractableList: IAqExtractableList<T>;
 
     property Comparer: IComparer<T> read GetComparer write SetComparer;
     property OnwsResults: Boolean read GetOnwsResults write SetOnwsResults;
+    property ExtractableList: IAqExtractableList<T> read GetExtractableList;
   end;
 
-  IAqList<T> = interface(IAqReadList<T>)
-    ['{AE2187BA-592A-4D0B-8C31-5FDEB6025341}']
-
-    /// <summary>
-    ///   EN-US:
-    ///     Insert a new item to the list, in a specific position.
-    ///   PT-BR:
-    ///     Insere um novo item, em uma posição específica da lista.
-    /// </summary>
-    /// <param name="pIndex">
-    ///   EN-US:
-    ///     Index which the new item must assume.
-    ///   PT-BR:
-    ///     Posição onde deve ser inserido o novo item.
-    /// </param>
-    /// <param name="pItem">
-    ///   EN-US:
-    ///     Item that must be entered.
-    ///   PT-BR:
-    ///     Item que deve ser inserido.
-    /// </param>
-    procedure Insert(const pIndex: Int32; const pItem: T);
-    /// <summary>
-    ///   EN-US:
-    ///     Deletes an item from the list.
-    ///   PT-BR:
-    ///     Exclui um item da lista.
-    /// </summary>
-    /// <param name="pIndex">
-    ///   EN-US:
-    ///     Index of the item to be deleted.
-    ///   PT-BR:
-    ///     Índice do item que deve ser excluído.
-    /// </param>
+  IAqWritableList<T> = interface(IAqReadableList<T>)
+    ['{111B4C3F-EE96-4EE4-BFA3-09456C050A99}']
     procedure Delete(const pIndex: Int32);
-    /// <summary>
-    ///   EN-US:
-    ///     Exchange the position of two items in the list.
-    ///   PT-BR:
-    ///     Troca de posição dois itens da lista.
-    /// </summary>
-    /// <param name="pIndex1">
-    ///   EN-US:
-    ///     Index of the first item.
-    ///   PT-BR:
-    ///     Índice do primeiro item.
-    /// </param>
-    /// <param name="pIndex2">
-    ///   EN-US:
-    ///     Index of the second item.
-    ///   PT-BR:
-    ///     Índice do segundo item.
-    /// </param>
+    procedure DeleteItem(const pItem: T);
     procedure Exchange(const pIndex1, pIndex2: Int32);
 
-    /// <summary>
-    ///   EN-US:
-    ///     Deletes all items of the list.
-    ///   PT-BR:
-    ///     Exclui todos os itens da lista.
-    /// </summary>
     procedure Clear;
-
-    /// <summary>
-    ///   EN-US:
-    ///     Adds a new item to the list.
-    ///   PT-BR:
-    ///     Adiciona um novo item à lista.
-    /// </summary>
-    /// <param name="pItem">
-    ///   EN-US:
-    ///     Item that must be added to the list.
-    ///   PT-BR:
-    ///     Item que deve ser adicionado à lista.
-    /// </param>
-    /// <returns>
-    ///   EN-US:
-    ///     Returns the index os the item added to the list.
-    ///   PT-BR:
-    ///     Retorna o índice do item adicionado à lista.
-    /// </returns>
-    function Add(const pItem: T): Int32;
-
-    function Extract(const pIndex: Int32): T;
 
     function GetComparer: IComparer<T>;
     procedure SetComparer(pValue: IComparer<T>);
+
+    function GetReadOnlyList: IAqReadableList<T>;
 
     procedure Sort; overload;
     procedure Sort(const pComparerFunction: TFunc<T, T, Int32>); overload;
     procedure Sort(pComparer: IComparer<T>); overload;
 
+    procedure BeginRead;
+    procedure EndRead;
+    procedure BeginWrite;
+    procedure EndWrite;
+
+    procedure ExecuteLockedForReading(const pMethod: TProc); overload;
+    procedure ExecuteLockedForReading(const pMethod: TProc<IAqWritableList<T>>); overload;
+    procedure ExecuteLockedForWriting(const pMethod: TProc); overload;
+    procedure ExecuteLockedForWriting(const pMethod: TProc<IAqWritableList<T>>); overload;
+
     property Comparer: IComparer<T> read GetComparer write SetComparer;
   end;
+
+  IAqList<T> = interface(IAqWritableList<T>)
+    ['{AE2187BA-592A-4D0B-8C31-5FDEB6025341}']
+
+    procedure SetItem(const pIndex: Int32; const pItem: T);
+    procedure Insert(const pIndex: Int32; const pItem: T);
+
+    function Add(const pItem: T): Int32;
+
+    function Extract(const pIndex: Int32 = 0): T;
+    procedure ExtractAllTo(pList: IAqList<T>);
+
+    function GetExtractableList: IAqExtractableList<T>;
+
+    property Items[const pIndex: Int32]: T read GetItem write SetItem; default;
+    property ExtractableList: IAqExtractableList<T> read GetExtractableList;
+  end;
+
+  IAqManagedList<T> = interface(IAqWritableList<T>)
+    ['{704294BF-F55C-42F6-8833-5FEFB5519055}']
+
+    function CreateNew: T;
+    function Add: T;
+  end;
+
+  TAqCreateItemLockerBehaviour = (
+    GoStraightToWriteRights,
+    HoldLockerWhileCreating,
+    RelaseAndIgnorePreviousIfClonflicted,
+    RelaseAndIgnoreNewIfClonflicted);
+
+  IAqDictionary<TKey, TValue> = interface
+    ['{F6E7723C-1B3A-4114-8713-6FED5F2098E9}']
+
+    procedure Clear;
+    function ContainsKey(const Key: TKey): Boolean;
+    function GetItem(const Key: TKey): TValue;
+    procedure SetItem(const Key: TKey; const Value: TValue);
+    function TryGetValue(const Key: TKey; out Value: TValue): Boolean;
+    procedure Remove(const Key: TKey);
+    function GetKeys: TDictionary<TKey, TValue>.TKeyCollection;
+    function GetValues: TDictionary<TKey, TValue>.TValueCollection;
+    procedure AddOrSetValue(const Key: TKey; const Value: TValue);
+    function GetCount: Int32;
+
+    function VerifyIfHasLocker: Boolean;
+
+    procedure BeginRead;
+    procedure EndRead;
+    procedure BeginWrite;
+    procedure EndWrite;
+
+    procedure ExecuteLockedForReading(const pMethod: TProc); overload;
+    procedure ExecuteLockedForReading(const pMethod: TProc<IAqDictionary<TKey, TValue>>); overload;
+    procedure ExecuteLockedForWriting(const pMethod: TProc); overload;
+    procedure ExecuteLockedForWriting(const pMethod: TProc<IAqDictionary<TKey, TValue>>); overload;
+
+    function LockAndTryGetValue(const pKey: TKey; out pValue: TValue): Boolean;
+    function LockAndAdd(const pKey: TKey; const pValue: TValue): Boolean;
+    procedure LockAndAddOrSetValue(const pKey: TKey; const pValue: TValue);
+
+    function GetOrCreate(const pKey: TKey; const pCreateItemMethod: TFunc<TValue>;
+      const pCreateItemLockerBehaviour: TAqCreateItemLockerBehaviour = HoldLockerWhileCreating): TValue;
+
+    function Add(const pKey: Tkey; const pValue: TValue): Boolean;
+
+    property HasLocker: Boolean read VerifyIfHasLocker;
+    property Keys: TDictionary<TKey,TValue>.TKeyCollection read GetKeys;
+    property Values: TDictionary<TKey,TValue>.TValueCollection read GetValues;
+    property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
+    property Count: Int32 read GetCount;
+  end;
+
+  IAqIDDictionary<TValue> = interface(IAqDictionary<TAqID, TValue>)
+    ['{BCAE60F6-F78E-4E5D-B2C4-0906FD8E6C14}']
+
+    function Add(const pValue: TValue): TAqID; overload;
+    function Add(const pCreateItemMethod: TFunc<TAqID, TValue>): TAqID; overload;
+  end;
+
+{TODO 3 -oTatu -cDesejável: criar interface específica para cache, com controle de descarte de cache (cache expire) built in}
 
 implementation
 

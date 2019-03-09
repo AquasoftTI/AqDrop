@@ -12,37 +12,39 @@ type
   strict private
     procedure ForEachAttribute<T: TCustomAttribute>(const pProcessing: TFunc<T, Boolean>);
   public
-    function GetAttribute<T: TCustomAttribute>(out pAttribute: T; const pIncidence: UInt32 = 0): Boolean;
+    function GetAttribute<T: TCustomAttribute>(out pAttribute: T; const pOccurrence: UInt32 = 0): Boolean;
     function GetAttributes<T: TCustomAttribute>(out pAttributes: IAqResultList<T>): Boolean; overload;
+    function HasAttribute<T: TCustomAttribute>: Boolean;
   end;
 
 implementation
 
 uses
+  AqDrop.Core.Helpers.TArray,
   AqDrop.Core.Collections;
 
 { TAqRttiObjectHelper }
 
-function TAqRttiObjectHelper.GetAttribute<T>(out pAttribute: T; const pIncidence: UInt32): Boolean;
+function TAqRttiObjectHelper.GetAttribute<T>(out pAttribute: T; const pOccurrence: UInt32): Boolean;
 var
   lResult: Boolean;
   lAttribute: T;
-  lActualIndex: UInt32;
+  lOccurrence: UInt32;
 begin
   lResult := False;
-  lActualIndex := 0;
-
+  lOccurrence := pOccurrence;
   ForEachAttribute<T>(
-    function(pProcessingAttribute: T): Boolean
+    function(pAttribute: T): Boolean
     begin
-      Result := lActualIndex <> pIncidence;
-      if not Result then
+      lResult := lOccurrence = 0;
+      if lResult then
       begin
-        lResult := True;
-        lAttribute := pProcessingAttribute;
+        lAttribute := pAttribute;
+      end else begin
+        Dec(lOccurrence);
       end;
 
-      Inc(lActualIndex);
+      Result := not lResult;
     end);
 
   Result := lResult;
@@ -88,25 +90,20 @@ begin
   end;
 end;
 
-procedure TAqRttiObjectHelper.ForEachAttribute<T>(const pProcessing: TFunc<T, Boolean>);
+function TAqRttiObjectHelper.HasAttribute<T>: Boolean;
 var
-  lAttributes: TArray<TCustomAttribute>;
-  lAttributesCount: Int32;
-  lI: Int32;
+  lAttribute: T;
 begin
-  lAttributes := GetAttributes;
-  lAttributesCount := Length(lAttributes);
-  lI := 0;
+  Result := GetAttribute<T>(lAttribute);
+end;
 
-  while lI < lAttributesCount do
-  begin
-    if lAttributes[lI].InheritsFrom(T) and not pProcessing(T(lAttributes[lI])) then
+procedure TAqRttiObjectHelper.ForEachAttribute<T>(const pProcessing: TFunc<T, Boolean>);
+begin
+  TAqArray<TCustomAttribute>.ForIn(GetAttributes,
+    function(pItem: TCustomAttribute): Boolean
     begin
-      lAttributesCount := 0;
-    end else begin
-      Inc(lI);
-    end;
-  end;
+      Result := not pItem.InheritsFrom(T) or pProcessing(T(pItem));
+    end);
 end;
 
 end.

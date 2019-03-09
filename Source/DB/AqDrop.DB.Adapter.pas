@@ -4,8 +4,7 @@ interface
 
 uses
   AqDrop.Core.Collections.Intf,
-  AqDrop.DB.SQL.Intf,
-  AqDrop.DB.SQL;
+  AqDrop.DB.SQL.Intf;
 
 type
   TAqDBAutoIncrementType = (aiAutoIncrement, aiGenerator);
@@ -32,7 +31,7 @@ type
     function SolveDateConstant(pConstant: IAqDBSQLDateConstant): string; virtual;
     function SolveTimeConstant(pConstant: IAqDBSQLTimeConstant): string; virtual;
     function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; virtual;
-    function SolveColumns(pColumnsList: IAqReadList<IAqDBSQLValue>): string; virtual;
+    function SolveColumns(pColumnsList: IAqReadableList<IAqDBSQLValue>): string; virtual;
     function SolveSource(pSource: IAqDBSQLSource): string; virtual;
     function SolveFrom(pSource: IAqDBSQLSource): string; virtual;
     function SolveTable(pTable: IAqDBSQLTable): string; virtual;
@@ -40,22 +39,31 @@ type
     function SolveSelectBody(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveJoins(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveJoin(pJoin: IAqDBSQLJoin): string; virtual;
-    function SolveCondition(pCondition: IAqDBSQLCondition): string; virtual;
     function SolveOrderBy(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveOrderByDesc(const pDesc: Boolean): string; virtual;
     function SolveLimit(pSelect: IAqDBSQLSelect): string; virtual;
+    function SolveOffset(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveComparisonCondition(pComparisonCondition: IAqDBSQLComparisonCondition): string; virtual;
     function SolveValueIsNullCondition(pValueIsNullCondition: IAqDBSQLValueIsNullCondition): string; virtual;
     function SolveComposedCondition(pComposedCondition: IAqDBSQLComposedCondition): string; virtual;
-    function SolveBetweenCondition(pBetweenCondition: IAqDBSQLBetweenCondition): string; virtual;
+    function SolveLikeLeftValue(pLeftValue: IAqDBSQLValue): string; virtual;
+    function SolveLikeRightValue(pRightValue: IAqDBSQLValue): string; virtual;
+    function SolveLikeCondition(pLikeCondition: IAqDBSQLLikeCondition): string; virtual;
+    function SolveLikeWildCard(const pLikeWildCard: TAqDBSQLLikeWildCard): string; virtual;
     function SolveComparison(const pComparison: TAqDBSQLComparison): string; virtual;
+    function SolveBetweenCondition(pBetweenCondition: IAqDBSQLBetweenCondition): string; virtual;
+    function SolveInCondition(pInCondition: IAqDBSQLInCondition): string; virtual;
     function SolveBooleanOperator(const pBooleanOperator: TAqDBSQLBooleanOperator): string; virtual;
+
+    function Negate(const pConditionText: string): string; virtual;
   public
     function SolveSelect(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveInsert(pInsert: IAqDBSQLInsert): string; virtual;
     function SolveUpdate(pUpdate: IAqDBSQLUpdate): string; virtual;
     function SolveDelete(pDelete: IAqDBSQLDelete): string; virtual;
     function SolveCommand(pCommand: IAqDBSQLCommand): string; virtual;
+
+    function SolveCondition(pCondition: IAqDBSQLCondition): string; virtual;
 
     function SolveGeneratorName(const pTableName, pFieldName: string): string; virtual;
 
@@ -92,7 +100,8 @@ uses
   System.SysUtils,
   System.Classes,
   AqDrop.Core.Exceptions,
-  AqDrop.Core.Helpers;
+  AqDrop.Core.Helpers,
+  AqDrop.DB.SQL;
 
 { TAqDBSQLSolver }
 
@@ -104,6 +113,11 @@ end;
 function TAqDBSQLSolver.GetAutoIncrementQuery(const pGeneratorName: string): string;
 begin
   Result := '';
+end;
+
+function TAqDBSQLSolver.Negate(const pConditionText: string): string;
+begin
+  Result := Format('not(%s)', [pCOnditionText]);
 end;
 
 function TAqDBSQLSolver.SolveAggregator(pValue: IAqDBSQLValue): string;
@@ -148,7 +162,7 @@ end;
 function TAqDBSQLSolver.SolveBetweenCondition(pBetweenCondition: IAqDBSQLBetweenCondition): string;
 begin
   Result := SolveValue(pBetweenCondition.Value, False) + ' between ' +
-    SolveValue(pBetweenCondition.RangeBegin, False) + ' and ' + SolveValue(pBetweenCondition.RangeEnd, False);
+    SolveValue(pBetweenCondition.LeftBoundary, False) + ' and ' + SolveValue(pBetweenCondition.RightBoundary, False);
 end;
 
 function TAqDBSQLSolver.SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string;
@@ -190,6 +204,11 @@ begin
   Result := SolveValue(pValueIsNullCondition.Value, False) + ' is null';
 end;
 
+function TAqDBSQLSolver.SolveOffset(pSelect: IAqDBSQLSelect): string;
+begin
+  Result := '';
+end;
+
 function TAqDBSQLSolver.SolveOperation(pOperation: IAqDBSQLOperation): string;
 begin
   Result := '(' + SolveValue(pOperation.LeftOperand, False) + ' ' + SolveOperator(pOperation.Operator) + ' ' +
@@ -201,7 +220,7 @@ begin
   Result := SolveDisambiguation(pColumn) + pColumn.Expression;
 end;
 
-function TAqDBSQLSolver.SolveColumns(pColumnsList: IAqReadList<IAqDBSQLValue>): string;
+function TAqDBSQLSolver.SolveColumns(pColumnsList: IAqReadableList<IAqDBSQLValue>): string;
 var
   lColumn: IAqDBSQLValue;
   lColumnsText: TStringList;
@@ -262,6 +281,8 @@ begin
       Result := '<';
     TAqDBSQLComparison.cpLessEqual:
       Result := '<=';
+    TAqDBSQLComparison.cpNotEqual:
+      Result := '<>';
   else
     raise EAqInternal.Create('Unexpected Comparison Type.');
   end;
@@ -277,11 +298,15 @@ function TAqDBSQLSolver.SolveComposedCondition(pComposedCondition: IAqDBSQLCompo
 var
   lI: Int32;
 begin
-  if pComposedCondition.Conditions.Count = 0 then
+  Result := '';
+  if pComposedCondition.Conditions.Count > 0 then
   begin
-    Result := '';
-  end else begin
-    Result := '(' + SolveCondition(pComposedCondition.Conditions.First);
+    if pComposedCondition.Conditions.Count > 1 then
+    begin
+      Result := '(';
+    end;
+
+    Result := Result + SolveCondition(pComposedCondition.Conditions.First);
 
     for lI := 1 to pComposedCondition.Conditions.Count - 1 do
     begin
@@ -289,7 +314,10 @@ begin
         SolveCondition(pComposedCondition.Conditions[lI]);
     end;
 
-    Result := Result + ')';
+    if pComposedCondition.Conditions.Count > 1 then
+    begin
+      Result := Result + ')';
+    end;
   end;
 end;
 
@@ -302,10 +330,19 @@ begin
       Result := SolveValueIsNullCondition(pCondition.GetAsValueIsNull);
     TAqDBSQLConditionType.ctComposed:
       Result := SolveComposedCondition(pCondition.GetAsComposed);
+    TAqDBSQLConditionType.ctLike:
+      Result := SolveLikeCondition(pCondition.GetAsLike);
     TAqDBSQLConditionType.ctBetween:
       Result := SolveBetweenCondition(pCondition.GetAsBetween);
+    TAqDBSQLConditionType.ctIn:
+      Result := SolveInCondition(pCondition.GetAsIn);
   else
     raise EAqInternal.Create('Unexpected condition type.');
+  end;
+
+  if pCondition.IsNegated then
+  begin
+    Result := Negate(Result);
   end;
 end;
 
@@ -336,8 +373,11 @@ begin
 end;
 
 function TAqDBSQLSolver.SolveCurrencyConstant(pConstant: IAqDBSQLCurrencyConstant): string;
+var
+  lSettings: TFormatSettings;
 begin
-  Result := pConstant.Value.ToString;
+  lSettings.DecimalSeparator := '.';
+  Result := pConstant.Value.ToString(lSettings);
 end;
 
 function TAqDBSQLSolver.SolveDateConstant(pConstant: IAqDBSQLDateConstant): string;
@@ -371,7 +411,7 @@ begin
     begin
       Result := pColumn.Source.GetAsTable.Name + '.';
     end else begin
-      raise EAqInternal.Create('Column source doesn''t have a valid desambiguation.');
+      raise EAqInternal.Create('Column source doesn''t have a valid disambiguation.');
     end;
   end else begin
     Result := '';
@@ -379,13 +419,36 @@ begin
 end;
 
 function TAqDBSQLSolver.SolveDoubleConstant(pConstant: IAqDBSQLDoubleConstant): string;
+var
+  lSettings: TFormatSettings;
 begin
-  Result := pConstant.Value.ToString;
+  lSettings.DecimalSeparator := '.';
+  Result := pConstant.Value.ToString(lSettings);
 end;
 
 function TAqDBSQLSolver.SolveFrom(pSource: IAqDBSQLSource): string;
 begin
   Result := 'from ' + SolveSource(pSource);
+end;
+
+function TAqDBSQLSolver.SolveInCondition(pInCondition: IAqDBSQLInCondition): string;
+var
+  lTextInValues: TStringList;
+  lInValue: IAqDBSQLValue;
+begin
+  lTextInValues := TStringList.Create;
+
+  try
+    for lInValue in pInCondition.InValues do
+    begin
+      lTextInValues.Add(SolveValue(lInValue, False));
+    end;
+
+    lTextInValues.Delimiter := ',';
+    Result := SolveValue(pInCondition.TestableValue, False) + ' in (' + lTextInValues.DelimitedText + ')';
+  finally
+    lTextInValues.Free;
+  end;
 end;
 
 function TAqDBSQLSolver.SolveInsert(pInsert: IAqDBSQLInsert): string;
@@ -463,6 +526,42 @@ begin
   end;
 end;
 
+function TAqDBSQLSolver.SolveLikeCondition(pLikeCondition: IAqDBSQLLikeCondition): string;
+var
+  lRightValue: IAqDBSQLTextConstant;
+begin
+  lRightValue := TAqDBSQLTextConstant.Create(
+    SolveLikeWildCard(pLikeCondition.LeftWildCard) +
+    pLikeCondition.RightValue.Value +
+    SolveLikeWildCard(pLikeCondition.RightWildCard));
+  Result := SolveLikeLeftValue(pLikeCondition.LeftValue) + ' like ' + SolveLikeRightValue(lRightValue);
+end;
+
+function TAqDBSQLSolver.SolveLikeLeftValue(pLeftValue: IAqDBSQLValue): string;
+begin
+  Result := SolveValue(pLeftValue, False);
+end;
+
+function TAqDBSQLSolver.SolveLikeRightValue(pRightValue: IAqDBSQLValue): string;
+begin
+  Result := SolveValue(pRightValue, False);
+end;
+
+function TAqDBSQLSolver.SolveLikeWildCard(const pLikeWildCard: TAqDBSQLLikeWildCard): string;
+begin
+  case pLikeWildCard of
+    lwcNone:
+      Result := '';
+    lwcSingleChar:
+      Result := '_';
+    lwcMultipleChars:
+      Result := '%';
+  else
+    raise EAqInternal.CreateFmt('Unexpected Wild Card in Like operation (%d).',
+      [Integer(pLikeWildCard)]);
+  end;
+end;
+
 function TAqDBSQLSolver.SolveLimit(pSelect: IAqDBSQLSelect): string;
 begin
   Result := '';
@@ -496,7 +595,7 @@ begin
     try
       for lItem in pSelect.OrderBy do
       begin
-        lValues.Add(SolveValue(lItem.Value, False) + SolveOrderByDesc(lItem.Desc));
+        lValues.Add(SolveValue(lItem.Value, False) + SolveOrderByDesc(not lItem.Ascending));
       end;
 
       lValues.StrictDelimiter := True;

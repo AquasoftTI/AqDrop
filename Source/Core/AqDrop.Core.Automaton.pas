@@ -3,7 +3,7 @@ unit AqDrop.Core.Automaton;
 interface
 
 uses
-  AqDrop.Core.Collections;
+  AqDrop.Core.Collections.Intf;
 
 type
   /// ----------------------------------------------------------------------------------------------------------------
@@ -39,9 +39,9 @@ type
   TAqAutomatonDictionary<TIdentifier, TValue> = class
   strict private
     FIdentifier: TIdentifier;
-    FValues: TAqList<TValue>;
+    FValues: IAqList<TValue>;
 
-    function GetValues: TAqReadList<TValue>;
+    function GetValues: IAqReadableList<TValue>;
   public
     /// <summary>
     ///   EN-US:
@@ -61,7 +61,7 @@ type
     ///   PT-BR:
     ///     Valores que irão compor o dicionário.
     /// </param>
-    constructor Create(const pIdentifier: TIdentifier; const pValues: TAqList<TValue>); overload;
+    constructor Create(const pIdentifier: TIdentifier; const pValues: IAqList<TValue>); overload;
     /// <summary>
     ///   EN-US:
     ///     Class constructor.
@@ -81,13 +81,7 @@ type
     ///     Valores que irão compor o dicionário.
     /// </param>
     constructor Create(const pIdentifier: TIdentifier; const pValues: array of TValue); overload;
-    /// <summary>
-    ///   EN-US:
-    ///     Class destructor.
-    ///   PT-BR:
-    ///     Destrutor da classe.
-    /// </summary>
-    destructor Destroy; override;
+
     /// <summary>
     ///   EN-US:
     ///     Checks whether a value belongs to the dictionary.
@@ -120,7 +114,7 @@ type
     ///   PT-BR:
     ///     Valores contidos pelo dicionário.
     /// </summary>
-    property Values: TAqReadList<TValue> read GetValues;
+    property Values: IAqReadableList<TValue> read GetValues;
   end;
 
   /// ------------------------------------------------------------------------------------------------------------------
@@ -135,7 +129,7 @@ type
   strict private
     FSource: TAqAutomatonState<TIdentifier, TValue, TOutput>;
     FTarget:  TAqAutomatonState<TIdentifier, TValue, TOutput>;
-    FDictionaries: TAqList<TAqAutomatonDictionary<TIdentifier, TValue>>;
+    FDictionaries: IAqList<TAqAutomatonDictionary<TIdentifier, TValue>>;
   public
     /// <summary>
     ///   EN-US:
@@ -157,13 +151,6 @@ type
     /// </param>
     constructor Create(const pSource:  TAqAutomatonState<TIdentifier, TValue, TOutput>;
       const pTarget:  TAqAutomatonState<TIdentifier, TValue, TOutput>);
-    /// <summary>
-    ///   EN-US:
-    ///     Class destructor.
-    ///   PT-BR:
-    ///     Destrutor da classe.
-    /// </summary>
-    destructor Destroy; override;
 
     /// <summary>
     ///   EN-US:
@@ -247,10 +234,10 @@ type
     FAutomaton: TAqAutomaton<TIdentifier, TValue, TOutput>;
     FID: UInt32;
     FStateType: TAqAutomatonStateType;
-    FTransitions: TAqList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>>;
+    FTransitions: IAqList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>>;
     FOutput: TOutput;
 
-    function GetTransitions: TAqReadList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>>;
+    function GetTransitions: IAqReadableList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>>;
     function GetIsFinal: Boolean;
 
     function TryTransition(const pValue: TValue;
@@ -327,13 +314,6 @@ type
     /// </param>
     constructor Create(const pAutomaton: TAqAutomaton<TIdentifier, TValue, TOutput>; const pID: UInt32;
       const pOutput: TOutput); overload;
-    /// <summary>
-    ///   EN-US:
-    ///     Class destructor.
-    ///   PT-BR:
-    ///     Destrutor da classe.
-    /// </summary>
-    destructor Destroy; override;
 
     /// <summary>
     ///   EN-US:
@@ -410,7 +390,7 @@ type
     ///   PT-BR:
     ///     Transições do estado.
     /// </summary>
-    property Transitions: TAqReadList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>> read GetTransitions;
+    property Transitions: IAqReadableList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>> read GetTransitions;
     /// <summary>
     ///   EN-US:
     ///     Identifies if the state is final or not.
@@ -430,8 +410,8 @@ type
   /// ------------------------------------------------------------------------------------------------------------------
   TAqAutomaton<TIdentifier, TValue, TOutput> = class
   strict private
-    FStates: TAqList<TAqAutomatonState<TIdentifier, TValue, TOutput>>;
-    FDictionaries: TAqDictionary<TIdentifier, TAqAutomatonDictionary<TIdentifier, TValue>>;
+    FStates: IAqList<TAqAutomatonState<TIdentifier, TValue, TOutput>>;
+    FDictionaries: IAqDictionary<TIdentifier, TAqAutomatonDictionary<TIdentifier, TValue>>;
 
     function GetInitialState: TAqAutomatonState<TIdentifier, TValue, TOutput>;
   strict protected
@@ -444,13 +424,6 @@ type
     ///     Construtor da classe.
     /// </summary>
     constructor Create;
-    /// <summary>
-    ///   EN-US:
-    ///     Class destructor.
-    ///   PT-BR:
-    ///     Destrutor da classe.
-    /// </summary>
-    destructor Destroy; override;
 
     /// <summary>
     ///   EN-US:
@@ -503,7 +476,7 @@ type
     ///     Retorna o dicionário adicionado ao autômato.
     /// </returns>
     function AddDictionary(const pDictionaryID: TIdentifier;
-      const pValues: TAqList<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>; overload;
+      const pValues: IAqList<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>; overload;
 
     /// <summary>
     ///   EN-US:
@@ -614,13 +587,13 @@ implementation
 
 uses
   System.Generics.Defaults,
-  AqDrop.Core.Exceptions;
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Collections;
 
 { TAqAutomatonState<TIdentifier, TValue, TOutput> }
 
 function TAqAutomatonState<TIdentifier, TValue, TOutput>.AddTransition(
-  const pTarget: TAqAutomatonState<TIdentifier, TValue, TOutput>)
-  : TAqAutomatonTransition<TIdentifier, TValue, TOutput>;
+  const pTarget: TAqAutomatonState<TIdentifier, TValue, TOutput>): TAqAutomatonTransition<TIdentifier, TValue, TOutput>;
 var
   lTransition: TAqAutomatonTransition<TIdentifier, TValue, TOutput>;
 begin
@@ -664,22 +637,15 @@ begin
   FOutput := pOutput;
 end;
 
-destructor TAqAutomatonState<TIdentifier, TValue, TOutput>.Destroy;
-begin
-  FTransitions.Free;
-
-  inherited;
-end;
-
 function TAqAutomatonState<TIdentifier, TValue, TOutput>.GetIsFinal: Boolean;
 begin
   Result := FStateType = TAqAutomatonStateType.astFinal;
 end;
 
 function TAqAutomatonState<TIdentifier, TValue, TOutput>.GetTransitions:
-  TAqReadList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>>;
+  IAqReadableList<TAqAutomatonTransition<TIdentifier, TValue, TOutput>>;
 begin
-  Result := FTransitions.GetTReadList;
+  Result := FTransitions.GetReadOnlyList;
 end;
 
 function TAqAutomatonState<TIdentifier, TValue, TOutput>.TryTransition(const pValue: TValue;
@@ -756,13 +722,6 @@ begin
   FTarget := pTarget;
 end;
 
-destructor TAqAutomatonTransition<TIdentifier, TValue, TOutput>.Destroy;
-begin
-  FDictionaries.Free;
-
-  inherited;
-end;
-
 function TAqAutomatonTransition<TIdentifier, TValue, TOutput>.SupportsValue(const pValue: TValue): Boolean;
 var
   lI: Int32;
@@ -782,25 +741,21 @@ end;
 constructor TAqAutomatonDictionary<TIdentifier, TValue>.Create(const pIdentifier: TIdentifier;
   const pValues: array of TValue);
 var
-  lList: TAqList<TValue>;
+  lList: IAqList<TValue>;
   lValue: TValue;
 begin
   lList := TAqList<TValue>.Create;
 
-  try
-    for lValue in pValues do
-    begin
-      lList.Add(lValue);
-    end;
-
-    Create(pIdentifier, lList);
-  finally
-    lList.Free;
+  for lValue in pValues do
+  begin
+    lList.Add(lValue);
   end;
+
+  Create(pIdentifier, lList);
 end;
 
 constructor TAqAutomatonDictionary<TIdentifier, TValue>.Create(const pIdentifier: TIdentifier;
-  const pValues: TAqList<TValue>);
+  const pValues: IAqList<TValue>);
 var
   lValue: TValue;
 begin
@@ -817,16 +772,9 @@ begin
   end;
 end;
 
-destructor TAqAutomatonDictionary<TIdentifier, TValue>.Destroy;
+function TAqAutomatonDictionary<TIdentifier, TValue>.GetValues: IAqReadableList<TValue>;
 begin
-  FValues.Free;
-
-  inherited;
-end;
-
-function TAqAutomatonDictionary<TIdentifier, TValue>.GetValues: TAqReadList<TValue>;
-begin
-  Result := FValues.GetTReadList;
+  Result := FValues.GetReadOnlyList;
 end;
 
 function TAqAutomatonDictionary<TIdentifier, TValue>.Validate(const pValue: TValue): Boolean;
@@ -848,25 +796,21 @@ end;
 function TAqAutomaton<TIdentifier, TValue, TOutput>.AddDictionary(const pDictionaryID: TIdentifier;
   const pValues: array of TValue): TAqAutomatonDictionary<TIdentifier, TValue>;
 var
-  lList: TAqList<TValue>;
+  lList: IAqList<TValue>;
   lValue: TValue;
 begin
   lList := TAqList<TValue>.Create;
 
-  try
-    for lValue in pValues do
-    begin
-      lList.Add(lValue);
-    end;
-
-    AddDictionary(pDictionaryID, lList);
-  finally
-    lList.Free;
+  for lValue in pValues do
+  begin
+    lList.Add(lValue);
   end;
+
+  AddDictionary(pDictionaryID, lList);
 end;
 
 function TAqAutomaton<TIdentifier, TValue, TOutput>.AddDictionary(const pDictionaryID: TIdentifier;
-  const pValues: TAqList<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>;
+  const pValues: IAqList<TValue>): TAqAutomatonDictionary<TIdentifier, TValue>;
 begin
   if FDictionaries.ContainsKey(pDictionaryID) then
   begin
@@ -916,14 +860,6 @@ begin
     TAqDictionary<TIdentifier, TAqAutomatonDictionary<TIdentifier, TValue>>.Create([TAqKeyValueOwnership.kvoValue]);
   FStates := TAqList<TAqAutomatonState<TIdentifier, TValue, TOutput>>.Create(True);
   FStates.Add(TAqAutomatonState<TIdentifier, TValue, TOutput>.Create(Self, 0, TAqAutomatonStateType.astInitial))
-end;
-
-destructor TAqAutomaton<TIdentifier, TValue, TOutput>.Destroy;
-begin
-  FStates.Free;
-  FDictionaries.Free;
-
-  inherited;
 end;
 
 function TAqAutomaton<TIdentifier, TValue, TOutput>.GetDictionary(const pDictionaryID: TIdentifier;

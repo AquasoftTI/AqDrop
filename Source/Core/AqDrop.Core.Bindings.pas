@@ -9,9 +9,9 @@ uses
   AqDrop.Core.Collections.Intf;
 
 type
-  TAqSetListBindSource<T: class; I: IAqReadList<T>> = procedure(pSender: TBindSourceAdapter; pList: I);
+  TAqSetListBindSource<T: class; I: IAqReadableList<T>> = procedure(pSender: TBindSourceAdapter; pList: I);
 
-  TAqBaseListBindSourceAdapter<T: class; I: IAqReadList<T>> = class(TBaseListBindSourceAdapter)
+  TAqBaseListBindSourceAdapter<T: class; I: IAqReadableList<T>> = class(TBaseListBindSourceAdapter)
   strict private
     FList: I;
     FOnBeforeSetList: TAqSetListBindSource<T, I>;
@@ -36,7 +36,7 @@ type
     property CurrentObject: T read GetCurrentObject;
   end;
 
-  TAqReadListBindSourceAdapter<T: class>  = class(TAqBaseListBindSourceAdapter<T, IAqReadList<T>>)
+  TAqReadListBindSourceAdapter<T: class>  = class(TAqBaseListBindSourceAdapter<T, IAqReadableList<T>>)
   strict protected
     function GetCanDelete: Boolean; override;
     function GetCanInsert: Boolean; override;

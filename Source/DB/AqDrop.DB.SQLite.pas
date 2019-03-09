@@ -10,12 +10,12 @@ type
   TAqDBSQLiteSQLSolver = class(TAqDBSQLSolver)
   strict protected
     function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
+    function SolveOffset(pSelect: IAqDBSQLSelect): string; override;
     function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
   public
     function SolveSelect(pSelect: IAqDBSQLSelect): string; override;
     function GetAutoIncrementQuery(const pGeneratorName: string): string; override;
   end;
-
 
 implementation
 
@@ -50,9 +50,19 @@ begin
   end;
 end;
 
+function TAqDBSQLiteSQLSolver.SolveOffset(pSelect: IAqDBSQLSelect): string;
+begin
+  if pSelect.IsOffsetDefined then
+  begin
+    Result := ' offset ' + pSelect.Offset.ToString;
+  end else begin
+    Result := '';
+  end;
+end;
+
 function TAqDBSQLiteSQLSolver.SolveSelect(pSelect: IAqDBSQLSelect): string;
 begin
-  Result := inherited + SolveLimit(pSelect);
+  Result := inherited + SolveLimit(pSelect) + SolveOffset(pSelect);
 end;
 
 end.

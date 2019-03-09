@@ -101,12 +101,15 @@ type
   TAqTokenizer<TIdentifier, TOutput> = class
   public type
     TAqTokenizerAutomaton = TAqTextAutomaton<TIdentifier, TOutput>;
-    IAqTokenizerResult = IAqResultList<TAqToken<TOutput>>;
+    IAqTokenizerResult = IAqList<TAqToken<TOutput>>;
     TAqTokenizerToken = TAqToken<TOutput>;
   strict private
     FAutomaton: TAqTextAutomaton<TIdentifier, TOutput>;
     function FinalizeToken(var pCurrentState: TAqAutomatonState<TIdentifier, Char, TOutput>; var pToken: string;
       var pCurrentPosition: Int32): TAqTokenizerToken;
+  strict protected type
+    TTokenizerState = TAqAutomatonState<TIdentifier, Char, TOutput>;
+    TTokenizerTransition = TAqAutomatonTransition<TIdentifier, Char, TOutput>;
   strict protected
     property Automaton: TAqTokenizerAutomaton read FAutomaton;
   public
@@ -180,38 +183,30 @@ var
   lNewState: TAqAutomatonState<TIdentifier, Char, TOutput>;
   lToken: string;
   lFinal: Int32;
-  lResult: TAqResultList<TAqTokenizerToken>;
   lChar: Char;
 begin
-  lResult := TAqResultList<TAqTokenizerToken>.Create(True);
+  Result := TAqList<TAqTokenizerToken>.Create(True);
 
-  try
-    lCurrentState := FAutomaton.InitialState;
-    lToken := '';
+  lCurrentState := FAutomaton.InitialState;
+  lToken := '';
 
-    lFinal := Length(pText);
-    lI := 0;
-    while lI < lFinal do
+  lFinal := pText.Length;
+  lI := 0;
+  while lI < lFinal do
+  begin
+    lChar := pText.Chars[lI];
+    if lCurrentState.Transition(lChar, lNewState) then
     begin
-      lChar := pText.Chars[lI];
-      if lCurrentState.Transition(lChar, lNewState) then
-      begin
-        lToken := lToken + lChar;
-        lCurrentState := lNewState;
-      end else begin
-        lResult.Add(FinalizeToken(lCurrentState, lToken, lI));
-      end;
-
-      Inc(lI);
+      lToken := lToken + lChar;
+      lCurrentState := lNewState;
+    end else begin
+      Result.Add(FinalizeToken(lCurrentState, lToken, lI));
     end;
 
-    lResult.Add(FinalizeToken(lCurrentState, lToken, lI));
-  except
-    lResult.Free;
-    raise;
+    Inc(lI);
   end;
 
-  Result := lResult;
+  Result.Add(FinalizeToken(lCurrentState, lToken, lI));
 end;
 
 function TAqTokenizer<TIdentifier, TOutput>.FinalizeToken(

@@ -10,7 +10,10 @@ type
   TAqDBFBSQLSolver = class(TAqDBSQLSolver)
   strict protected
     function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
+    function SolveOffset(pSelect: IAqDBSQLSelect): string; override;
     function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
+    function SolveLikeLeftValue(pLeftValue: IAqDBSQLValue): string; override;
+    function SolveLikeRightValue(pRightValue: IAqDBSQLValue): string; override;
   public
     function SolveSelect(pSelect: IAqDBSQLSelect): string; override;
     function SolveGeneratorName(const pTableName, pFieldName: string): string; override;
@@ -47,6 +50,16 @@ begin
   Result := Format('GEN_%s_ID', [pTableName]);
 end;
 
+function TAqDBFBSQLSolver.SolveLikeLeftValue(pLeftValue: IAqDBSQLValue): string;
+begin
+  Result := Format('upper(%s)', [inherited]);
+end;
+
+function TAqDBFBSQLSolver.SolveLikeRightValue(pRightValue: IAqDBSQLValue): string;
+begin
+  Result := Format('upper(%s)', [inherited]);
+end;
+
 function TAqDBFBSQLSolver.SolveLimit(pSelect: IAqDBSQLSelect): string;
 begin
   if pSelect.IsLimitDefined then
@@ -57,9 +70,19 @@ begin
   end;
 end;
 
+function TAqDBFBSQLSolver.SolveOffset(pSelect: IAqDBSQLSelect): string;
+begin
+  if pSelect.IsOffsetDefined then
+  begin
+    Result := 'skip ' + pSelect.Offset.ToString + ' ';
+  end else begin
+    Result := '';
+  end;
+end;
+
 function TAqDBFBSQLSolver.SolveSelect(pSelect: IAqDBSQLSelect): string;
 begin
-  Result := 'select ' + SolveLimit(pSelect) + SolveSelectBody(pSelect);
+  Result := 'select ' + SolveLimit(pSelect) + SolveOffset(pSelect) + SolveSelectBody(pSelect);
 end;
 
 end.

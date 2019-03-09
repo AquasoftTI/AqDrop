@@ -6,12 +6,12 @@ uses
   System.SysUtils,
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Collections.Intf,
-  AqDrop.Core.Collections,
-  AqDrop.Core.Observer,
+  AqDrop.Core.Observers.Intf,
   AqDrop.DB.Types,
   AqDrop.DB.Connection,
   AqDrop.DB.SQL.Intf,
-  AqDrop.DB.Adapter;
+  AqDrop.DB.Adapter,
+  AqDrop.DB.ORM.Reader;
 
 type
   TAqDBORMManager = class;
@@ -27,7 +27,7 @@ type
     procedure CommitTransaction;
     procedure RollbackTransaction;
   public
-    constructor Create; virtual;
+    constructor Create(const pORMManager: TAqDBORMManager); virtual;
 
     property ORMManager: TAqDBORMManager read FORMManager;
   end;
@@ -35,13 +35,20 @@ type
   TAqDBORMManager = class
   strict private
     FConnection: TAqDBConnection;
-    FClients: TAqDictionary<string, TAqDBORMManagerClient>;
-    FOnNewClient: TAqObserversChannel<TAqDBORMManagerClient>;
+    FClients: IAqDictionary<string, TAqDBORMManagerClient>;
+    FOnNewClient: IAqObservable<TAqDBORMManagerClient>;
 
     procedure FillParametersWithObjectValues(pParameters: IAqDBParameters; const pObject: TObject);
 
     function GetAdapter: TAqDBAdapter;
     function GetSQLSolver: TAqDBSQLSolver;
+
+    procedure OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: IAqDBSQLSelect;
+      const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader> = nil); overload;
+    procedure OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: string;
+      const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader> = nil); overload;
+
+    procedure DoAndSaveDetails(const pMethod: TProc; const pMaster: TObject);
 
     class var FDefault: TAqDBORMManager;
   strict protected
@@ -51,60 +58,109 @@ type
     constructor Create(const pConnection: TAqDBConnection);
     destructor Destroy; override;
 
-    function BuildBaseSelect(const pClass: TClass): IAqDBSQLSelect;
-    function BuildSelect(const pClass: TClass): IAqDBSQLSelect;
+    function BuildBaseSelect(const pORM: TAqDBORM): IAqDBSQLSelect; overload;
+    function BuildBaseSelect(const pClass: TClass): IAqDBSQLSelect; overload;
+    function BuildSelect(const pORM: TAqDBORM): IAqDBSQLSelect; overload;
+    function BuildSelect(const pClass: TClass): IAqDBSQLSelect; overload;
 
-    function BuildBaseInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>;
-    function BuildInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>;
+    function BuildBaseInserts(const pORM: TAqDBORM): IAqResultList<IAqDBSQLInsert>; overload;
+    function BuildBaseInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>; overload;
+    function BuildInserts(const pORM: TAqDBORM): IAqResultList<IAqDBSQLInsert>; overload;
+    function BuildInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>; overload;
 
-    function BuildBaseUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>;
-    function BuildUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>;
+    function BuildBaseUpdates(const pORM: TAqDBORM): IAqResultList<IAqDBSQLUpdate>; overload;
+    function BuildBaseUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>; overload;
+    function BuildUpdates(const pORM: TAqDBORM): IAqResultList<IAqDBSQLUpdate>; overload;
+    function BuildUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>; overload;
 
-    function BuildBaseDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>;
-    function BuildDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>;
+    function BuildBaseDeletes(const pORM: TAqDBORM): IAqResultList<IAqDBSQLDelete>; overload;
+    function BuildBaseDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>; overload;
+    function BuildDeletes(const pORM: TAqDBORM): IAqResultList<IAqDBSQLDelete>; overload;
+    function BuildDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>; overload;
 
     function CreateFilter: IAqDBSQLComposedCondition;
 
-    function Get<T: class, constructor>(out pResultList: IAqResultList<T>): Boolean; overload;
-    function Get<T: class, constructor>(pSelect: IAqDBSQLSelect; out pResultList: IAqResultList<T>): Boolean; overload;
-    function Get<T: class, constructor>(const pSelect: string; out pResultList: IAqResultList<T>): Boolean; overload;
-    function Get<T: class, constructor>(pFilter: IAqDBSQLComposedCondition;
-      out pResultList: IAqResultList<T>): Boolean; overload;
+    function Get<T: class, constructor>(out pResultList: IAqResultList<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+    function Get<T: class>(out pResultList: IAqResultList<T>; const pNewItemMethod: TFunc<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+
+    function Get<T: class, constructor>(pSelect: IAqDBSQLSelect; out pResultList: IAqResultList<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+    function Get<T: class>(pSelect: IAqDBSQLSelect; out pResultList: IAqResultList<T>;
+      const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+
+    function Get<T: class, constructor>(const pSelect: string; out pResultList: IAqResultList<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+    function Get<T: class>(const pSelect: string; out pResultList: IAqResultList<T>;
+      const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+
+    function Get<T: class, constructor>(pFilter: IAqDBSQLComposedCondition; out pResultList: IAqResultList<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+    function Get<T: class>(pFilter: IAqDBSQLComposedCondition; out pResultList: IAqResultList<T>;
+      const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+
     function Get<T: class, constructor>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
-      out pResultList: IAqResultList<T>): Boolean; overload;
-    function Get<T: class, constructor>:IAqResultList<T>; overload;
-    function Get<T: class, constructor>(pSelect: IAqDBSQLSelect): IAqResultList<T>; overload;
-    function Get<T: class, constructor>(pSelect: string): IAqResultList<T>; overload;
-    function Get<T: class, constructor>(pFilter: IAqDBSQLComposedCondition): IAqResultList<T>; overload;
-    function Get<T: class, constructor>(
-      const pCustomizationMethod: TProc<IAqDBSQLSelect>): IAqResultList<T>; overload;
+      out pResultList: IAqResultList<T>; const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+    function Get<T: class>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
+      out pResultList: IAqResultList<T>; const pNewItemMethod: TFunc<T>; 
+      const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
+
+    function Get<T: class, constructor>(const pOnReadData: TProc<IAqDBReader> = nil):IAqResultList<T>; overload;
+    function Get<T: class>(const pNewItemMethod: TFunc<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+
+    function Get<T: class, constructor>(pSelect: IAqDBSQLSelect;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+    function Get<T: class>(pSelect: IAqDBSQLSelect; const pNewItemMethod: TFunc<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+
+    function Get<T: class, constructor>(const pSelect: string;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+    function Get<T: class>(const pSelect: string; const pNewItemMethod: TFunc<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+
+    function Get<T: class, constructor>(pFilter: IAqDBSQLComposedCondition;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+    function Get<T: class>(pFilter: IAqDBSQLComposedCondition; const pNewItemMethod: TFunc<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+
+    function Get<T: class, constructor>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
+    function Get<T: class>(const pCustomizationMethod: TProc<IAqDBSQLSelect>; const pNewItemMethod: TFunc<T>;
+      const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
 
     function GetByID<T: class, constructor>(const pID: Int64; out pResult: T): Boolean; overload;
+    function GetByID<T: class>(const pID: Int64; out pResult: T; const pNewItemMethod: TFunc<T>): Boolean; overload;
+
     function GetByID<T: class, constructor>(const pID: Int64): T; overload;
+    function GetByID<T: class>(const pID: Int64; const pNewItemMethod: TFunc<T>): T; overload;
 
     procedure Add(const pObject: TObject; const pFreeObject: Boolean = False); overload;
-    procedure Add(const pInserts: IAqReadList<IAqDBSQLInsert>; const pObject: TObject); overload;
+    procedure Add(const pInserts: IAqReadableList<IAqDBSQLInsert>; const pObject: TObject); overload;
     procedure Add(const pInsert: IAqDBSQLInsert; const pObject: TObject); overload;
     procedure Add<T: class>(const pCustomizationMethod: TProc<IAqDBSQLInsert>); overload;
 
     procedure Update(const pObject: TObject; const pFreeObject: Boolean = False); overload;
-    procedure Update(const pUpdates: IAqReadList<IAqDBSQLUpdate>; const pObject: TObject); overload;
+    procedure Update(const pUpdates: IAqReadableList<IAqDBSQLUpdate>; const pObject: TObject); overload;
     procedure Update(const pUpdate: IAqDBSQLUpdate; const pObject: TObject); overload;
     procedure Update<T: class>(const pCustomizationMethod: TProc<IAqDBSQLUpdate>); overload;
 
     procedure Delete(const pObject: TObject; const pFreeObject: Boolean = True); overload;
-    procedure Delete(const pDeletes: IAqReadList<IAqDBSQLDelete>; const pObject: TObject); overload;
+    procedure Delete(pDeletes: IAqReadableList<IAqDBSQLDelete>; const pObject: TObject); overload;
     procedure Delete(const pDelete: IAqDBSQLDelete; const pObject: TObject); overload;
     procedure Delete<T: class>(const pCustomizationMethod: TProc<IAqDBSQLDelete>); overload;
 
     procedure Post(const pObject: TObject; const pFreeObject: Boolean = False);
+
+    procedure LoadDetails(const pMaster: TObject; const pDetailORM: TAqDBORM; const pNewDetailFunction: TFunc<TObject>);
 
     function ExecuteWithObject(const pSQLCommand: string; const pObject: TObject): Int64;
 
     function GetClient<T: TAqDBORMManagerClient>: T;
 
     property Connection: TAqDBConnection read FConnection;
-    property OnNewClient: TAqObserversChannel<TAqDBORMManagerClient> read FOnNewClient;
+    property OnNewClient: IAqObservable<TAqDBORMManagerClient> read FOnNewClient;
 
     class property Default: TAqDBORMManager read FDefault write FDefault;
   end;
@@ -116,9 +172,10 @@ uses
   System.Rtti,
   AqDrop.Core.Types,
   AqDrop.Core.Exceptions,
-  AqDrop.DB.ORM.Reader,
-  AqDrop.DB.SQL,
-  AqDrop.DB.ORM.Attributes;
+  AqDrop.Core.Observers,
+  AqDrop.Core.Collections,
+  AqDrop.DB.ORM.Attributes,
+  AqDrop.DB.SQL;
 
 { TAqDBORMManager }
 
@@ -126,8 +183,10 @@ constructor TAqDBORMManager.Create(const pConnection: TAqDBConnection);
 begin
   FConnection := pConnection;
   FConnection.AddDependent(Self);
-  FClients := TAqDictionary<string, TAqDBORMManagerClient>.Create([TAqKeyValueOwnership.kvoValue], True);
-  FOnNewClient := TAqObserversChannel<TAqDBORMManagerClient>.Create;
+  FClients := TAqDictionary<string, TAqDBORMManagerClient>.Create(
+    [TAqKeyValueOwnership.kvoValue],
+    TAqLockerType.lktMultiReadeExclusiveWriter);
+  FOnNewClient := TAqObservationChannel<TAqDBORMManagerClient>.Create;
 end;
 
 function TAqDBORMManager.CreateFilter: IAqDBSQLComposedCondition;
@@ -135,7 +194,7 @@ begin
   Result := TAqDBSQLComposedCondition.Create;
 end;
 
-procedure TAqDBORMManager.Delete(const pDeletes: IAqReadList<IAqDBSQLDelete>; const pObject: TObject);
+procedure TAqDBORMManager.Delete(pDeletes: IAqReadableList<IAqDBSQLDelete>; const pObject: TObject);
 var
   lDelete: IAqDBSQLDelete;
 begin
@@ -167,20 +226,20 @@ var
 begin
   lDeletes := BuildBaseDeletes(T);
 
-  Connection.StartTransaction;
+  FConnection.StartTransaction;
 
   try
     for lDelete in lDeletes do
     begin
       pCustomizationMethod(lDelete);
-      Connection.ExecuteCommand(lDelete);
+      FConnection.ExecuteCommand(lDelete);
     end;
 
-    Connection.CommitTransaction;
+    FConnection.CommitTransaction;
   except
     on E: Exception do
     begin
-      Connection.RollbackTransaction;
+      FConnection.RollbackTransaction;
       E.RaiseOuterException(EAqInternal.Create('Impossible to execute the custom delete.'));
     end;
   end;
@@ -188,16 +247,176 @@ end;
 
 destructor TAqDBORMManager.Destroy;
 begin
-  FOnNewClient.Free;
-  FClients.Free;
   FConnection.RemoveDependent(Self);
 
   inherited;
 end;
 
-procedure TAqDBORMManager.Delete(const pObject: TObject; const pFreeObject: Boolean);
+procedure TAqDBORMManager.DoAndSaveDetails(const pMethod: TProc; const pMaster: TObject);
+var
+  lORM: TAqDBORM;
+  lHasDetails: Boolean;
+  lDetail: IAqDBORMDetail;
+  lDetailItems: IAqReadableList<TObject>;
+  lObject: TObject;
+  lDetailKeys: IAqReadableList<TAqDBORMColumn>;
+  lMasterKeys: IAqReadableList<TAqDBORMColumn>;
+  lI: Int32;
+  lDeleteCommands: IAqResultList<IAqDBSQLDelete>;
+  lDeleteCommand: IAqDBSQLDelete;
+  lCondition: IAqDBSQLComposedCondition;
+  lKeysCondition: IAqDBSQLComposedCondition;
+  lKeyCondition: IAqDBSQLComposedCondition;
+  lPKs: IAqReadableList<TAqDBORMColumn>;
 begin
-  Delete(BuildDeletes(pObject.ClassType), pObject);
+{TODO 3 -oTatu -cMelhoria: verificar como unificar esse método com o método de delete, a difenrença principal é que esse método aqui executa o save de details depois, o delete deleta details antes}
+  lORM := TAqDBORMReader.Instance.GetORM(pMaster.ClassType);
+  lHasDetails := lORM.HasDetails;
+  if lHasDetails then
+  begin
+    FConnection.StartTransaction;
+  end;
+
+  try
+    pMethod();
+
+    if lHasDetails then
+    begin
+      for lDetail in lORM.Details do
+      begin
+        if lDetail.VerifyIfDetailsAreLoaded(pMaster) then
+        begin
+          if lDetail.ManagedDeletedItens then
+          begin
+            for lObject in lDetail.GetDeletedItens(pMaster) do
+            begin
+              Delete(lObject, False);
+            end;
+          end;
+
+          lDetailItems := lDetail.GetItems(pMaster);
+
+          lDetailKeys := lDetail.ORM.DetailKeys;
+          lMasterKeys := lORM.PrimaryKeys;
+
+          for lObject in lDetailItems do
+          begin
+{TODO 3 -oTatu -cMelhoria: hoje está com o post em cada detail, mas se a origem for um add, dá pra otimizar e chamar o add também aqui, ou seja, teria que ser dinâmico}
+            for lI := 0 to lDetailKeys.Count - 1 do
+            begin
+              lDetailKeys[lI].SetObjectValue(lObject, lMasterKeys[lI].GetValue(pMaster));
+            end;
+
+            Post(lObject, False);
+          end;
+
+          if not lDetail.ManagedDeletedItens then
+          begin
+            lDeleteCommands := BuildBaseDeletes(lDetail.ORM);
+            Assert(lDeleteCommands.Count = 1); {TODO 1 -oTatu -cPB: verificar como o sistema de exclusão vai funcionar com múltiplas tabelas detalhes, no caso de especialização}
+
+            lDeleteCommand := lDeleteCommands.First;
+            lCondition := lDeleteCommand.CustomizeCondition;
+
+            for lI := 0 to lDetailKeys.Count - 1 do
+            begin
+              lCondition.AddColumnEqual(
+                TAqDBSQLColumn.Create(lDetailKeys[lI].Name, lDeleteCommand.Table),
+                TAqDBSQLValue.FromValue(lMasterKeys[lI].GetValue(pMaster), lMasterKeys[lI].&Type));
+            end;
+
+            if lDetailItems.Count > 0 then
+            begin
+              lPKs := lDetail.ORM.PrimaryKeys;
+              lKeysCondition := CreateFilter;
+
+              for lObject in lDetailItems do
+              begin
+                lKeyCondition := CreateFilter;
+
+                for lI := 0 to lPKs.Count - 1 do
+                begin
+                  lKeyCondition.AddColumnEqual(
+                    TAqDBSQLColumn.Create(lPKs[lI].Name, lDeleteCommand.Table),
+                    TAqDBSQLValue.FromValue(lPKs[lI].GetValue(lObject), lPKs[lI].&Type));
+                end;
+
+                lKeysCondition.AddOr(lKeyCondition);
+              end;
+
+              lKeysCondition.Negate;
+              lCondition.AddAnd(lKeysCondition);
+            end;
+
+            FConnection.ExecuteCommand(lDeleteCommand);
+          end;
+        end;
+      end;
+    end;
+
+    if lHasDetails then
+    begin
+      FConnection.CommitTransaction;
+    end;
+  except
+    on E: Exception do
+    begin
+      if lHasDetails then
+      begin
+        FConnection.RollbackTransaction;
+      end;
+      raise;
+    end;
+  end;
+end;
+
+procedure TAqDBORMManager.Delete(const pObject: TObject; const pFreeObject: Boolean);
+var
+  lORM: TAqDBORM;
+  lDetail: IAqDBORMDetail;
+  lObject: TObject;
+  lHasDetails: Boolean;
+begin
+  lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
+  lHasDetails := lORM.HasDetails;
+  if lHasDetails then
+  begin
+    FConnection.StartTransaction;
+  end;
+
+  try
+    if lHasDetails then
+    begin
+      for lDetail in lORM.Details do
+      begin
+        for lObject in lDetail.GetDeletedItens(pObject) do
+        begin
+          Delete(lObject, False);
+        end;
+
+        for lObject in lDetail.GetItems(pObject) do
+        begin
+          Delete(lObject, False);
+        end;
+      end;
+    end;
+
+    Delete(BuildDeletes(pObject.ClassType), pObject);
+
+    if lHasDetails then
+    begin
+      FConnection.CommitTransaction;
+    end;
+  except
+    on E: Exception do
+    begin
+      if lHasDetails then
+      begin
+        FConnection.RollbackTransaction;
+      end;
+      raise;
+    end;
+  end;
 
 {$IFNDEF AUTOREFCOUNT}
   if pFreeObject then
@@ -213,7 +432,7 @@ var
   lColumn: TAqDBORMColumn;
   lORM: TAqDBORM;
 begin
-  lORM := TAqDBORMReader.GetORM(pObject.ClassType);
+  lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
 
   for lI := 0 to pParameters.Count - 1 do
   begin
@@ -224,65 +443,36 @@ begin
   end;
 end;
 
-function TAqDBORMManager.Get<T>(out pResultList: IAqResultList<T>): Boolean;
+function TAqDBORMManager.Get<T>(out pResultList: IAqResultList<T>; const pOnReadData: TProc<IAqDBReader>): Boolean;
 begin
-  Result := Get<T>(BuildSelect(T), pResultList);
+  Result := Get<T>(BuildSelect(T), pResultList, pOnReadData);
 end;
 
-function TAqDBORMManager.Get<T>(pSelect: IAqDBSQLSelect; out pResultList: IAqResultList<T>): Boolean;
+function TAqDBORMManager.Get<T>(pSelect: IAqDBSQLSelect; out pResultList: IAqResultList<T>;
+  const pOnReadData: TProc<IAqDBReader> = nil): Boolean;
 begin
-  Result := Get<T>(SQLSolver.SolveSelect(pSelect), pResultList);
+  Result := Get<T>(SQLSolver.SolveSelect(pSelect), pResultList, pOnReadData);
 end;
 
-function TAqDBORMManager.Get<T>(const pSelect: string; out pResultList: IAqResultList<T>): Boolean;
+function TAqDBORMManager.Get<T>(const pSelect: string; out pResultList: IAqResultList<T>;
+  const pOnReadData: TProc<IAqDBReader> = nil): Boolean;
 var
-  lORM: TAqDBORM;
-  lReader: IAqDBReader;
   lList: TAqResultList<T>;
-  lObject: T;
-  lI: Int32;
-  lColumn: TAqDBORMColumn;
 begin
-  Result := False;
-  lList := nil;
-
-  try
-    lReader := FConnection.OpenQuery(pSelect);
-
-    while lReader.Next do
+  Result := Get<T>(pSelect, pResultList,
+    function: T
     begin
-      if not Result then
-      begin
-        lORM := TAqDBORMReader.GetORM(T);
-        Result := True;
-        lList := TAqResultList<T>.Create(True);
-      end;
-
-      lList.Add(T.Create);
-      lObject := lList.Last;
-
-      for lI := 0 to lReader.Count - 1 do
-      begin
-        if lORM.GetColumn(lReader[lI].Name, lColumn) then
-        begin
-          lColumn.SetObjectValue(lObject, lReader[lI]);
-        end;
-      end;
-    end;
-  except
-    lList.Free;
-    raise;
-  end;
-
-  if Result then
-  begin
-    pResultList := lList;
-  end;
+      Result := T.Create;
+    end, pOnReadData);
 end;
 
 procedure TAqDBORMManager.Add(const pObject: TObject; const pFreeObject: Boolean);
 begin
-  Add(BuildInserts(pObject.ClassType), pObject);
+  DoAndSaveDetails(
+    procedure
+    begin
+      Add(BuildInserts(pObject.ClassType), pObject);
+    end, pObject);
 
 {$IFNDEF AUTOREFCOUNT}
   if pFreeObject then
@@ -293,64 +483,89 @@ begin
 end;
 
 procedure TAqDBORMManager.Post(const pObject: TObject; const pFreeObject: Boolean = False);
-var
-  lInserts: IAqResultList<IAqDBSQLInsert>;
-  lUpdates: IAqResultList<IAqDBSQLUpdate>;
-  lI: Int32;
-  lSelect: IAqDBSQLSelect;
-  lReader: IAqDBReader;
 begin
-{$IFNDEF AUTOREFCOUNT}
-  try
-{$ENDIF}
-    lInserts := BuildInserts(pObject.ClassType);
-    lUpdates := BuildUpdates(pObject.ClassType);
-
-    if lInserts.Count <> lUpdates.Count then
+  DoAndSaveDetails(
+    procedure
+    var
+      lInserts: IAqResultList<IAqDBSQLInsert>;
+      lUpdates: IAqResultList<IAqDBSQLUpdate>;
+      lI: Int32;
+      lSelect: IAqDBSQLSelect;
+      lReader: IAqDBReader;
+      lORM: TAqDBORM;
+      lSpecialization: TAqDBORMTable<AqSpecialization>;
+      lLink: TAqDBLink;
+      lTableName: string;
+      lMasterKey: TAqDBORMColumn;
+      lForeignKey: TAqDBORMColumn;
     begin
-      raise EAqInternal.Create('Inserts and Updates of ' + pObject.ClassName + ' has diferent counts.');
-    end;
+{$IFNDEF AUTOREFCOUNT}
+      try
+{$ENDIF}
+        lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
 
-    FConnection.StartTransaction;
+        lInserts := BuildInserts(pObject.ClassType);
+        lUpdates := BuildUpdates(pObject.ClassType);
 
-    try
-      for lI := 0 to lUpdates.Count - 1 do
-      begin
-        lSelect := TAqDBSQLSelect.Create(lUpdates[lI].Table.Name);
-        lSelect.AddColumn(TAqDBSQLIntConstant.Create(1));
-        lSelect.Condition := lUpdates[lI].Condition;
-        lSelect.Limit := 1;
-
-        lReader := FConnection.OpenQuery(lSelect,
-          procedure(pParameters: IAqDBParameters)
-          begin
-            FillParametersWithObjectValues(pParameters, pObject);
-          end);
-
-        if lReader.Next then
+        if lInserts.Count <> lUpdates.Count then
         begin
-          Update(lUpdates[lI], pObject);
-        end else begin
-          Add(lInserts[lI], pObject);
+          raise EAqInternal.Create('Count of Inserts and Updates of ' + pObject.ClassName + ' doesn''t match.');
+        end;
+
+        FConnection.StartTransaction;
+
+        try
+          for lI := 0 to lUpdates.Count - 1 do
+          begin
+            lSelect := TAqDBSQLSelect.Create(lUpdates[lI].Table.Name);
+            lSelect.AddColumn(TAqDBSQLIntConstant.Create(1));
+            lSelect.Condition := lUpdates[lI].Condition;
+            lSelect.Limit := 1;
+
+            lReader := FConnection.OpenQuery(lSelect,
+              procedure(pParameters: IAqDBParameters)
+              begin
+                FillParametersWithObjectValues(pParameters, pObject);
+              end);
+
+            if lReader.Next then
+            begin
+              Update(lUpdates[lI], pObject);
+            end else begin
+              Add(lInserts[lI], pObject);
+
+              lTableName := lInserts[lI].Table.Name;
+              if lORM.GetSpecializationUnderTable(lTableName, lSpecialization) then
+              begin
+                for lLink in lSpecialization.Attribute.Links do
+                begin
+                  if lORM.GetColumn(lTableName, lLink.MasterKey, lMasterKey) and
+                    lORM.GetColumn(lSpecialization.Name, lLink.ForeignKey, lForeignKey) then
+                  begin
+                    lForeignKey.SetObjectValue(pObject, lMasterKey.GetValue(pObject));
+                  end;
+                end;
+              end;
+            end;
+          end;
+
+          FConnection.CommitTransaction;
+        except
+          FConnection.RollbackTransaction;
+          raise;
+        end;
+{$IFNDEF AUTOREFCOUNT}
+      finally
+        if pFreeObject then
+        begin
+          pObject.Free;
         end;
       end;
-
-      FConnection.CommitTransaction;
-    except
-      FConnection.RollbackTransaction;
-      raise;
-    end;
-{$IFNDEF AUTOREFCOUNT}
-  finally
-    if pFreeObject then
-    begin
-      pObject.Free;
-    end;
-  end;
 {$ENDIF}
+    end, pObject);
 end;
 
-procedure TAqDBORMManager.Update(const pUpdates: IAqReadList<IAqDBSQLUpdate>; const pObject: TObject);
+procedure TAqDBORMManager.Update(const pUpdates: IAqReadableList<IAqDBSQLUpdate>; const pObject: TObject);
 var
   lUpdate: IAqDBSQLUpdate;
 begin
@@ -380,23 +595,27 @@ var
 begin
   lUpdates := BuildBaseUpdates(T);
 
-  Connection.StartTransaction;
+  FConnection.StartTransaction;
 
   try
     for lUpdate in lUpdates do
     begin
       pCustomizationMethod(lUpdate);
-      Connection.ExecuteCommand(lUpdate);
+      FConnection.ExecuteCommand(lUpdate);
     end;
   except
-    Connection.RollbackTransaction;
+    FConnection.RollbackTransaction;
     raise EAqInternal.Create('Impossible to execute the custom update.');
   end;
 end;
 
 procedure TAqDBORMManager.Update(const pObject: TObject; const pFreeObject: Boolean);
 begin
-  Update(BuildUpdates(pObject.ClassType), pObject);
+  DoAndSaveDetails(
+    procedure
+    begin
+      Update(BuildUpdates(pObject.ClassType), pObject);
+    end, pObject);
 
 {$IFNDEF AUTOREFCOUNT}
   if pFreeObject then
@@ -414,7 +633,7 @@ var
   lAutoIncrementColumn: TAqDBORMColumn;
   lGeneratorName: string;
 begin
-  lORM := TAqDBORMReader.GetORM(pObject.ClassType);
+  lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
 
   lHasAutoIncrementColumn := lORM.GetTable(pInsert.Table.Name, lTable) and
     lTable.HasAutoIncrementColumn(lAutoIncrementColumn);
@@ -432,14 +651,16 @@ begin
         lGeneratorName := SQLSolver.SolveGeneratorName(lTable.Name, lAutoIncrementColumn.Name);
       end;
 
-      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(FConnection.GetAutoIncrement(lGeneratorName)));
+      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(
+        FConnection.GetAutoIncrementValue(lGeneratorName)));
     end;
 
     ExecuteWithObject(SQLSolver.SolveInsert(pInsert), pObject);
 
     if lHasAutoIncrementColumn and (Adapter.AutoIncrementType = TAqDBAutoIncrementType.aiAutoIncrement) then
     begin
-      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(FConnection.GetAutoIncrement));
+      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(
+        FConnection.GetAutoIncrementValue));
     end;
 
     FConnection.CommitTransaction;
@@ -456,21 +677,21 @@ var
 begin
   lInserts := BuildBaseInserts(T);
 
-  Connection.StartTransaction;
+  FConnection.StartTransaction;
 
   try
     for lInsert in lInserts do
     begin
       pCustomizationMethod(lInsert);
-      Connection.ExecuteCommand(lInsert);
+      FConnection.ExecuteCommand(lInsert);
     end;
   except
-    Connection.RollbackTransaction;
+    FConnection.RollbackTransaction;
     raise EAqInternal.Create('Impossible to execute the custom insert.');
   end;
 end;
 
-procedure TAqDBORMManager.Add(const pInserts: IAqReadList<IAqDBSQLInsert>; const pObject: TObject);
+procedure TAqDBORMManager.Add(const pInserts: IAqReadableList<IAqDBSQLInsert>; const pObject: TObject);
 var
   lInsert: IAqDBSQLInsert;
 begin
@@ -488,22 +709,19 @@ begin
   end;
 end;
 
-function TAqDBORMManager.BuildBaseDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>;
+function TAqDBORMManager.BuildBaseDeletes(const pORM: TAqDBORM): IAqResultList<IAqDBSQLDelete>;
 var
-  lORM: TAqDBORM;
   lDeletes: TAqResultList<IAqDBSQLDelete>;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
 begin
-  lORM := TAqDBORMReader.GetORM(pClass);
-
   lDeletes := TAqResultList<IAqDBSQLDelete>.Create;
 
   try
-    lDeletes.Add(TAqDBSQLDelete.Create(lORM.MainTable.Name));
+    lDeletes.Add(TAqDBSQLDelete.Create(pORM.MainTable.Name));
 
-    if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
     begin
-      for lSpecialization in lORM.Specializations do
+      for lSpecialization in pORM.Specializations do
       begin
         lDeletes.Insert(0, TAqDBSQLDelete.Create(lSpecialization.Name));
       end;
@@ -516,22 +734,19 @@ begin
   Result := lDeletes;
 end;
 
-function TAqDBORMManager.BuildBaseInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>;
+function TAqDBORMManager.BuildBaseInserts(const pORM: TAqDBORM): IAqResultList<IAqDBSQLInsert>;
 var
-  lORM: TAqDBORM;
   lInserts: TAqResultList<IAqDBSQLInsert>;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
 begin
-  lORM := TAqDBORMReader.GetORM(pClass);
-
   lInserts := TAqResultList<IAqDBSQLInsert>.Create;
 
   try
-    lInserts.Add(TAqDBSQLInsert.Create(lORM.MainTable.Name));
+    lInserts.Add(TAqDBSQLInsert.Create(pORM.MainTable.Name));
 
-    if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
     begin
-      for lSpecialization in lORM.Specializations do
+      for lSpecialization in pORM.Specializations do
       begin
         lInserts.Add(TAqDBSQLInsert.Create(lSpecialization.Name));
       end;
@@ -545,14 +760,23 @@ begin
 end;
 
 function TAqDBORMManager.BuildBaseSelect(const pClass: TClass): IAqDBSQLSelect;
+begin
+  Result := BuildBaseSelect(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildBaseUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>;
+begin
+  Result := BuildBaseUpdates(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildBaseSelect(const pORM: TAqDBORM): IAqDBSQLSelect;
 var
   lSelect: TAqDBSQLSelect;
-  lORM: TAqDBORM;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
   lCondition: TAqDBSQLComposedCondition;
   lLink: TAqDBLink;
   lMasterSource: TAqDBSQLSource;
-  lDetail: TAqDBSQLSource;
+  lSpecializationSource: TAqDBSQLSource;
 
   procedure AddLinkCondition(const pCondition: TAqDBSQLCondition);
   begin
@@ -566,21 +790,19 @@ var
 begin
   lSelect := nil;
   try
-    lORM := TAqDBORMReader.GetORM(pClass);
-
-    lMasterSource := TAqDBSQLTable.Create(lORM.MainTable.Name);
+    lMasterSource := TAqDBSQLTable.Create(pORM.MainTable.Name);
     lSelect := TAqDBSQLSelect.Create(lMasterSource);
 
-    if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
     begin
-      for lSpecialization in lORM.Specializations do
+      for lSpecialization in pORM.Specializations do
       begin
         if lSpecialization.Attribute.Links.Count = 0 then
         begin
           raise EAqInternal.Create('The specialization has no links.');
         end;
 
-        lDetail := TAqDBSQLTable.Create(lSpecialization.Name);
+        lSpecializationSource := TAqDBSQLTable.Create(lSpecialization.Name);
         lCondition := nil;
 
         for lLink in lSpecialization.Attribute.Links do
@@ -588,42 +810,39 @@ begin
           AddLinkCondition(TAqDBSQLComparisonCondition.Create(
             TAqDBSQLColumn.Create(lLink.MasterKey, lMasterSource),
             TAqDBSQLComparison.cpEqual,
-            TAqDBSQLColumn.Create(lLink.ForeignKey, lDetail)));
+            TAqDBSQLColumn.Create(lLink.ForeignKey, lSpecializationSource)));
         end;
 
-        lSelect.AddJoin(TAqDBSQLJoinType.jtInnerJoin, lDetail, lCondition);
+        lSelect.AddJoin(TAqDBSQLJoinType.jtInnerJoin, lSpecializationSource, lCondition);
 
-        lMasterSource := lDetail;
+        lMasterSource := lSpecializationSource;
       end;
     end;
   except
     on E: Exception do
     begin
       lSelect.Free;
-      E.RaiseOuterException(EAqInternal.Create('It wasn''t possible to build the select for the ' +
-        pClass.QualifiedClassName + ' class.'));
+      E.RaiseOuterException(EAqInternal.CreateFmt('It wasn''t possible to build the select for the %s class.',
+        [pORM.ORMClass.QualifiedClassName]));
     end;
   end;
 
   Result := lSelect;
 end;
 
-function TAqDBORMManager.BuildBaseUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>;
+function TAqDBORMManager.BuildBaseUpdates(const pORM: TAqDBORM): IAqResultList<IAqDBSQLUpdate>;
 var
-  lORM: TAqDBORM;
   lUpdates: TAqResultList<IAqDBSQLUpdate>;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
 begin
-  lORM := TAqDBORMReader.GetORM(pClass);
-
   lUpdates := TAqResultList<IAqDBSQLUpdate>.Create;
 
   try
-    lUpdates.Add(TAqDBSQLUpdate.Create(lORM.MainTable.Name));
+    lUpdates.Add(TAqDBSQLUpdate.Create(pORM.MainTable.Name));
 
-    if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
     begin
-      for lSpecialization in lORM.Specializations do
+      for lSpecialization in pORM.Specializations do
       begin
         lUpdates.Add(TAqDBSQLUpdate.Create(lSpecialization.Name));
       end;
@@ -636,11 +855,10 @@ begin
   Result := lUpdates;
 end;
 
-function TAqDBORMManager.BuildDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>;
+function TAqDBORMManager.BuildDeletes(const pORM: TAqDBORM): IAqResultList<IAqDBSQLDelete>;
 var
-  lORM: TAqDBORM;
   lDeletes: TAqResultList<IAqDBSQLDelete>;
-  lPKs: TAqList<TAqDBORMColumn>;
+  lPKs: IAqList<TAqDBORMColumn>;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
   lFirstCondition: TAqDBSQLComparisonCondition;
   lComposedCondition: TAqDBSQLComposedCondition;
@@ -704,25 +922,19 @@ var
     lDeletes.Insert(0, lDelete);
   end;
 begin
-  lORM := TAqDBORMReader.GetORM(pClass);
-
   lDeletes := TAqResultList<IAqDBSQLDelete>.Create;
 
   try
     lPKs := TAqList<TAqDBORMColumn>.Create;
 
-    try
-      AddDelete(lORM.MainTable);
+    AddDelete(pORM.MainTable);
 
-      if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
+    begin
+      for lSpecialization in pORM.Specializations do
       begin
-        for lSpecialization in lORM.Specializations do
-        begin
-          AddDelete(TAqDBORMTable<AqTable>(lSpecialization));
-        end;
+        AddDelete(TAqDBORMTable<AqTable>(lSpecialization));
       end;
-    finally
-      lPKs.Free;
     end;
   except
     lDeletes.Free;
@@ -732,12 +944,11 @@ begin
   Result := lDeletes;
 end;
 
-function TAqDBORMManager.BuildInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>;
+function TAqDBORMManager.BuildInserts(const pORM: TAqDBORM): IAqResultList<IAqDBSQLInsert>;
 var
-  lORM: TAqDBORM;
   lInserts: TAqResultList<IAqDBSQLInsert>;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
-  lPKs: TAqList<TAqDBORMColumn>;
+  lPKs: IAqList<TAqDBORMColumn>;
   lAutoIncrementType: TAqDBAutoIncrementType;
 
   procedure AddInsert(const pTable: TAqDBORMTable<AqTable>);
@@ -772,26 +983,20 @@ var
     lInserts.Add(lInsert);
   end;
 begin
-  lORM := TAqDBORMReader.GetORM(pClass);
-
   lInserts := TAqResultList<IAqDBSQLInsert>.Create;
 
   try
     lAutoIncrementType := Adapter.AutoIncrementType;
     lPKs := TAqList<TAqDBORMColumn>.Create;
 
-    try
-      AddInsert(lORM.MainTable);
+    AddInsert(pORM.MainTable);
 
-      if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
+    begin
+      for lSpecialization in pORM.Specializations do
       begin
-        for lSpecialization in lORM.Specializations do
-        begin
-          AddInsert(TAqDBORMTable<AqTable>(lSpecialization));
-        end;
+        AddInsert(TAqDBORMTable<AqTable>(lSpecialization));
       end;
-    finally
-      lPKs.Free;
     end;
   except
     lInserts.Free;
@@ -802,8 +1007,17 @@ begin
 end;
 
 function TAqDBORMManager.BuildSelect(const pClass: TClass): IAqDBSQLSelect;
+begin
+  Result := BuildSelect(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>;
+begin
+  Result := BuildUpdates(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildSelect(const pORM: TAqDBORM): IAqDBSQLSelect;
 var
-  lORM: TAqDBORM;
   lI: Int32;
 
   procedure AddColumns(const pORMTable: TAqDBORMTable; const pSource: IAqDBSQLSource);
@@ -816,25 +1030,23 @@ var
     end;
   end;
 begin
-  Result := BuildBaseSelect(pClass);
-  lORM := TAqDBORMReader.GetORM(pClass);
+  Result := BuildBaseSelect(pORM);
 
-  AddColumns(lORM.MainTable, Result.Source);
+  AddColumns(pORM.MainTable, Result.Source);
 
-  if lORM.HasSpecializations then
+  if pORM.HasSpecializations then
   begin
-    for lI := 0 to lORM.Specializations.Count - 1 do
+    for lI := 0 to pORM.Specializations.Count - 1 do
     begin
-      AddColumns(lORM.Specializations[lI], Result.Joins[lI].Source);
+      AddColumns(pORM.Specializations[lI], Result.Joins[lI].Source);
     end;
   end;
 end;
 
-function TAqDBORMManager.BuildUpdates(const pClass: TClass): IAqResultList<IAqDBSQLUpdate>;
+function TAqDBORMManager.BuildUpdates(const pORM: TAqDBORM): IAqResultList<IAqDBSQLUpdate>;
 var
-  lORM: TAqDBORM;
   lUpdates: TAqResultList<IAqDBSQLUpdate>;
-  lPKs: TAqList<TAqDBORMColumn>;
+  lPKs: IAqList<TAqDBORMColumn>;
   lSpecialization: TAqDBORMTable<AqSpecialization>;
   lFirstCondition: TAqDBSQLComparisonCondition;
   lComposedCondition: TAqDBSQLComposedCondition;
@@ -900,25 +1112,19 @@ var
     lUpdates.Add(lUpdate);
   end;
 begin
-  lORM := TAqDBORMReader.GetORM(pClass);
-
   lUpdates := TAqResultList<IAqDBSQLUpdate>.Create;
 
   try
     lPKs := TAqList<TAqDBORMColumn>.Create;
 
-    try
-      AddUpdate(lORM.MainTable);
+    AddUpdate(pORM.MainTable);
 
-      if lORM.HasSpecializations then
+    if pORM.HasSpecializations then
+    begin
+      for lSpecialization in pORM.Specializations do
       begin
-        for lSpecialization in lORM.Specializations do
-        begin
-          AddUpdate(TAqDBORMTable<AqTable>(lSpecialization));
-        end;
+        AddUpdate(TAqDBORMTable<AqTable>(lSpecialization));
       end;
-    finally
-      lPKs.Free;
     end;
   except
     lUpdates.Free;
@@ -942,42 +1148,44 @@ begin
   end;
 end;
 
-function TAqDBORMManager.Get<T>(pSelect: IAqDBSQLSelect): IAqResultList<T>;
+function TAqDBORMManager.Get<T>(pSelect: IAqDBSQLSelect; const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
 begin
-  if not Get<T>(pSelect, Result) then
+  if not Get<T>(pSelect, Result, pOnReadData) then
   begin
     Result := nil;
   end;
 end;
 
-function TAqDBORMManager.Get<T>: IAqResultList<T>;
+function TAqDBORMManager.Get<T>(const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
 begin
-  if not Get<T>(Result) then
+  if not Get<T>(Result, pOnReadData) then
   begin
     Result := nil;
   end;
 end;
 
-function TAqDBORMManager.Get<T>(pFilter: IAqDBSQLComposedCondition; out pResultList: IAqResultList<T>): Boolean;
+function TAqDBORMManager.Get<T>(pFilter: IAqDBSQLComposedCondition; out pResultList: IAqResultList<T>;
+  const pOnReadData: TProc<IAqDBReader>): Boolean;
 var
   lSelect: IAqDBSQLSelect;
 begin
   lSelect := BuildSelect(T);
   lSelect.CustomizeCondition(pFilter);
-  Result := Get<T>(lSelect, pResultList);
+  Result := Get<T>(lSelect, pResultList, pOnReadData);
 end;
 
-function TAqDBORMManager.Get<T>(pSelect: string): IAqResultList<T>;
+function TAqDBORMManager.Get<T>(const pSelect: string; const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
 begin
-  if not Get<T>(pSelect, Result) then
+  if not Get<T>(pSelect, Result, pOnReadData) then
   begin
     Result := nil;
   end;
 end;
 
-function TAqDBORMManager.Get<T>(pFilter: IAqDBSQLComposedCondition): IAqResultList<T>;
+function TAqDBORMManager.Get<T>(pFilter: IAqDBSQLComposedCondition;
+  const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
 begin
-  if not Get<T>(pFilter, Result) then
+  if not Get<T>(pFilter, Result, pOnReadData) then
   begin
     Result := nil;
   end;
@@ -995,7 +1203,7 @@ function TAqDBORMManager.GetClient<T>: T;
 var
   lClient: TAqDBORMManagerClient;
 begin
-  FClients.Lock;
+  FClients.BeginWrite;
 
   try
     if not FClients.TryGetValue(T.QualifiedClassName, lClient) then
@@ -1008,7 +1216,7 @@ begin
 
     Result := T(lClient);
   finally
-    FClients.Release;
+    FClients.EndWrite;
   end;
 end;
 
@@ -1031,19 +1239,88 @@ begin
   end;
 end;
 
-function TAqDBORMManager.GetByID<T>(const pID: Int64; out pResult: T): Boolean;
+procedure TAqDBORMManager.LoadDetails(const pMaster: TObject; const pDetailORM: TAqDBORM;
+  const pNewDetailFunction: TFunc<TObject>);
 var
-  lPKs: IAqResultList<TAqDBORMColumn>;
-  lResultList: IAqResultList<T>;
+  lDetailSelect: IAqDBSQLSelect;
+  lMasterKeys: IAqReadableList<TAqDBORMColumn>;
+  lDetailKeys: IAqReadableList<TAqDBORMColumn>;
+  lCondition: IAqDBSQLComposedCondition;
+  lI: Int32;
 begin
-  lPKs := TAqDBORMReader.GetORM(T).GetPrimaryKeys;
+  lDetailSelect := BuildSelect(pDetailORM);
 
-  if (lPKs.Count <> 1) or not (lPKs.First.&Type in adtIntTypes) then
+  lMasterKeys := TAqDBORMReader.Instance.GetORM(pMaster.ClassType).PrimaryKeys;
+  lDetailKeys := pDetailORM.DetailKeys;
+
+  lCondition := lDetailSelect.CustomizeCondition;
+
+  for lI := 0 to lMasterKeys.Count - 1 do
   begin
-    raise EAqInternal.Create('The class ' + T.QualifiedClassName + ' doesn''t observe the Unique Key rule.');
+    lCondition.AddColumnEqual(
+      TAqDBSQLColumn.Create(lDetailKeys[lI].Name, lDetailSelect.Source),
+      TAqDBSQLValue.FromValue(lMasterKeys[lI].GetValue(pMaster), lMasterKeys[lI].&Type));
   end;
 
-  Result := Get<T>(CreateFilter.AddColumnEqual(lPKs.First.Name, pID), lResultList);
+  OpenAndMapObjects(pDetailORM, lDetailSelect, pNewDetailFunction);
+end;
+
+procedure TAqDBORMManager.OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: IAqDBSQLSelect;
+  const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader>);
+begin
+  OpenAndMapObjects(pORM, SQLSolver.SolveSelect(pSelect), pNewObjectFunction, pOnReadData);
+end;
+
+procedure TAqDBORMManager.OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: string;
+  const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader>);
+var
+  lReader: IAqDBReader;
+  lObject: TObject;
+  lI: Int32;
+  lColumn: TAqDBORMColumn;
+  lDetail: IAqDBORMDetail;
+begin
+  lReader := FConnection.OpenQuery(pSelect);
+
+  while lReader.Next do
+  begin
+    lObject := pNewObjectFunction();
+
+    for lI := 0 to lReader.Count - 1 do
+    begin
+      if pORM.GetColumn(lReader[lI].Name, lColumn) then
+      begin
+        lColumn.SetObjectValue(lObject, lReader[lI]);
+      end;
+    end;
+
+    if pORM.HasDetails then
+    begin
+      for lDetail in pORM.Details do
+      begin
+        if not lDetail.LazyLoadingAvailable then
+        begin
+          LoadDetails(lObject, lDetail.ORM,
+            function: TObject
+            begin
+              Result := lDetail.AddItem(lObject);
+            end);
+        end;
+      end;
+    end;
+
+    if Assigned(pOnReadData) then
+    begin
+      pOnReadData(lReader);
+    end;
+  end;
+end;
+
+function TAqDBORMManager.GetByID<T>(const pID: Int64; out pResult: T): Boolean;
+var
+  lResultList: IAqResultList<T>;
+begin
+  Result := Get<T>(CreateFilter.AddColumnEqual(TAqDBORMReader.Instance.GetORM(T).UniqueKey.Name, pID), lResultList);
   if Result then
   begin
     pResult := lResultList.Extract;
@@ -1051,7 +1328,7 @@ begin
 end;
 
 function TAqDBORMManager.Get<T>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
-  out pResultList: IAqResultList<T>): Boolean;
+  out pResultList: IAqResultList<T>; const pOnReadData: TProc<IAqDBReader>): Boolean;
 var
   lSelect: IAqDBSQLSelect;
 begin
@@ -1062,12 +1339,123 @@ begin
     pCustomizationMethod(lSelect);
   end;
 
-  Result := Get<T>(lSelect, pResultList);
+  Result := Get<T>(lSelect, pResultList, pOnReadData);
 end;
 
-function TAqDBORMManager.Get<T>(const pCustomizationMethod: TProc<IAqDBSQLSelect>): IAqResultList<T>;
+function TAqDBORMManager.Get<T>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
+  const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
 begin
-  if not Get<T>(pCustomizationMethod, Result) then
+  if not Get<T>(pCustomizationMethod, Result, pOnReadData) then
+  begin
+    Result := nil;
+  end;
+end;
+
+function TAqDBORMManager.Get<T>(const pSelect: string; const pNewItemMethod: TFunc<T>;
+  const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
+begin
+  if not Get<T>(pSelect, Result, pNewItemMethod, pOnReadData) then
+  begin
+    Result := nil;
+  end;
+end;
+
+function TAqDBORMManager.Get<T>(pSelect: IAqDBSQLSelect; const pNewItemMethod: TFunc<T>;
+  const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
+begin
+  if not Get<T>(pSelect, Result, pNewItemMethod, pOnReadData) then
+  begin
+    Result := nil;
+  end;
+end;
+
+function TAqDBORMManager.Get<T>(const pNewItemMethod: TFunc<T>;
+  const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
+begin
+  if not Get<T>(Result, pNewItemMethod, pOnReadData) then
+  begin
+    Result := nil;
+  end;
+end;
+
+function TAqDBORMManager.Get<T>(const pCustomizationMethod: TProc<IAqDBSQLSelect>; out pResultList: IAqResultList<T>;
+  const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader>): Boolean;
+var
+  lSelect: IAqDBSQLSelect;
+begin
+  lSelect := BuildSelect(T);
+
+  if Assigned(pCustomizationMethod) then
+  begin
+    pCustomizationMethod(lSelect);
+  end;
+
+  Result := Get<T>(lSelect, pResultList, pNewItemMethod, pOnReadData);
+end;
+
+function TAqDBORMManager.Get<T>(pFilter: IAqDBSQLComposedCondition; out pResultList: IAqResultList<T>;
+  const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader>): Boolean;
+var
+  lSelect: IAqDBSQLSelect;
+begin
+  lSelect := BuildSelect(T);
+  lSelect.CustomizeCondition(pFilter);
+  Result := Get<T>(lSelect, pResultList, pNewItemMethod, pOnReadData);
+end;
+
+function TAqDBORMManager.Get<T>(out pResultList: IAqResultList<T>; const pNewItemMethod: TFunc<T>;
+  const pOnReadData: TProc<IAqDBReader>): Boolean;
+begin
+  Result := Get<T>(BuildSelect(T), pResultList, pNewItemMethod, pOnReadData);
+end;
+
+function TAqDBORMManager.Get<T>(const pSelect: string; out pResultList: IAqResultList<T>;
+  const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader>): Boolean;
+var
+  lList: TAqResultList<T>;
+begin
+  lList := nil;
+
+  try
+    OpenAndMapObjects(TAqDBORMReader.Instance.GetORM(T), pSelect,
+      function: TObject
+      begin
+        if not Assigned(lList) then
+        begin
+          lList := TAqResultList<T>.Create(True);
+        end;
+
+        lList.Add(pNewItemMethod);
+        Result := lList.Last;
+      end, pOnReadData);
+  except
+    lList.Free;
+    raise;
+  end;
+
+  Result := Assigned(lList);
+  pResultList := lList;
+end;
+
+function TAqDBORMManager.Get<T>(pSelect: IAqDBSQLSelect; out pResultList: IAqResultList<T>;
+  const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader>): Boolean;
+begin
+  Result := Get<T>(SQLSolver.SolveSelect(pSelect), pResultList, pNewItemMethod, pOnReadData);
+end;
+
+function TAqDBORMManager.Get<T>(pFilter: IAqDBSQLComposedCondition; const pNewItemMethod: TFunc<T>;
+  const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
+begin
+  if not Get<T>(pFilter, Result, pNewItemMethod, pOnReadData) then
+  begin
+    Result := nil;
+  end;
+end;
+
+function TAqDBORMManager.Get<T>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
+  const pNewItemMethod: TFunc<T>; const pOnReadData: TProc<IAqDBReader>): IAqResultList<T>;
+begin
+  if not Get<T>(pCustomizationMethod, Result, pNewItemMethod, pOnReadData) then
   begin
     Result := nil;
   end;
@@ -1097,6 +1485,46 @@ begin
   end;
 end;
 
+function TAqDBORMManager.GetByID<T>(const pID: Int64; const pNewItemMethod: TFunc<T>): T;
+begin
+  if not GetByID<T>(pID, Result, pNewItemMethod) then
+  begin
+    Result := nil;
+  end;
+end;
+
+function TAqDBORMManager.GetByID<T>(const pID: Int64; out pResult: T; const pNewItemMethod: TFunc<T>): Boolean;
+var
+  lResultList: IAqResultList<T>;
+begin
+  Result := Get<T>(CreateFilter.AddColumnEqual(TAqDBORMReader.Instance.GetORM(T).UniqueKey.Name, pID), lResultList,
+    pNewItemMethod);
+  if Result then
+  begin
+    pResult := lResultList.Extract;
+  end;
+end;
+
+function TAqDBORMManager.BuildBaseDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>;
+begin
+  Result := BuildBaseDeletes(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildBaseInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>;
+begin
+  Result := BuildBaseInserts(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildDeletes(const pClass: TClass): IAqResultList<IAqDBSQLDelete>;
+begin
+  Result := BuildDeletes(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
+function TAqDBORMManager.BuildInserts(const pClass: TClass): IAqResultList<IAqDBSQLInsert>;
+begin
+  Result := BuildInserts(TAqDBORMReader.Instance.GetORM(pClass));
+end;
+
 { TAqDBORMManagerClient }
 
 procedure TAqDBORMManagerClient.CommitTransaction;
@@ -1104,15 +1532,19 @@ begin
   FORMManager.Connection.CommitTransaction;
 end;
 
-constructor TAqDBORMManagerClient.Create;
+constructor TAqDBORMManagerClient.Create(const pORMManager: TAqDBORMManager);
 begin
+  if not Assigned(pORMManager) then
+  begin
+    raise EAqInternal.Create('Não foi possível instanciar ' + Self.QualifiedClassName + ' sem um ORMManager.');
+  end;
 
+  FORMManager := pORMManager;
 end;
 
 class function TAqDBORMManagerClient.CreateNew(const pORMManager: TAqDBORMManager): TAqDBORMManagerClient;
 begin
-  Result := Self.Create;
-  Result.FORMManager := pORMManager;
+  Result := Self.Create(pORMManager);
 end;
 
 procedure TAqDBORMManagerClient.RollbackTransaction;

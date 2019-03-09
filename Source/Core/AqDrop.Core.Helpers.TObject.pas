@@ -26,15 +26,16 @@ type
     property FieldTo: TRttiField read FFieldTo;
   end;
 
+  {TODO 3 -oTatu -cMelhoria: tirar class method de clone e colocar em classe especializada}
   TAqObjectMapping = class
   strict private
-    FFrom: TRttiType;
-    FTo: TRttiType;
-
     FFieldMappings: TObjectList<TAqFieldMapping>;
 
     class var FLocker: TCriticalSection;
     class var FMappings: TObjectDictionary<string, TAqObjectMapping>;
+    class var FFieldsToIgnore: TList<TRttiField>;
+
+    class procedure AddDefaultFieldsToIgnoreList;
   private
     class procedure _Initialize;
     class procedure _Finalize;
@@ -49,22 +50,29 @@ type
 
   TAqObjectHelper = class helper for TObject
   public
-    procedure CloneTo(const pObject: TObject); overload;
+    function CloneTo(const pObject: TObject): TObject; overload;
     function CloneTo<T: class, constructor>: T; overload;
-
-    function ConvertToJSON(const pDestroySource: Boolean = False): TJSONValue;
   end;
 
 implementation
 
 uses
-  Data.DBXJSONReflect;
+  System.SysUtils,
+  Data.DBXJSONReflect,
+  AqDrop.Core.Types,
+  AqDrop.Core.Clonable.Intf,
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Helpers.TValue,
+  AqDrop.Core.Helpers.TRttiObject,
+  AqDrop.Core.Helpers.Rtti,
+  AqDrop.Core.Helpers.TRttiType;
 
 { TAqObjectHelper }
 
-procedure TAqObjectHelper.CloneTo(const pObject: TObject);
+function TAqObjectHelper.CloneTo(const pObject: TObject): TObject;
 begin
   TAqObjectMapping.Clone(Self, pObject);
+  Result := pObject;
 end;
 
 function TAqObjectHelper.CloneTo<T>: T;
@@ -84,47 +92,45 @@ begin
   end;
 end;
 
-function TAqObjectHelper.ConvertToJSON(const pDestroySource: Boolean): TJSONValue;
-var
-  lMarshal: TJSONMarshal;
-begin
-  if not Assigned(Self) then
-  begin
-    Result := TJSONNull.Create;
-  end else begin
-    try
-      lMarshal := TJSONMarshal.Create;
-
-      try
-        Result := lMarshal.Marshal(Self);
-      finally
-        lMarshal.Free;
-      end;
-    finally
-{$IFNDEF AQMOBILE}
-      if pDestroySource then
-      begin
-        Free;
-      end;
-{$ENDIF}
-    end;
-  end;
-end;
-
 { TAqObjectMapping }
+
+class procedure TAqObjectMapping.AddDefaultFieldsToIgnoreList;
+  procedure AddFieldRefCountToIgnoreList;
+  var
+    lField: TRttiField;
+  begin
+    lField := TAqRtti.&Implementation.GetType(TInterfacedObject).GetField('FRefCount');
+
+    if not Assigned(lField) then
+    begin
+      raise EAqInternal.Create('Field FRefCount not found to add to ignored field list to clone.');
+    end;
+
+    FFieldsToIgnore.Add(lField);
+  end;
+begin
+  FFieldsToIgnore := TList<TRttiField>.Create;
+
+  AddFieldRefCountToIgnoreList;
+end;
 
 class procedure TAqObjectMapping.Clone(const pFrom, pTo: TObject);
 var
   lMappingName: string;
   lMapping: TAqObjectMapping;
 begin
-  lMappingName := pFrom.QualifiedClassName + ' X ' + pTo.QualifiedClassName;
+  lMappingName := pFrom.QualifiedClassName + '|' + pTo.QualifiedClassName;
 
   FLocker.Enter;
 
   try
     if not FMappings.TryGetValue(lMappingName, lMapping) then
     begin
+      if not Assigned(FFieldsToIgnore) then
+      begin
+        AddDefaultFieldsToIgnoreList;
+      end;
+
       lMapping := TAqObjectMapping.Create(pFrom.ClassType, pTo.ClassType);
       FMappings.Add(lMappingName, lMapping);
     end;
@@ -137,29 +143,44 @@ end;
 
 constructor TAqObjectMapping.Create(const pFrom, pTo: TClass);
 var
-  lContext: TRttiContext;
   lFieldFrom: TRttiField;
   lFieldTo: TRttiField;
+  lSameClass: Boolean;
+  lFrom: TRttiType;
+  lTo: TRttiType;
+  lFieldToFound: Boolean;
 begin
   FFieldMappings := TObjectList<TAqFieldMapping>.Create;
 
-  lContext := TRttiContext.Create;
+  lFrom := TAqRtti.&Implementation.GetType(pFrom);
 
-  try
-    FFrom := lContext.GetType(pFrom);
-    FTo := lContext.GetType(pTo);
+  lSameClass := pFrom = pTo;
 
-    for lFieldFrom in FFrom.GetFields do
+  lTo := nil;
+  if not lSameClass then
+  begin
+    lTo := TAqRtti.&Implementation.GetType(pTo);
+  end;
+
+  for lFieldFrom in lFrom.GetFields do
+  begin
+    if (FFieldsToIgnore.IndexOf(lFieldFrom) < 0) and not lFieldFrom.HasAttribute<AqCloneOff> then
     begin
-      lFieldTo := FTo.GetField(lFieldFrom.Name);
+      if lSameClass then
+      begin
+        lFieldTo := lFieldFrom;
+        lFieldToFound := True;
+      end else begin
+        lFieldTo := lTo.GetField(lFieldFrom.Name);
+        lFieldToFound := Assigned(lFieldTo) and (FFieldsToIgnore.IndexOf(lFieldTo) < 0) and
+          not lFieldTo.HasAttribute<AqCloneOff>;
+      end;
 
-      if Assigned(lFieldTo) then
+      if lFieldToFound then
       begin
         FFieldMappings.Add(TAqFieldMapping.Create(lFieldFrom, lFieldTo));
       end;
     end;
-  finally
-    lContext.Free;
   end;
 end;
 
@@ -171,15 +192,49 @@ end;
 procedure TAqObjectMapping.Execute(const pFrom, pTo: TObject);
 var
   lFieldMapping: TAqFieldMapping;
+  lInterfaceFrom: IInterface;
+  lInterfaceTo: IInterface;
+  lClonableFrom: IAqClonable;
+  lClonableTo: IAqClonable;
+  lValueFrom: TValue;
 begin
   for lFieldMapping in FFieldMappings do
   begin
-    lFieldMapping.FieldTo.SetValue(Pointer(pTo), lFieldMapping.FieldFrom.GetValue(pFrom));
+    if lFieldMapping.FieldTo.FieldType.GetDataType = TAqDataType.adtClass then
+    begin
+      {TODO 3 -oTatu -cMelhoria: estudar a necessidade de verificar se as object implementa iaqclonable, exemplo: Fdeleteditens de um detalhe}
+
+      if lFieldMapping.FieldTo.GetValue(pTo).AsObject = nil then
+      begin
+        lFieldMapping.FieldTo.SetValue(pTo, lFieldMapping.FieldFrom.GetValue(pFrom));
+      end;
+    end else if lFieldMapping.FieldTo.FieldType.GetDataType = TAqDataType.adtInterface then
+    begin
+      lValueFrom := lFieldMapping.FieldFrom.GetValue(pFrom);
+      lInterfaceFrom := lValueFrom.AsInterface;
+      lInterfaceTo := lFieldMapping.FieldTo.GetValue(pTo).AsInterface;
+
+      if Assigned(lInterfaceFrom) then
+      begin
+        if not Assigned(lInterfaceTo) then
+        begin
+          lFieldMapping.FieldTo.SetValue(pTo, lValueFrom);
+        end else if Supports(lInterfaceFrom, IAqClonable, lClonableFrom) and
+          Supports(lInterfaceTo, IAqClonable, lClonableTo) then
+        begin
+          lClonableFrom.CloneTo(lClonableTo);
+        end;
+      end;
+    end else begin
+      lFieldMapping.FieldTo.SetValue(pTo,
+        lFieldMapping.FieldFrom.GetValue(pFrom).ConvertTo(lFieldMapping.FieldTo.FieldType.Handle));
+    end;
   end;
 end;
 
 class procedure TAqObjectMapping._Finalize;
 begin
+  FFieldsToIgnore.Free;
   FMappings.Free;
   FLocker.Free;
 end;

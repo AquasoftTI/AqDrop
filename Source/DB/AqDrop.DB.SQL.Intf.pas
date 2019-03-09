@@ -3,6 +3,7 @@ unit AqDrop.DB.SQL.Intf;
 interface
 
 uses
+  System.Classes,
   AqDrop.Core.Collections.Intf;
 
 type
@@ -11,12 +12,15 @@ type
   TAqDBSQLValueType = (vtColumn, vtOperation, vtSubselect, vtConstant, vtParameter);
   TAqDBSQLConstantValueType = (cvText, cvInt, cvDouble, cvCurrency, cvDateTime, cvDate, cvTime, cvBoolean, cvUInt);
   TAqDBSQLAggregatorType = (atNone, atCount, atSum, atAvg, atMax, atMin);
-  TAqDBSQLConditionType = (ctComparison, ctValueIsNull, ctComposed, ctBetween);
+  TAqDBSQLConditionType = (ctComparison, ctValueIsNull, ctComposed, ctLike, ctBetween, ctIn);
   TAqDBSQLOperator = (opSum, opSubtraction, opMultiplication, opDivision, opDiv, opMod);
-  TAqDBSQLComparison = (cpEqual, cpGreaterThan, cpGreaterEqual, cpLessThan, cpLessEqual);
+  TAqDBSQLComparison = (cpEqual, cpGreaterThan, cpGreaterEqual, cpLessThan, cpLessEqual, cpNotEqual);
+  TAqDBSQLConditionDescriptorType = (cdComposed, cdComparison, cdLike, cdBetween, cdIn, cdIsNull, cdIsNotNull);
   TAqDBSQLJoinType = (jtInnerJoin, jtLeftJoin);
   TAqDBSQLBooleanOperator = (boAnd, boOr, boXor);
+  TAqDBSQLLikeWildCard = (lwcNone, lwcSingleChar, lwcMultipleChars);
 
+  {TODO 3 -oTatu -cMelhoria: criar tipo enumerado para o tipo ordenação de order by (ascendente e descendente) e substituir os booleans que hoje dizem se é ascendente ou não}
 
   IAqDBSQLAliasable = interface;
 
@@ -29,7 +33,9 @@ type
   IAqDBSQLComparisonCondition = interface;
   IAqDBSQLValueIsNullCondition = interface;
   IAqDBSQLComposedCondition = interface;
+  IAqDBSQLLikeCondition = interface;
   IAqDBSQLBetweenCondition = interface;
+  IAqDBSQLInCondition = interface;
 
   IAqDBSQLTextConstant = interface;
   IAqDBSQLIntConstant = interface;
@@ -40,6 +46,14 @@ type
   IAqDBSQLDateConstant = interface;
   IAqDBSQLTimeConstant = interface;
   IAqDBSQLBooleanConstant = interface;
+
+  IAqDBSQLComposedConditionDescriptor = interface;
+  IAqDBSQLSimpleComparisonDescriptor = interface;
+  IAqDBSQLLikeDescriptor = interface;
+  IAqDBSQLBetweenDescriptor = interface;
+  IAqDBSQLInDescriptor = interface;
+  IAqDBSQLIsNullDescriptor = interface;
+  IAqDBSQLIsNotNullDescriptor = interface;
 
   IAqDBSQLSource = interface;
   IAqDBSQLTable = interface;
@@ -54,6 +68,8 @@ type
     ['{E4657747-4933-46BB-97E9-D1883CC710B5}']
     function GetAlias: string;
     function GetIsAliasDefined: Boolean;
+
+    procedure SetAlias(const pAlias: string);
 
     property Alias: string read GetAlias;
     property IsAliasDefined: Boolean read GetIsAliasDefined;
@@ -119,72 +135,81 @@ type
     ['{F6994A33-3466-45C2-A3A1-18F5FEC8A085}']
 
     function GetValue: string;
+    procedure SetValue(const pValue: string);
 
-    property Value: string read GetValue;
+    property Value: string read GetValue write SetValue;
   end;
 
   IAqDBSQLIntConstant = interface(IAqDBSQLConstant)
     ['{295A5BBB-BBF1-4116-AF2D-065AB1ACB319}']
 
     function GetValue: Int64;
+    procedure SetValue(const pValue: Int64);
 
-    property Value: Int64 read GetValue;
+    property Value: Int64 read GetValue write SetValue;
   end;
 
   IAqDBSQLUIntConstant = interface(IAqDBSQLConstant)
     ['{B70B8502-A9E6-4785-98A6-B8E7884DD72A}']
 
     function GetValue: UInt64;
+    procedure SetValue(const pValue: UInt64);
 
-    property Value: UInt64 read GetValue;
+    property Value: UInt64 read GetValue write SetValue;
   end;
 
   IAqDBSQLDoubleConstant = interface(IAqDBSQLConstant)
     ['{5A58062E-E2D2-4D01-A766-6C1D8B5D67FF}']
 
     function GetValue: Double;
+    procedure SetValue(const pValue: Double);
 
-    property Value: Double read GetValue;
+    property Value: Double read GetValue write SetValue;
   end;
 
   IAqDBSQLCurrencyConstant = interface(IAqDBSQLConstant)
     ['{C67AD516-8976-45C0-8201-0D46787E5DCA}']
 
     function GetValue: Currency;
+    procedure SetValue(const pValue: Currency);
 
-    property Value: Currency read GetValue;
+    property Value: Currency read GetValue write SetValue;
   end;
 
   IAqDBSQLDateTimeConstant = interface(IAqDBSQLConstant)
     ['{B86A810B-2C1B-4CE5-99B5-BC7A1CDA7A7F}']
 
     function GetValue: TDateTime;
+    procedure SetValue(const pValue: TDateTime);
 
-    property Value: TDateTime read GetValue;
+    property Value: TDateTime read GetValue write SetValue;
   end;
 
   IAqDBSQLDateConstant = interface(IAqDBSQLConstant)
     ['{6FCC3B86-E7D0-4B29-B1B5-F2B2617EC687}']
 
     function GetValue: TDate;
+    procedure SetValue(const pValue: TDate);
 
-    property Value: TDate read GetValue;
+    property Value: TDate read GetValue write SetValue;
   end;
 
   IAqDBSQLTimeConstant = interface(IAqDBSQLConstant)
     ['{E01C3405-6619-45DB-969D-26C564AE2636}']
 
     function GetValue: TTime;
+    procedure SetValue(const pValue: TTime);
 
-    property Value: TTime read GetValue;
+    property Value: TTime read GetValue write SetValue;
   end;
 
   IAqDBSQLBooleanConstant = interface(IAqDBSQLConstant)
     ['{920397AF-DBFE-4AA1-B304-9FF3CAD61ED0}']
 
     function GetValue: Boolean;
+    procedure SetValue(const pValue: Boolean);
 
-    property Value: Boolean read GetValue;
+    property Value: Boolean read GetValue write SetValue;
   end;
 
   IAqDBSQLSubselect = interface(IAqDBSQLValue)
@@ -221,14 +246,20 @@ type
   IAqDBSQLCondition = interface
     ['{29E8EE3A-8CF5-404F-8A23-F2BEAB43F79D}']
 
+    function VerifyIfIsNegated: Boolean;
     function GetConditionType: TAqDBSQLConditionType;
 
     function GetAsComparison: IAqDBSQLComparisonCondition;
     function GetAsValueIsNull: IAqDBSQLValueIsNullCondition;
     function GetAsComposed: IAqDBSQLComposedCondition;
+    function GetAsLike: IAqDBSQLLikeCondition;
     function GetAsBetween: IAqDBSQLBetweenCondition;
+    function GetAsIn: IAqDBSQLInCondition;
+
+    procedure Negate;
 
     property ConditionType: TAqDBSQLConditionType read GetConditionType;
+    property IsNegated: Boolean read VerifyIfIsNegated;
   end;
 
   IAqDBSQLComparisonCondition = interface(IAqDBSQLCondition)
@@ -247,6 +278,38 @@ type
     property RightValue: IAqDBSQLValue read GetRightValue write SetRightValue;
   end;
 
+  IAqDBSQLLikeCondition = interface(IAqDBSQLCondition)
+    ['{7D45BD3A-8A54-4516-A3EB-AB63392BD624}']
+
+    function GetLeftValue: IAqDBSQLValue;
+    function GetRightValue: IAqDBSQLTextConstant;
+    function GetLeftWildCard: TAqDBSQLLikeWildCard;
+    function GetRightWildCard: TAqDBSQLLikeWildCard;
+
+    procedure SetLeftValue(pValue: IAqDBSQLValue);
+    procedure SetRightValue(pValue: IAqDBSQLTextConstant);
+    procedure SetLeftWildCard(pValue: TAqDBSQLLikeWildCard);
+    procedure SetRightWildCard(pValue: TAqDBSQLLikeWildCard);
+
+    property LeftValue: IAqDBSQLValue read GetLeftValue write SetLeftValue;
+    property RightValue: IAqDBSQLTextConstant read GetRightValue write SetRightValue;
+    property LeftWildCard: TAqDBSQLLikeWildCard read GetLeftWildCard write SetLeftWildCard;
+    property RightWildCard: TAqDBSQLLikeWildCard read GetRightWildCard write SetRightWildCard;
+  end;
+
+  IAqDBSQLInCondition = interface(IAqDBSQLCondition)
+    ['{FCF291F9-6FD0-4614-9823-5AEEB257CDCE}']
+
+    function GetTestableValue: IAqDBSQLValue;
+    function GetInValues: IAqReadableList<IAqDBSQLValue>;
+
+    procedure SetTestableValue(pValue: IAqDBSQLValue);
+    procedure AddInValue(pValue: IAqDBSQLValue);
+
+    property TestableValue: IAqDBSQLValue read GetTestableValue write SetTestableValue;
+    property InValues: IAqReadableList<IAqDBSQLValue> read GetInValues;
+  end;
+
   IAqDBSQLValueIsNullCondition = interface(IAqDBSQLCondition)
     ['{095FEB07-4D62-48EE-AAD2-839BB91101FB}']
 
@@ -258,8 +321,8 @@ type
   IAqDBSQLComposedCondition = interface(IAqDBSQLCondition)
     ['{3FF25D29-ECDF-4C9C-8C1A-23E4EE52CF65}']
 
-    function GetConditions: IAqReadList<IAqDBSQLCondition>;
-    function GetLinkOperators: IAqReadList<TAqDBSQLBooleanOperator>;
+    function GetConditions: IAqReadableList<IAqDBSQLCondition>;
+    function GetLinkOperators: IAqReadableList<TAqDBSQLBooleanOperator>;
     function GetIsInitialized: Boolean;
 
     function AddCondition(const pLinkOperator: TAqDBSQLBooleanOperator; pCondition: IAqDBSQLCondition): Int32;
@@ -267,6 +330,67 @@ type
     function AddAnd(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
     function AddOr(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
     function AddXor(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: UInt64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: UInt64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
 
     function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
@@ -525,6 +649,8 @@ type
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
 
+    {TODO 3 -oTatu -cMelhoria: Criar métodos para sintaxe fluente com not equal}
+
     function AddColumnIsNull(pColumn: IAqDBSQLColumn;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
@@ -532,68 +658,97 @@ type
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
 
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: IAqDBSQLValue;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: IAqDBSQLValue;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: string;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: string;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: string;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: string;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Int64;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Int64;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Int64;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: Int64;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Double;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Double;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Double;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: Double;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Currency;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Currency;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Currency;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: Currency;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDateTime;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TDateTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDateTime;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: TDateTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDate;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TDate;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDate;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: TDate;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TTime;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TTime;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: TTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
 
-    property Conditions: IAqReadList<IAqDBSQLCondition> read GetConditions;
-    property LinkOperators: IAqReadList<TAqDBSQLBooleanOperator> read GetLinkOperators;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLTextConstant;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; const pValue: string;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; const pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; pValue: IAqDBSQLTextConstant;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; const pValue: string;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; pValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; const pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+
+    property Conditions: IAqReadableList<IAqDBSQLCondition> read GetConditions;
+    property LinkOperators: IAqReadableList<TAqDBSQLBooleanOperator> read GetLinkOperators;
     property IsInitialized: Boolean read GetIsInitialized;
   end;
 
   IAqDBSQLBetweenCondition = interface(IAqDBSQLCondition)
     function GetValue: IAqDBSQLValue;
-    function GetRangeBegin: IAqDBSQLValue;
-    function GetRangeEnd: IAqDBSQLValue;
+    function GetLeftBoundary: IAqDBSQLValue;
+    function GetRightBoundary: IAqDBSQLValue;
 
     property Value: IAqDBSQLValue read GetValue;
-    property RangeBegin: IAqDBSQLValue read GetRangeBegin;
-    property RangeEnd: IAqDBSQLValue read GetRangeEnd;
+    property LeftBoundary: IAqDBSQLValue read GetLeftBoundary;
+    property RightBoundary: IAqDBSQLValue read GetRightBoundary;
   end;
 
   IAqDBSQLJoin = interface
@@ -601,32 +756,254 @@ type
     function GetSource: IAqDBSQLSource;
     function GetCondition: IAqDBSQLCondition;
     function GetJoinType: TAqDBSQLJoinType;
+    function GetHasPreviousJoin: Boolean;
+    function GetPreviousJoin: IAqDBSQLJoin;
+    function GetIdentifier: string;
 
     function &On(const pColumnName: string): IAqDBSQLJoin;
-    function EqualsTo(const pColumnName: string): IAqDBSQLJoin;
+    function EqualsTo(pValue: IAqDBSQLValue): IAqDBSQLJoin; overload;
+    function EqualsTo(const pColumnName: string): IAqDBSQLJoin; overload;
 
     property JoinType: TAqDBSQLJoinType read GetJoinType;
     property Source: IAqDBSQLSource read GetSource;
     property Condition: IAqDBSQLCondition read GetCondition;
+    property HasPreviousJoin: Boolean read GetHasPreviousJoin;
+    property PreviousJoin: IAqDBSQLJoin read GetPreviousJoin;
+    property Identifier: string read GetIdentifier;
   end;
 
   IAqDBSQLOrderByItem = interface
     ['{CBBDA2D1-FF3B-4C65-942A-D030AE76A572}']
     function GetValue: IAqDBSQLValue;
-    function GetDesc: Boolean;
+    function GetIsAscending: Boolean;
 
     property Value: IAqDBSQLValue read GetValue;
-    property Desc: Boolean read GetDesc;
+    property Ascending: Boolean read GetIsAscending;
+  end;
+
+  IAqDBSQLConditionDescriptor = interface
+    ['{250DBFFA-35B7-4A49-AA27-D91D66540E9D}']
+
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+    function GetAsComposedConditionDescriptor: IAqDBSQLComposedConditionDescriptor;
+    function GetAsSimpleComparisonDescriptor: IAqDBSQLSimpleComparisonDescriptor;
+    function GetAsLikeDescriptor: IAqDBSQLLikeDescriptor;
+    function GetAsBetweenDescriptor: IAqDBSQLBetweenDescriptor;
+    function GetAsInDescriptor: IAqDBSQLInDescriptor;
+    function GetAsIsNullDescriptor: IAqDBSQLIsNullDescriptor;
+    function GetAsIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor;
+
+    function VerifyIfIsNegated: Boolean;
+    procedure Negate;
+
+    property ConditionDescriptorType: TAqDBSQLConditionDescriptorType read GetConditionDescriptorType;
+    property IsNegated: Boolean read VerifyIfIsNegated;
+  end;
+
+  IAqDBSQLComposedConditionDescriptor = interface(IAqDBSQLConditionDescriptor)
+    ['{8B034557-AC4D-451E-9EEB-84E9184B71F4}']
+
+    function GetCount: Int32;
+    function GetItem(const pIndex: Int32): IAqDBSQLConditionDescriptor;
+    function GetLinkOperator(const pIndex: Int32): TAqDBSQLBooleanOperator;
+
+    {TODO: criar mais métodos para simplificar a entrada desses parâmetros, ao estilo AndColumnEqual, AndColumnGreaterThan, OrColumnEqual}
+    {TODO: criar também sobrecargas que recebam constantes como entrada dos valores}
+    function AddCondition(pCondition: IAqDBSQLConditionDescriptor;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): Int32;
+    function AddComposedDescriptor(
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLComposedConditionDescriptor;
+    function AddComparison(const pSourceIdentifier, pColumnName: string; const pComparison: TAqDBSQLComparison;
+      pComparisonValue: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator =
+      TAqDBSQLBooleanOperator.boAnd): IAqDBSQLSimpleComparisonDescriptor; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pComparisonValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator =
+      TAqDBSQLBooleanOperator.boAnd): IAqDBSQLSimpleComparisonDescriptor; overload;
+    function AddLike(const pColumnName: string; pLikeValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLLikeDescriptor;
+
+    {Métodos para sintaxe fluente}
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnLike(
+      const pColumnName: string; pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnLike(
+      const pColumnName: string; pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+
+    property Count: Int32 read GetCount;
+    property Items[const pIndex: Int32]: IAqDBSQLConditionDescriptor read GetItem; default;
+    property LinkOperators[const pIndex: Int32]: TAqDBSQLBooleanOperator read GetLinkOperator;
+  end;
+
+  IAqDBSQLColumnBasedConditionDescriptor = interface(IAqDBSQLConditionDescriptor)
+    ['{395E544B-FDFF-47EB-AC18-C1FB5D2F9518}']
+
+    function GetColumnName: string;
+    function VerifyIfHasSourceIdentifier: Boolean;
+    function GetSourceIdentifier: string;
+    procedure SetSourceIdentifier(const pValue: string);
+    procedure ClearSourceIdentifier;
+
+    property ColumnName: string read GetColumnName;
+    property HasSourceIdentifier: Boolean read VerifyIfHasSourceIdentifier;
+    property SourceIdentifier: string read GetSourceIdentifier write SetSourceIdentifier;
+  end;
+
+  IAqDBSQLSimpleComparisonDescriptor = interface(IAqDBSQLColumnBasedConditionDescriptor)
+    ['{2315D81A-A8B7-4259-BD2D-6BCF1ABBEA7C}']
+
+    function GetComparison: TAqDBSQLComparison;
+    function GetComparisonValue: IAqDBSQLValue;
+
+    property Comparison: TAqDBSQLComparison read GetComparison;
+    property ComparisonValue: IAqDBSQLValue read GetComparisonValue;
+  end;
+
+  IAqDBSQLLikeDescriptor = interface(IAqDBSQLColumnBasedConditionDescriptor)
+    ['{F20BC556-A260-42F3-83F2-A0AF632D1AD5}']
+
+    function GetLikeValue: IAqDBSQLTextConstant;
+
+    property LikeValue: IAqDBSQLTextConstant read GetLikeValue;
+  end;
+
+  IAqDBSQLBetweenDescriptor = interface(IAqDBSQLColumnBasedConditionDescriptor)
+    ['{15F8337B-6D42-401C-897D-BA3E9CC2EC54}']
+
+    function GetLeftBoundaryValue: IAqDBSQLConstant;
+    function GetRightBoundaryValue: IAqDBSQLConstant;
+
+    property LeftBoundaryValue: IAqDBSQLConstant read GetLeftBoundaryValue;
+    property RightBoundaryValue: IAqDBSQLConstant read GetRightBoundaryValue;
+  end;
+
+  IAqDBSQLInDescriptor = interface(IAqDBSQLColumnBasedConditionDescriptor)
+    ['{59243A55-7933-46E8-B9FA-18B202EA6832}']
+
+    function GetInValues: IAqReadableList<IAqDBSQLConstant>;
+    procedure AddInValue(pValue: IAqDBSQLConstant);
+
+    property InValues: IAqReadableList<IAqDBSQLConstant> read GetInValues;
+  end;
+
+  IAqDBSQLIsNullDescriptor = interface(IAqDBSQLColumnBasedConditionDescriptor)
+    ['{02EE7989-EA01-4EBB-BB41-C350C21B020F}']
+  end;
+
+  IAqDBSQLIsNotNullDescriptor = interface(IAqDBSQLColumnBasedConditionDescriptor)
+    ['{CEB70C07-49BC-4CE5-80AB-7483BB3B649B}']
+  end;
+
+  IAqDBSQLJoinParameters = interface
+    ['{24F72250-8128-4E50-9A1D-B2F5573D7A3E}']
+
+    function GetJoinType: TAqDBSQLJoinType;
+    function GetMainSourceJoin: IAqDBSQLJoinParameters;
+    function GetMainColumns: TStrings;
+    function GetJoinTable: string;
+    function GetJoinColumns: TStrings;
+
+    function GetIdentifier: string;
+
+    property MainSourceJoin: IAqDBSQLJoinParameters read GetMainSourceJoin;
+    property MainColumns: TStrings read GetMainColumns;
+    property JoinTable: string read GetJoinTable;
+    property JoinColumns: TStrings read GetJoinColumns;
+
+    property Identifier: string read GetIdentifier;
+
+    property JoinType: TAqDBSQLJoinType read GetJoinType;
+  end;
+
+  IAqDBSQLOrderByDescriptor = interface
+    ['{EBE10923-E6A5-4D0B-9E9E-8599AD1B9C96}']
+
+    function VerifyIfHasSourceIdentifier: Boolean;
+    function GetSourceIdentifier: string;
+    function GetColumnName: string;
+    function GetIsAscending: Boolean;
+    function GetColumnShouldBeReturnedAsResult: Boolean;
+    function GetGeneratedColumn: IAqDBSQLColumn;
+    procedure SetGeneratedColumn(pColumn: IAqDBSQLColumn);
+
+    property HasSourceIdentifier: Boolean read VerifyIfHasSourceIdentifier;
+    property SourceIdentifier: string read GetSourceIdentifier;
+    property ColumnName: string read GetColumnName;
+    property Ascending: Boolean read GetIsAscending;
+    property ColumnShouldBeReturnedAsResult: Boolean read GetColumnShouldBeReturnedAsResult;
+    property GeneratedColumm: IAqDBSQLColumn read GetGeneratedColumn;
+  end;
+
+  IAqDBSQLSelectSetup = interface
+    ['{9CC87F0D-8C33-4DCB-8511-41A48CC14505}']
+
+    function GetIsCustomConditionDefied: Boolean;
+    function GetCustomCondition: IAqDBSQLComposedCondition;
+
+    function GetHasJoinsParameters: Boolean;
+    function GetJoinsParameters: IAqReadableList<IAqDBSQLJoinParameters>;
+
+    function AddJoinParameters(pJoinParameters: IAqDBSQLJoinParameters): Int32; overload;
+    function AddJoinParameters(const pJoinTable, pMainTableColumns, pJoinTableColumns: string;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin): IAqDBSQLJoinParameters; overload;
+    function AddJoinParameters(const pJoinTable: string;
+      const pMainTableColumns, pJoinTableColumns: array of string;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin): IAqDBSQLJoinParameters; overload;
+    function AddJoinParameters(const pJoinTable: string;
+      const pMainTableColumns, pJoinTableColumns: TStrings;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin): IAqDBSQLJoinParameters; overload;
+
+    function GetHasConditionDescriptors: Boolean;
+    function GetConditionDescriptors: IAqDBSQLComposedConditionDescriptor;
+
+    function AddOrderBy(pOrderByDescriptor: IAqDBSQLOrderByDescriptor): Int32; overload;
+    function AddOrderBy(const pColumnName: string;
+      const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean): IAqDBSQLOrderByDescriptor; overload;
+    function AddOrderBy(const pIdentifier: string; pColumnName: string;
+      const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean): IAqDBSQLOrderByDescriptor; overload;
+    function GetHasOrderBy: Boolean;
+    function GetOrderByList: IAqReadableList<IAqDBSQLOrderByDescriptor>;
+
+    procedure TakeSetup(pSetup: IAqDBSQLSelectSetup);
+
+    property IsCustomConditionDefied: Boolean read GetIsCustomConditionDefied;
+    property CustomCondition: IAqDBSQLComposedCondition read GetCustomCondition;
+    property HasJoinsParameters: Boolean read GetHasJoinsParameters;
+    property JoinsParameters: IAqReadableList<IAqDBSQLJoinParameters> read GetJoinsParameters;
+    property HasConditionDescriptors: Boolean read GetHasConditionDescriptors;
+    property ConditionDescriptors: IAqDBSQLComposedConditionDescriptor read GetConditionDescriptors;
+    property HasOrderBy: Boolean read GetHasOrderby;
+    property OrderByList: IAqReadableList<IAqDBSQLOrderByDescriptor> read GetOrderByList;
   end;
 
   IAqDBSQLSelect = interface(IAqDBSQLSource)
     ['{05EED8D5-FD87-4157-89D8-F295B921FC4E}']
-    function GetColumns: IAqReadList<IAqDBSQLValue>;
+    function GetColumns: IAqReadableList<IAqDBSQLValue>;
     function GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
     function GetSource: IAqDBSQLSource;
 
     function GetHasJoins: Boolean;
-    function GetJoins: IAqReadList<IAqDBSQLJoin>;
+    function GetJoins: IAqReadableList<IAqDBSQLJoin>;
 
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
@@ -636,25 +1013,44 @@ type
     function GetIsLimitDefined: Boolean;
     function GetLimit: UInt32;
     procedure SetLimit(const pValue: UInt32);
-    procedure UnsetLimit;
+    procedure ClearLimit;
+
+    function GetIsOffsetDefined: Boolean;
+    function GetOffset: UInt32;
+    procedure SetOffset(const pValue: UInt32);
+    procedure ClearOffset;
 
     function GetIsOrderByDefined: Boolean;
-    function GetOrderBy: IAqReadList<IAqDBSQLOrderByItem>;
-    function AddOrderBy(pValue: IAqDBSQLValue; const pDesc: Boolean = False): Int32;
+    function GetOrderBy: IAqReadableList<IAqDBSQLOrderByItem>;
+    function AddOrderBy(pValue: IAqDBSQLValue; const pAscending: Boolean = True): Int32; overload;
+    function AddOrderBy(const pColumnName: string; const pAscending: Boolean = True): Int32; overload;
 
     function AddColumn(pValue: IAqDBSQLValue): Int32; overload;
-    function AddColumn(const pExpression: string; const pAlias: string = ''; pSource: IAqDBSQLSource = nil;
-      const pAggregator: TAqDBSQLAggregatorType = atNone): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; const pAlias: string): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression, pAlias: string; pSource: IAqDBSQLSource): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression, pAlias: string; pSource: IAqDBSQLSource;
+      const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; pSource: IAqDBSQLSource): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; pSource: IAqDBSQLSource;
+      const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn; overload;
 
+    function AddJoin(pJoin: IAqDBSQLJoin): Int32; overload;
     function AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
-      pCondition: IAqDBSQLCondition): IAqDBSQLJoin;
+      pCondition: IAqDBSQLCondition): IAqDBSQLJoin; overload;
     function InnerJoin(const pTableName: string): IAqDBSQLJoin;
+    function LeftJoin(const pTableName: string): IAqDBSQLJoin;
 
-    property Columns: IAqReadList<IAqDBSQLValue> read GetColumns;
+    procedure TakeSetup(pSetup: IAqDBSQLSelectSetup);
+
+    procedure Encapsulate;
+
+    property Columns: IAqReadableList<IAqDBSQLValue> read GetColumns;
     property Source: IAqDBSQLSource read GetSource;
 
     property HasJoins: Boolean read GetHasJoins;
-    property Joins: IAqReadList<IAqDBSQLJoin> read GetJoins;
+    property Joins: IAqReadableList<IAqDBSQLJoin> read GetJoins;
 
     property IsConditionDefined: Boolean read GetIsConditionDefined;
     property Condition: IAqDBSQLCondition read GetCondition write SetCondition;
@@ -662,8 +1058,11 @@ type
     property IsLimitDefined: Boolean read GetIsLimitDefined;
     property Limit: UInt32 read GetLimit write SetLimit;
 
+    property IsOffsetDefined: Boolean read GetIsOffsetDefined;
+    property Offset: UInt32 read GetOffset write SetOffset;
+
     property IsOrderByDefined: Boolean read GetIsOrderByDefined;
-    property OrderBy: IAqReadList<IAqDBSQLOrderByItem> read GetOrderBy;
+    property OrderBy: IAqReadableList<IAqDBSQLOrderByItem> read GetOrderBy;
   end;
 
   IAqDBSQLAssignment = interface
@@ -692,20 +1091,20 @@ type
     ['{A8E24816-1545-4291-B598-FC7872CBB6B7}']
 
     function GetTable: IAqDBSQLTable;
-    function GetAssignments: IAqReadList<IAqDBSQLAssignment>;
+    function GetAssignments: IAqReadableList<IAqDBSQLAssignment>;
 
     function AddAssignment(pAssignment: IAqDBSQLAssignment): Int32; overload;
     function AddAssignment(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue): IAqDBSQLAssignment; overload;
 
     property Table: IAqDBSQLTable read GetTable;
-    property Assignments: IAqReadList<IAqDBSQLAssignment> read GetAssignments;
+    property Assignments: IAqReadableList<IAqDBSQLAssignment> read GetAssignments;
   end;
 
   IAqDBSQLUpdate = interface(IAqDBSQLCommand)
     ['{A8E24816-1545-4291-B598-FC7872CBB6B7}']
 
     function GetTable: IAqDBSQLTable;
-    function GetAssignments: IAqReadList<IAqDBSQLAssignment>;
+    function GetAssignments: IAqReadableList<IAqDBSQLAssignment>;
 
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
@@ -717,7 +1116,7 @@ type
     function CustomizeCondition(pNewCondition: IAqDBSQLCondition = nil): IAqDBSQLComposedCondition;
 
     property Table: IAqDBSQLTable read GetTable;
-    property Assignments: IAqReadList<IAqDBSQLAssignment> read GetAssignments;
+    property Assignments: IAqReadableList<IAqDBSQLAssignment> read GetAssignments;
     property IsConditionDefined: Boolean read GetIsConditionDefined;
     property Condition: IAqDBSQLCondition read GetCondition write SetCondition;
   end;

@@ -17,7 +17,7 @@ type
 
     function AsJSONObject: TJSONObject;
     function AsJSONString: TJSONString;
-    function AsInteger: Integer;
+    function AsInt32: Int32;
     function AsInt64: Int64;
     function AsBoolean: Boolean;
   end;
@@ -58,7 +58,7 @@ begin
   Result := (Self as TJSONNumber).AsInt64;
 end;
 
-function TAqJSONValueHelper.AsInteger: Integer;
+function TAqJSONValueHelper.AsInt32: Int32;
 begin
   Result := (Self as TJSONNumber).AsInt;
 end;

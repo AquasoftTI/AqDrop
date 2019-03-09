@@ -3,9 +3,10 @@ unit AqDrop.DB.SQL;
 interface
 
 uses
+  System.Classes,
   System.Rtti,
+  AqDrop.Core.Types,
   AqDrop.Core.Collections.Intf,
-  AqDrop.Core.Collections,
   AqDrop.Core.InterfacedObject,
   AqDrop.DB.SQL.Intf;
 
@@ -17,10 +18,7 @@ type
   TAqDBSQLTable = class;
   TAqDBSQLSelect = class;
 
-  TAqDBSQLAbstraction = class(TAqInterfacedObject)
-  strict protected
-    class function MustCountReferences: Boolean; override;
-  end;
+  TAqDBSQLAbstraction = class(TAqARCObject);
 
   TAqDBSQLAliasable = class(TAqDBSQLAbstraction, IAqDBSQLAliasable)
   strict private
@@ -28,8 +26,14 @@ type
 
     function GetAlias: string;
     function GetIsAliasDefined: Boolean;
+  strict protected
+    procedure SetAlias(const pAlias: string);
+    procedure ClearAlias;
   public
     constructor Create(const pAlias: string = '');
+
+    property IsAliasDefined: Boolean read GetIsAliasDefined;
+    property Alias: string read GetAlias;
   end;
 
   TAqDBSQLValue = class(TAqDBSQLAliasable, IAqDBSQLValue)
@@ -43,8 +47,13 @@ type
     function GetAsSubselect: IAqDBSQLSubselect; virtual;
     function GetAsConstant: IAqDBSQLConstant; virtual;
     function GetAsParameter: IAqDBSQLParameter; virtual;
+
+    property Aggregator: TAqDBSQLAggregatorType read FAggregator;
   public
     constructor Create(const pAlias: string = ''; const pAggregator: TAqDBSQLAggregatorType = atNone);
+
+    {TODO 3 -oTatu -cMelhoria: verificar se essa função permanece depois ou não, e se o parâmetro type pode ser omitido}
+    class function FromValue(const pValue: TValue; const pType: TAqDataType): TAqDBSQLValue;
   end;
 
   TAqDBSQLColumn = class(TAqDBSQLValue, IAqDBSQLColumn)
@@ -118,6 +127,7 @@ type
     constructor Create(const pValue: T; const pAlias: string = '';
       const pAggregator: TAqDBSQLAggregatorType = atNone);
     function GetValue: T;
+    procedure SetValue(const pValue: T);
   end;
 
   TAqDBSQLTextConstant = class(TAqDBSQLGenericConstant<string>, IAqDBSQLTextConstant)
@@ -207,13 +217,20 @@ type
   end;
 
   TAqDBSQLCondition = class(TAqDBSQLAbstraction, IAqDBSQLCondition)
+  strict private
+    FNegated: Boolean;
   strict protected
     function GetConditionType: TAqDBSQLConditionType; virtual; abstract;
+    function VerifyIfIsNegated: Boolean;
 
     function GetAsComparison: IAqDBSQLComparisonCondition; virtual;
     function GetAsValueIsNull: IAqDBSQLValueIsNullCondition; virtual;
     function GetAsComposed: IAqDBSQLComposedCondition; virtual;
     function GetAsBetween: IAqDBSQLBetweenCondition; virtual;
+    function GetAsLike: IAqDBSQLLikeCondition; virtual;
+    function GetAsIn: IAqDBSQLInCondition; virtual;
+
+    procedure Negate;
   end;
 
   TAqDBSQLComparisonCondition = class(TAqDBSQLCondition, IAqDBSQLComparisonCondition)
@@ -250,17 +267,16 @@ type
 
   TAqDBSQLComposedCondition = class(TAqDBSQLCondition, IAqDBSQLComposedCondition)
   strict private
-    FConditions: TAqList<IAqDBSQLCondition>;
-    FOperators: TAqList<TAqDBSQLBooleanOperator>;
+    FConditions: IAqList<IAqDBSQLCondition>;
+    FOperators: IAqList<TAqDBSQLBooleanOperator>;
 
-    function GetConditions: AqDrop.Core.Collections.Intf.IAqReadList<AqDrop.DB.SQL.Intf.IAqDBSQLCondition>;
-    function GetLinkOperators: AqDrop.Core.Collections.Intf.IAqReadList<AqDrop.DB.SQL.Intf.TAqDBSQLBooleanOperator>;
+    function GetConditions: IAqReadableList<IAqDBSQLCondition>;
+    function GetLinkOperators: IAqReadableList<TAqDBSQLBooleanOperator>;
   strict protected
     function GetConditionType: TAqDBSQLConditionType; override;
     function GetAsComposed: IAqDBSQLComposedCondition; override;
   public
     constructor Create(pInitialCondition: IAqDBSQLCondition = nil);
-    destructor Destroy; override;
 
     function GetIsInitialized: Boolean;
 
@@ -268,6 +284,67 @@ type
     function AddAnd(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
     function AddOr(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
     function AddXor(pCondition: IAqDBSQLCondition): IAqDBSQLComposedCondition;
+
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Int64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: UInt64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: UInt64;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Double;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Currency;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: TDateTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: TDate;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: TTime;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
 
     function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
@@ -533,119 +610,450 @@ type
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
 
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: IAqDBSQLValue;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: IAqDBSQLValue;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: IAqDBSQLValue;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: string;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: string;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: string;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: string;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Int64;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Int64;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Int64;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: Int64;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Double;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Double;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Double;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: Double;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Currency;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Currency;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Currency;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: Currency;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDateTime;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TDateTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDateTime;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: TDateTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDate;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TDate;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDate;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: TDate;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TTime;
+    function AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
-    function AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TTime;
+    function AddColumnBetween(const pColumnName: string; const pLeftBoundary, pRightBoundary: TTime;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
+
+    function AddColumnLike(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLTextConstant;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; const pValue: string;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(pColumn: IAqDBSQLColumn; const pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; pValue: IAqDBSQLTextConstant;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; const pValue: string;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; pValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
+    function AddColumnLike(const pColumnName: string; const pValue: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition; overload;
   end;
 
   TAqDBSQLBetweenCondition = class(TAqDBSQLCondition, IAqDBSQLBetweenCondition)
   strict private
     FValue: IAqDBSQLValue;
-    FRangeBegin: IAqDBSQLValue;
-    FRangeEnd: IAqDBSQLValue;
+    FLeftBoundary: IAqDBSQLValue;
+    FRightBoundary: IAqDBSQLValue;
     function GetValue: IAqDBSQLValue;
-    function GetRangeBegin: IAqDBSQLValue;
-    function GetRangeEnd: IAqDBSQLValue;
+    function GetLeftBoundary: IAqDBSQLValue;
+    function GetRightBoundary: IAqDBSQLValue;
   strict protected
     function GetAsBetween: IAqDBSQLBetweenCondition; override;
     function GetConditionType: TAqDBSQLConditionType; override;
   public
-    constructor Create(pValue, pRangeBegin, pRangeEnd: IAqDBSQLValue);
+    constructor Create(pValue, pLeftBoundary, pRightBoundary: IAqDBSQLValue);
+  end;
+
+  TAqDBSQLInCondition = class(TAqDBSQLCondition, IAqDBSQLInCondition)
+  strict private
+    FTestableValue: IAqDBSQLValue;
+    FInValues: IAqList<IAqDBSQLValue>;
+
+    function GetTestableValue: IAqDBSQLValue;
+    function GetInValues: IAqReadableList<IAqDBSQLValue>;
+
+    procedure SetTestableValue(pValue: IAqDBSQLValue);
+    procedure AddInValue(pValue: IAqDBSQLValue);
+  strict protected
+    function GetAsIn: IAqDBSQLInCondition; override;
+    function GetConditionType: TAqDBSQLConditionType; override;
+  public
+    constructor Create(pTestableValue: IAqDBSQLValue); overload;
+  end;
+
+  TAqDBSQLLikeCondition = class(TAqDBSQLCondition, IAqDBSQLLikeCondition)
+  strict private
+    FLeftValue: IAqDBSQLValue;
+    FRightValue: IAqDBSQLTextConstant;
+    FLeftWildCard: TAqDBSQLLikeWildCard;
+    FRightWildCard: TAqDBSQLLikeWildCard;
+
+    function GetLeftValue: IAqDBSQLValue;
+    function GetRightValue: IAqDBSQLTextConstant;
+    procedure SetLeftValue(pValue: IAqDBSQLValue);
+    procedure SetRightValue(pValue: IAqDBSQLTextConstant);
+    function GetLeftWildCard: TAqDBSQLLikeWildCard;
+    function GetRightWildCard: TAqDBSQLLikeWildCard;
+    procedure SetLeftWildCard(pValue: TAqDBSQLLikeWildCard);
+    procedure SetRightWildCard(pValue: TAqDBSQLLikeWildCard);
+  strict protected
+    function GetAsLike: IAqDBSQLLikeCondition; override;
+    function GetConditionType: TAqDBSQLConditionType; override;
+  public
+    constructor Create(pLeftValue: IAqDBSQLValue; pRightValue: IAqDBSQLTextConstant;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars); overload;
+    constructor Create(pLeftValue: string; pRightValue: string;
+      const pLeftWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars;
+      const pRightWildCard: TAqDBSQLLikeWildCard = TAqDBSQLLikeWildCard.lwcMultipleChars); overload;
   end;
 
   TAqDBSQLJoin = class(TAqDBSQLAliasable, IAqDBSQLJoin)
   strict private
     FType: TAqDBSQLJoinType;
-    FMainSource: IAqDBSQLSource;
+    FPreviousJoin: IAqDBSQLJoin;
     FJoinSource: IAqDBSQLSource;
     FCondition: IAqDBSQLCondition;
+    FMainSource: IAqDBSQLSource;
 
     function GetSource: IAqDBSQLSource;
     function GetCondition: IAqDBSQLCondition;
     function GetJoinType: TAqDBSQLJoinType;
+    function GetHasPreviousJoin: Boolean;
+    function GetPreviousJoin: IAqDBSQLJoin;
+    function GetIdentifier: string;
+    function GetMainSource: IAqDBSQLSource;
   public
-    constructor Create(const pType: TAqDBSQLJoinType; pMainSource: IAqDBSQLSource; pJoinSource: IAqDBSQLSource;
+    constructor Create(const pType: TAqDBSQLJoinType; pJoinSource: IAqDBSQLSource;
+      pMainSource: IAqDBSQLSource = nil); overload;
+    constructor Create(const pType: TAqDBSQLJoinType; pJoinSource: IAqDBSQLSource;
+      pCondition: IAqDBSQLCondition); overload;
+    constructor Create(const pType: TAqDBSQLJoinType; pPreviousJoin: IAqDBSQLJoin; pJoinSource: IAqDBSQLSource;
       pCondition: IAqDBSQLCondition); overload;
 
     function &On(const pColumnName: string): IAqDBSQLJoin;
-    function EqualsTo(const pColumnName: string): IAqDBSQLJoin;
+    function EqualsTo(pValue: IAqDBSQLValue): IAqDBSQLJoin; overload;
+    function EqualsTo(const pColumnName: string): IAqDBSQLJoin; overload;
   end;
 
   TAqDBSQLOrderByItem = class(TAqDBSQLAbstraction, IAqDBSQLOrderByItem)
   strict private
     FValue: IAqDBSQLValue;
-    FDesc: Boolean;
+    FAscending: Boolean;
 
     function GetValue: IAqDBSQLValue;
-    function GetDesc: Boolean;
+    function GetIsAscending: Boolean;
   public
-    constructor Create(pValue: IAqDBSQLValue; const pDesc: Boolean);
+    constructor Create(pValue: IAqDBSQLValue; const pAscending: Boolean);
+  end;
 
-    property Value: IAqDBSQLValue read GetValue;
-    property Desc: Boolean read GetDesc;
+  TAqDBSQLConditionDescriptor = class(TAqARCObject, IAqDBSQLConditionDescriptor)
+  strict private
+    FNegated: Boolean;
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; virtual; abstract;
+
+    function GetAsComposedConditionDescriptor: IAqDBSQLComposedConditionDescriptor; virtual;
+    function GetAsSimpleComparisonDescriptor: IAqDBSQLSimpleComparisonDescriptor; virtual;
+    function GetAsLikeDescriptor: IAqDBSQLLikeDescriptor; virtual;
+    function GetAsBetweenDescriptor: IAqDBSQLBetweenDescriptor; virtual;
+    function GetAsInDescriptor: IAqDBSQLInDescriptor; virtual;
+    function GetAsIsNullDescriptor: IAqDBSQLIsNullDescriptor; virtual;
+    function GetAsIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor; virtual;
+
+    function VerifyIfIsNegated: Boolean;
+    procedure Negate;
+  end;
+
+  TAqDBSQLComposedConditionDescriptor = class(TAqDBSQLConditionDescriptor, IAqDBSQLComposedConditionDescriptor)
+  strict private
+    FConditions: IAqList<IAqDBSQLConditionDescriptor>;
+    FLinks: IAqList<TAqDBSQLBooleanOperator>;
+
+    function GetCount: Int32;
+    function GetItem(const pIndex: Int32): IAqDBSQLConditionDescriptor;
+    function GetLinkOperator(const pIndex: Int32): TAqDBSQLBooleanOperator;
+
+    function AddCondition(pCondition: IAqDBSQLConditionDescriptor;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): Int32;
+    function AddComposedDescriptor(
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLComposedConditionDescriptor;
+    function AddComparison(const pSourceIdentifier, pColumnName: string; const pComparison: TAqDBSQLComparison;
+      pComparisonValue: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator =
+      TAqDBSQLBooleanOperator.boAnd): IAqDBSQLSimpleComparisonDescriptor; overload;
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pComparisonValue: IAqDBSQLValue;
+      const pLinkOperator: TAqDBSQLBooleanOperator =
+      TAqDBSQLBooleanOperator.boAnd): IAqDBSQLSimpleComparisonDescriptor; overload;
+    function AddLike(const pColumnName: string; pLikeValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLLikeDescriptor;
+
+    {Métodos para sintaxe fluente}
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnLike(
+      const pColumnName: string; pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnLike(
+      const pColumnName: string; pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsComposedConditionDescriptor: IAqDBSQLComposedConditionDescriptor; override;
+  public
+    constructor Create;
+  end;
+
+  TAqDBSQLColumnBasedConditionDescriptor = class(TAqDBSQLConditionDescriptor, IAqDBSQLColumnBasedConditionDescriptor)
+  strict private
+    FColumnName: string;
+    FSourceIdentifier: string;
+
+    function GetColumnName: string;
+    function VerifyIfHasSourceIdentifier: Boolean;
+    function GetSourceIdentifier: string;
+    procedure SetSourceIdentifier(const pValue: string);
+    procedure ClearSourceIdentifier;
+  public
+    constructor Create(const pColumnName: string);
+  end;
+
+  TAqDBSQLSimpleComparisonDescriptor = class(TAqDBSQLColumnBasedConditionDescriptor, IAqDBSQLSimpleComparisonDescriptor)
+  strict private
+    FComparison: TAqDBSQLComparison;
+    FComparisonValue: IAqDBSQLValue;
+
+    function GetComparison: TAqDBSQLComparison;
+    function GetComparisonValue: IAqDBSQLValue;
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsSimpleComparisonDescriptor: IAqDBSQLSimpleComparisonDescriptor; override;
+  public
+    constructor Create(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+      pComparisonValue: IAqDBSQLValue);
+  end;
+
+  TAqDBSQLLikeDescriptor = class(TAqDBSQLColumnBasedConditionDescriptor, IAqDBSQLLikeDescriptor)
+  strict private
+    FLikeValue: IAqDBSQLTextConstant;
+
+    function GetLikeValue: IAqDBSQLTextConstant;
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsLikeDescriptor: IAqDBSQLLikeDescriptor; override;
+  public
+    constructor Create(const pColumnName: string; pLikeValue: IAqDBSQLTextConstant);
+  end;
+
+  TAqDBSQLBetweenDescriptor = class(TAqDBSQLColumnBasedConditionDescriptor, IAqDBSQLBetweenDescriptor)
+  strict private
+    FLeftBoundaryValue: IAqDBSQLConstant;
+    FRightBoundaryValue: IAqDBSQLConstant;
+
+    function GetLeftBoundaryValue: IAqDBSQLConstant;
+    function GetRightBoundaryValue: IAqDBSQLConstant;
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsBetweenDescriptor: IAqDBSQLBetweenDescriptor; override;
+  public
+    constructor Create(const pColumnName: string; pLeftBoundaryValue, pRightBoundaryValue: IAqDBSQLConstant);
+  end;
+
+  TAqDBSQLInDescriptor = class(TAqDBSQLColumnBasedConditionDescriptor, IAqDBSQLInDescriptor)
+  strict private
+    FInValues: IAqList<IAqDBSQLConstant>;
+
+    function GetInValues: IAqReadableList<IAqDBSQLConstant>;
+    procedure AddInValue(pValue: IAqDBSQLConstant);
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsInDescriptor: IAqDBSQLInDescriptor; override;
+  public
+    constructor Create(const pColumnName: string);
+  end;
+
+  TAqDBSQLIsNullDescriptor = class(TAqDBSQLColumnBasedConditionDescriptor, IAqDBSQLIsNullDescriptor)
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsIsNullDescriptor: IAqDBSQLIsNullDescriptor; override;
+  end;
+
+  TAqDBSQLIsNotNullDescriptor = class(TAqDBSQLColumnBasedConditionDescriptor, IAqDBSQLIsNotNullDescriptor)
+  strict protected
+    function GetConditionDescriptorType: TAqDBSQLConditionDescriptorType; override;
+    function GetAsIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor; override;
+  end;
+
+  TAqDBSQLJoinParameters = class(TAqDBSQLAbstraction, IAqDBSQLJoinParameters)
+  strict private
+    FJoinType: TAqDBSQLJoinType;
+    {TODO 3 -oTatu -cMelhoria: atualmente o mais source join permanece com uma referência para um objeto original, mesmo que este idealmente
+    tenha sido descartado durante um takesetup (caso de identifier já existente), então seria bom estudar se isto está ok, ou se seria possível
+    trocar a referência pela que ficou}
+    FMainSourceJoin: IAqDBSQLJoinParameters;
+    FMainColumns: TStringList;
+    FJoinTable: string;
+    FJoinColumns: TStringList;
+  public
+    constructor Create(const pJoinTable: string; const pMainTableColumns, pJoinTableColumns: TStrings;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin); overload;
+    constructor Create(const pJoinTable: string; const pMainTableColumns, pJoinTableColumns: string;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin); overload;
+    constructor Create(pMainSourceJoin: IAqDBSQLJoinParameters; const pJoinTable: string;
+      const pMainTableColumns, pJoinTableColumns: TStrings;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin); overload;
+    destructor Destroy; override;
+
+    function GetJoinType: TAqDBSQLJoinType;
+    function GetMainSourceJoin: IAqDBSQLJoinParameters;
+    function GetMainColumns: TStrings;
+    function GetJoinTable: string;
+    function GetJoinColumns: TStrings;
+
+    function GetIdentifier: string;
+  end;
+
+  TAqDBSQLOrderByDescriptor = class(TAqDBSQLAbstraction, IAqDBSQLOrderByDescriptor)
+  strict private
+    FSourceIdentifier: string;
+    FColumnName: string;
+    FAscending: Boolean;
+    FColumnShouldBeReturnedAsResult: Boolean;
+    FGeneratedColumn: IAqDBSQLColumn;
+
+    function VerifyIfHasSourceIdentifier: Boolean;
+    function GetSourceIdentifier: string;
+    function GetColumnName: string;
+    function GetIsAscending: Boolean;
+    function GetColumnShouldBeReturnedAsResult: Boolean;
+    function GetGeneratedColumn: IAqDBSQLColumn;
+    procedure SetGeneratedColumn(pColumn: IAqDBSQLColumn);
+  public
+    constructor Create(const pSourceIdentifier, pColumnName: string;
+      const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean);
+  end;
+
+  TAqDBSQLSelectSetup = class(TAqDBSQLAbstraction, IAqDBSQLSelectSetup)
+  strict private
+    FCustomCondition: IAqDBSQLComposedCondition;
+    FJoinsParameters: IAqList<IAqDBSQLJoinParameters>;
+    FConditionDescriptors: IAqDBSQLComposedConditionDescriptor;
+    FOrderByList: IAqList<IAqDBSQLOrderByDescriptor>;
+
+    function DoGetJoinsParameters: IAqList<IAqDBSQLJoinParameters>;
+    function DoGetOrderbyList: IAqList<IAqDBSQLOrderByDescriptor>;
+  public
+    constructor Create(pInitialCondition: IAqDBSQLCondition); overload;
+
+    function GetIsCustomConditionDefied: Boolean;
+    function GetCustomCondition: IAqDBSQLComposedCondition;
+
+    function GetHasJoinsParameters: Boolean;
+    function GetJoinsParameters: IAqReadableList<IAqDBSQLJoinParameters>;
+
+    function AddJoinParameters(pJoinParameters: IAqDBSQLJoinParameters): Int32; overload;
+    function AddJoinParameters(const pJoinTable, pMainTableColumns, pJoinTableColumns: string;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin): IAqDBSQLJoinParameters; overload;
+    function AddJoinParameters(const pJoinTable: string;
+      const pMainTableColumns, pJoinTableColumns: array of string;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin): IAqDBSQLJoinParameters; overload;
+    function AddJoinParameters(const pJoinTable: string;
+      const pMainTableColumns, pJoinTableColumns: TStrings;
+      const pJoinType: TAqDBSQLJoinType = TAqDBSQLJoinType.jtLeftJoin): IAqDBSQLJoinParameters; overload;
+
+    function GetHasConditionDescriptors: Boolean;
+    function GetConditionDescriptors: IAqDBSQLComposedConditionDescriptor;
+
+    function AddOrderBy(pOrderByDescriptor: IAqDBSQLOrderByDescriptor): Int32; overload;
+    function AddOrderBy(const pColumnName: string;
+      const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean): IAqDBSQLOrderByDescriptor; overload;
+    function AddOrderBy(const pIdentifier: string; pColumnName: string;
+      const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean): IAqDBSQLOrderByDescriptor; overload;
+    function GetHasOrderBy: Boolean;
+    function GetOrderByList: IAqReadableList<IAqDBSQLOrderByDescriptor>;
+
+    procedure TakeSetup(pSetup: IAqDBSQLSelectSetup);
   end;
 
   TAqDBSQLSelect = class(TAqDBSQLSource, IAqDBSQLSource, IAqDBSQLSelect, IAqDBSQLCommand)
   strict private
-    FColumns: TAqList<IAqDBSQLValue>;
+    FColumns: IAqList<IAqDBSQLValue>;
     FSource: IAqDBSQLSource;
-    FJoins: TAqList<IAqDBSQLJoin>;
+    FJoins: IAqList<IAqDBSQLJoin>;
     FLimit: UInt32;
+    FOffset: UInt32;
     FCondition: IAqDBSQLCondition;
-    FOrderBy: TAqList<IAqDBSQLOrderByItem>;
+    FOrderBy: IAqList<IAqDBSQLOrderByItem>;
+
+    procedure Reset;
 
     constructor InternalCreate(const pAlias: string);
 
-    function GetColumns: IAqReadList<IAqDBSQLValue>;
+    function GetColumns: IAqReadableList<IAqDBSQLValue>;
     function GetSource: IAqDBSQLSource;
 
     function GetHasJoins: Boolean;
-    function GetJoins: IAqReadList<IAqDBSQLJoin>;
+    function DoGetJoins: IAqList<IAqDBSQLJoin>;
+    function GetJoins: IAqReadableList<IAqDBSQLJoin>;
+
+    function GetSourcesAliases: IAqDictionary<string, IAqDBSQLSource>;
 
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
@@ -656,8 +1064,12 @@ type
     function GetLimit: UInt32;
     procedure SetLimit(const pValue: UInt32);
 
+    function GetIsOffsetDefined: Boolean;
+    function GetOffset: UInt32;
+    procedure SetOffset(const pValue: UInt32);
+
     function GetIsOrderByDefined: Boolean;
-    function GetOrderBy: IAqReadList<IAqDBSQLOrderbyItem>;
+    function GetOrderBy: IAqReadableList<IAqDBSQLOrderbyItem>;
 
     function GetAsDelete: IAqDBSQLDelete;
     function GetAsInsert: IAqDBSQLInsert;
@@ -667,23 +1079,38 @@ type
     function GetSourceType: TAqDBSQLSourceType; override;
     function GetAsSelect: IAqDBSQLSelect; override;
   public
-    constructor Create(const pSource: TAqDBSQLSource; const pAlias: string = ''); overload;
+    constructor Create(const pSource: IAqDBSQLSource; const pAlias: string = ''); overload;
     constructor Create(const pSourceTable: string; const pAlias: string = ''); overload;
-    destructor Destroy; override;
 
     function GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
 
     function AddColumn(pValue: IAqDBSQLValue): Int32; overload;
-    function AddColumn(const pExpression: string; const pAlias: string = ''; pSource: IAqDBSQLSource = nil;
-      const pAggregator: TAqDBSQLAggregatorType = atNone): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; const pAlias: string): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression, pAlias: string; pSource: IAqDBSQLSource): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression, pAlias: string; pSource: IAqDBSQLSource;
+      const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; pSource: IAqDBSQLSource): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; pSource: IAqDBSQLSource;
+      const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn; overload;
+    function AddColumn(const pExpression: string; const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn; overload;
 
+    function AddJoin(pJoin: IAqDBSQLJoin): Int32; overload;
     function AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
-      pCondition: IAqDBSQLCondition): IAqDBSQLJoin;
+      pCondition: IAqDBSQLCondition): IAqDBSQLJoin; overload;
+
     function InnerJoin(const pTableName: string): IAqDBSQLJoin;
+    function LeftJoin(const pTableName: string): IAqDBSQLJoin;
 
-    function AddOrderBy(pValue: IAqDBSQLValue; const pDesc: Boolean): Int32;
+    procedure TakeSetup(pSetup: IAqDBSQLSelectSetup);
 
-    procedure UnsetLimit;
+    function AddOrderBy(pValue: IAqDBSQLValue; const pAscending: Boolean = True): Int32; overload;
+    function AddOrderBy(const pColumnName: string; const pAscending: Boolean = True): Int32; overload;
+
+    procedure ClearLimit;
+    procedure ClearOffset;
+
+    procedure Encapsulate;
   end;
 
   TAqDBSQLCommand = class(TAqDBSQLAbstraction, IAqDBSQLCommand)
@@ -709,9 +1136,9 @@ type
   TAqDBSQLInsert = class(TAqDBSQLCommand, IAqDBSQLInsert)
   strict private
     FTable: IAqDBSQLTable;
-    FAssignments: TAqList<IAqDBSQLAssignment>;
+    FAssignments: IAqList<IAqDBSQLAssignment>;
 
-    function GetAssignments: IAqReadList<IAqDBSQLAssignment>;
+    function GetAssignments: IAqReadableList<IAqDBSQLAssignment>;
     function GetTable: IAqDBSQLTable;
   strict protected
     function GetCommandType: TAqDBSQLCommandType; override;
@@ -719,7 +1146,6 @@ type
   public
     constructor Create(pTable: IAqDBSQLTable); overload;
     constructor Create(const pTableName: string); overload;
-    destructor Destroy; override;
 
     function AddAssignment(pAssignment: IAqDBSQLAssignment): Int32; overload;
     function AddAssignment(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue): IAqDBSQLAssignment; overload;
@@ -728,10 +1154,10 @@ type
   TAqDBSQLUpdate = class(TAqDBSQLCommand, IAqDBSQLUpdate)
   strict private
     FTable: IAqDBSQLTable;
-    FAssignments: TAqList<IAqDBSQLAssignment>;
+    FAssignments: IAqList<IAqDBSQLAssignment>;
     FCondition: IAqDBSQLCondition;
 
-    function GetAssignments: IAqReadList<IAqDBSQLAssignment>;
+    function GetAssignments: IAqReadableList<IAqDBSQLAssignment>;
     function GetTable: IAqDBSQLTable;
     function GetIsConditionDefined: Boolean;
     function GetCondition: IAqDBSQLCondition;
@@ -743,7 +1169,6 @@ type
   public
     constructor Create(pTable: IAqDBSQLTable); overload;
     constructor Create(const pTableName: string); overload;
-    destructor Destroy; override;
 
     function AddAssignment(pAssignment: IAqDBSQLAssignment): Int32; overload;
     function AddAssignment(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLValue): IAqDBSQLAssignment; overload;
@@ -770,7 +1195,11 @@ type
 implementation
 
 uses
-  AqDrop.Core.Exceptions;
+  System.SysUtils,
+  System.TypInfo,
+  AqDrop.Core.Helpers,
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Collections;
 
 { TAqDBSQLColumn }
 
@@ -810,9 +1239,14 @@ end;
 
 { TAqDBSQLAliasable }
 
+procedure TAqDBSQLAliasable.ClearAlias;
+begin
+  FAlias := string.Empty;
+end;
+
 constructor TAqDBSQLAliasable.Create(const pAlias: string);
 begin
-  FAlias := pAlias;
+  SetAlias(pAlias);
 end;
 
 { TAqDBSQLSubselectColumn }
@@ -888,16 +1322,51 @@ begin
   FCondition := Result;
 end;
 
+function TAqDBSQLSelect.DoGetJoins: IAqList<IAqDBSQLJoin>;
+begin
+  if not Assigned(FJoins) then
+  begin
+    FJoins := TAqList<IAqDBSQLJoin>.Create;
+  end;
+
+  Result := FJoins;
+end;
+
+procedure TAqDBSQLSelect.Encapsulate;
+var
+  lInnerSelect: TAqDBSQLSelect;
+begin
+  lInnerSelect := TAqDBSQLSelect.Create;
+
+  try
+    lInnerSelect.SetAlias('encapsultadedsource');
+    lInnerSelect.FColumns := FColumns;
+    lInnerSelect.FSource := FSource;
+    lInnerSelect.FJoins := FJoins;
+    lInnerSelect.FLimit := FLimit;
+    lInnerSelect.FOffset := FOffset;
+    lInnerSelect.FCondition := FCondition;
+    lInnerSelect.FOrderBy := FOrderBy;
+
+    Reset;
+
+    FSource := lInnerSelect;
+  except
+    lInnerSelect.Free;
+    raise;
+  end;
+end;
+
 function TAqDBSQLSelect.AddColumn(const pExpression: string; const pAlias: string; pSource: IAqDBSQLSource;
   const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn;
 begin
-  if Assigned(pSource) then
-  begin
-    Result := TAqDBSQLColumn.Create(pExpression, pSource, pAlias, pAggregator);
-  end else begin
-    Result := TAqDBSQLColumn.Create(pExpression, Self.FSource, pAlias, pAggregator);
-  end;
+  Result := TAqDBSQLColumn.Create(pExpression, pSource, pAlias, pAggregator);
   FColumns.Add(Result);
+end;
+
+function TAqDBSQLSelect.AddJoin(pJoin: IAqDBSQLJoin): Int32;
+begin
+  Result := DoGetJoins.Add(pJoin);
 end;
 
 function TAqDBSQLSelect.AddColumn(pValue: IAqDBSQLValue): Int32;
@@ -905,27 +1374,58 @@ begin
   Result := FColumns.Add(pValue);
 end;
 
+function TAqDBSQLSelect.AddColumn(const pExpression, pAlias: string; pSource: IAqDBSQLSource): IAqDBSQLColumn;
+begin
+  Result := AddColumn(pExpression, pAlias, pSource, TAqDBSQLAggregatorType.atNone);
+end;
+
+function TAqDBSQLSelect.AddColumn(const pExpression, pAlias: string): IAqDBSQLColumn;
+begin
+  Result := AddColumn(pExpression, pAlias, nil, TAqDBSQLAggregatorType.atNone);
+end;
+
+function TAqDBSQLSelect.AddColumn(const pExpression: string): IAqDBSQLColumn;
+begin
+  Result := AddColumn(pExpression, '', nil, TAqDBSQLAggregatorType.atNone);
+end;
+
+function TAqDBSQLSelect.AddColumn(const pExpression: string; const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn;
+begin
+  Result := AddColumn(pExpression, '', nil, pAggregator);
+end;
+
+function TAqDBSQLSelect.AddColumn(const pExpression: string; pSource: IAqDBSQLSource;
+  const pAggregator: TAqDBSQLAggregatorType): IAqDBSQLColumn;
+begin
+  Result := AddColumn(pExpression, '', pSource, pAggregator);
+end;
+
+function TAqDBSQLSelect.AddColumn(const pExpression: string; pSource: IAqDBSQLSource): IAqDBSQLColumn;
+begin
+  Result := AddColumn(pExpression, '', pSource, TAqDBSQLAggregatorType.atNone);
+end;
+
 function TAqDBSQLSelect.AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
   pCondition: IAqDBSQLCondition): IAqDBSQLJoin;
 begin
-  Result := TAqDBSQLJoin.Create(pType, Self.FSource, pSource, pCondition);
+  Result := TAqDBSQLJoin.Create(pType, pSource, pCondition);
 
-  if not Assigned(FJoins) then
-  begin
-    FJoins := TAqList<IAqDBSQLJoin>.Create;
-  end;
-
-  FJoins.Add(Result);
+  AddJoin(Result);
 end;
 
-function TAqDBSQLSelect.AddOrderBy(pValue: IAqDBSQLValue; const pDesc: Boolean): Int32;
+function TAqDBSQLSelect.AddOrderBy(const pColumnName: string; const pAscending: Boolean): Int32;
+begin
+  Result := AddOrderBy(TAqDBSQLColumn.Create(pColumnName, FSource), pAscending);
+end;
+
+function TAqDBSQLSelect.AddOrderBy(pValue: IAqDBSQLValue; const pAscending: Boolean): Int32;
 begin
   if not Assigned(FOrderBy) then
   begin
     FOrderBy := TAqList<IAqDBSQLOrderByItem>.Create;
   end;
 
-  Result := FOrderBy.Add(TAqDBSQLOrderByItem.Create(pValue, pDesc));
+  Result := FOrderBy.Add(TAqDBSQLOrderByItem.Create(pValue, pAscending));
 end;
 
 function TAqDBSQLSelect.GetAsDelete: IAqDBSQLDelete;
@@ -957,8 +1457,23 @@ constructor TAqDBSQLSelect.InternalCreate(const pAlias: string);
 begin
   inherited Create(pAlias);
 
+  Reset;
+end;
+
+function TAqDBSQLSelect.LeftJoin(const pTableName: string): IAqDBSQLJoin;
+begin
+  Result := AddJoin(TAqDBSQLJoinType.jtLeftJoin, TAqDBSQLTable.Create(pTableName), nil);
+end;
+
+procedure TAqDBSQLSelect.Reset;
+begin
   FColumns := TAqList<IAqDBSQLValue>.Create;
   FLimit :=  High(FLimit);
+  FOffset :=  0;
+  FSource := nil;
+  FJoins := nil;
+  FCondition := nil;
+  FOrderBy := nil;
 end;
 
 procedure TAqDBSQLSelect.SetCondition(pValue: IAqDBSQLCondition);
@@ -971,24 +1486,304 @@ begin
   FLimit := pValue;
 end;
 
-procedure TAqDBSQLSelect.UnsetLimit;
+procedure TAqDBSQLSelect.SetOffset(const pValue: UInt32);
+begin
+  FOffset := pValue;
+end;
+
+procedure TAqDBSQLSelect.TakeSetup(pSetup: IAqDBSQLSelectSetup);
+var
+  lJoinParameters: IAqDBSQLJoinParameters;
+  lJoinsByIdentifier: IAqDictionary<string, IAqDBSQLJoin>;
+  lI: Int32;
+  lJoins: IAqReadableList<IAqDBSQLJoin>;
+  lMainSource: IAqDBSQLSource;
+  lMainSourceJoin: IAqDBSQLJoin;
+  lJoinSource: IAqDBSQLTable;
+  lKnownAliases: IAqDictionary<string, IAqDBSQLSource>;
+  lAlias: string;
+  lAttempts: Int32;
+  lOnCondition: IAqDBSQLComposedCondition;
+  lMainColumn: IAqDBSQLColumn;
+  lJoinColumn: IAqDBSQLColumn;
+  lJoin: IAqDBSQLJoin;
+  lWhereCondition: IAqDBSQLComposedCondition;
+  lOrderBy: IAqDBSQLOrderByDescriptor;
+  lOrderBySource: IAqDBSQLSource;
+  lOrderByColumn: IAqDBSQLColumn;
+  lOrderByIndex: Int32;
+
+  function GetSourceByIdentifier(const pSourceIdentifier: string): IAqDBSQLSource;
+  begin
+    if pSourceIdentifier.IsEmpty then
+    begin
+      Result := FSource;
+    end else if lJoinsByIdentifier.TryGetValue(pSourceIdentifier, lJoin) then
+    begin
+      Result := lJoin.Source;
+    end else
+    begin
+      raise EAqInternal.CreateFmt('Join not found for identifier %s.', [pSourceIdentifier]);
+    end;
+  end;
+
+  function GetLinkOperator(pComposedDescriptor: IAqDBSQLComposedConditionDescriptor;
+    const pConditionIndex: Int32): TAqDBSQLBooleanOperator;
+  begin
+    if pConditionIndex <= 0 then
+    begin
+      Result := TAqDBSQLBooleanOperator.boAnd;
+    end else begin
+      Result := pComposedDescriptor.LinkOperators[pConditionIndex - 1];
+    end;
+  end;
+
+  procedure AddConditionByDescriptor(pWhereCondition: IAqDBSQLComposedCondition;
+    pDescriptor: IAqDBSQLConditionDescriptor;
+    const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd);
+  var
+    lComparisonDescriptor: IAqDBSQLSimpleComparisonDescriptor;
+    lLikeDescriptor: IAqDBSQLLikeDescriptor;
+    lNewCondition: IAqDBSQLCondition;
+    lNewComposedCondition: IAqDBSQLComposedCondition;
+    lComposedDescriptor: IAqDBSQLComposedConditionDescriptor;
+    lBetweenDescriptor: IAqDBSQLBetweenDescriptor;
+    lInDescriptor: IAqDBSQLInDescriptor;
+    lInCondition: IAqDBSQLInCondition;
+    lInValue: IAqDBSQLConstant;
+    lIsNullDescriptor: IAqDBSQLIsNullDescriptor;
+    lIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor;
+    lI: Int32;
+  begin
+    case pDescriptor.ConditionDescriptorType of
+      cdComposed:
+        begin
+          lNewCondition := TAqDBSQLComposedCondition.Create;
+          lNewComposedCondition := lNewCondition.GetAsComposed;
+          lComposedDescriptor := pDescriptor.GetAsComposedConditionDescriptor;
+
+          for lI := 0 to lComposedDescriptor.Count - 1 do
+          begin
+            AddConditionByDescriptor(lNewComposedCondition, lComposedDescriptor.Items[lI],
+              GetLinkOperator(lComposedDescriptor, lI));
+          end;
+        end;
+      cdComparison:
+        begin
+          lComparisonDescriptor := pDescriptor.GetAsSimpleComparisonDescriptor;
+          lNewCondition := TAqDBSQLComparisonCondition.Create(
+            TAqDBSQLColumn.Create(lComparisonDescriptor.ColumnName,
+            GetSourceByIdentifier(lComparisonDescriptor.SourceIdentifier)),
+            lComparisonDescriptor.Comparison,
+            lComparisonDescriptor.ComparisonValue);
+        end;
+      cdBetween:
+        begin
+          lBetweenDescriptor := pDescriptor.GetAsBetweenDescriptor;
+          lNewCondition := TAqDBSQLBetweenCondition.Create(
+            TAqDBSQLColumn.Create(lBetweenDescriptor.ColumnName,
+            GetSourceByIdentifier(lBetweenDescriptor.SourceIdentifier)),
+            lBetweenDescriptor.LeftBoundaryValue,
+            lBetweenDescriptor.RightBoundaryValue);
+        end;
+      cdLike:
+        begin
+          lLikeDescriptor := pDescriptor.GetAsLikeDescriptor;
+          lNewCondition := TAqDBSQLLikeCondition.Create(
+            TAqDBSQLColumn.Create(lLikeDescriptor.ColumnName, GetSourceByIdentifier(lLikeDescriptor.SourceIdentifier)),
+            lLikeDescriptor.LikeValue);
+        end;
+      cdIn:
+        begin
+          lInDescriptor := pDescriptor.GetAsInDescriptor;
+          lInCondition := TAqDBSQLInCondition.Create(
+            TAqDBSQLColumn.Create(lInDescriptor.ColumnName, GetSourceByIdentifier(lInDescriptor.SourceIdentifier)));
+
+          for lInValue in lInDescriptor.InValues do
+          begin
+            lInCondition.AddInValue(lInValue);
+          end;
+
+          lNewCondition := lInCondition;
+        end;
+      cdIsNull:
+        begin
+          lIsNullDescriptor := pDescriptor.GetAsIsNullDescriptor;
+          lNewCondition := TAqDBSQLValueIsNullCondition.Create(
+            TAqDBSQLColumn.Create(lIsNullDescriptor.ColumnName,
+            GetSourceByIdentifier(lIsNullDescriptor.SourceIdentifier)));
+        end;
+      cdIsNotNull:
+        begin
+          {TODO 3 -oTatu -cVerificar: verificar se é melhor criar uma condição específca para 'is not null' e respectivo solver, ou o not na frente tem mesmo efeito e performance}
+          lIsNotNullDescriptor := pDescriptor.GetAsIsNotNullDescriptor;
+          lNewCondition := TAqDBSQLValueIsNullCondition.Create(
+            TAqDBSQLColumn.Create(lIsNotNullDescriptor.ColumnName,
+            GetSourceByIdentifier(lIsNotNullDescriptor.SourceIdentifier)));
+          lNewCondition.Negate;
+        end;
+    end;
+
+    if pDescriptor.IsNegated then
+    begin
+      lNewCondition.Negate;
+    end;
+
+    pWhereCondition.AddCondition(pLinkOperator, lNewCondition);
+  end;
+begin
+  if Assigned(pSetup) then
+  begin
+    lWhereCondition := nil;
+
+    if pSetup.IsCustomConditionDefied then
+    begin
+      CustomizeCondition(pSetup.CustomCondition);
+    end;
+
+    if pSetup.HasJoinsParameters then
+    begin
+      lJoinsByIdentifier := TAqDictionary<string, IAqDBSQLJoin>.Create;
+
+      for lJoinParameters in pSetup.JoinsParameters do
+      begin
+        if (lJoinParameters.MainColumns.Count <= 0) or
+          (lJoinParameters.MainColumns.Count <> lJoinParameters.JoinColumns.Count) then
+        begin
+          raise EAqInternal.Create('Invalid number of columns in the join parameter.');
+        end;
+
+        lJoins := GetJoins;
+        if lJoins.Find(
+          function(pItem: IAqDBSQLJoin): Boolean
+          begin
+            Result := pItem.Identifier = lJoinParameters.Identifier;
+          end, lI) then
+        begin
+          lJoinsByIdentifier.AddOrSetValue(lJoinParameters.Identifier, lJoins[lI]);
+          lJoin := lJoins[lI];
+        end else begin
+          if not Assigned(lJoinParameters.MainSourceJoin) then
+          begin
+            lMainSource := FSource;
+            lMainSourceJoin := nil;
+          end else begin
+            if not lJoinsByIdentifier.TryGetValue(lJoinParameters.MainSourceJoin.Identifier, lMainSourceJoin) then
+            begin
+              raise EAqInternal.Create('Previous join not found.');
+            end;
+
+            lMainSource := lMainSourceJoin.Source;
+          end;
+
+          lKnownAliases := GetSourcesAliases;
+
+          lAlias := lJoinParameters.JoinTable;
+          lAttempts := 1;
+          while lKnownAliases.ContainsKey(lAlias) do
+          begin
+            Inc(lAttempts);
+            lAlias := lJoinParameters.JoinTable + lAttempts.ToString;
+          end;
+
+          lJoinSource := TAqDBSQLTable.Create(lJoinParameters.JoinTable, lAlias);
+          lKnownAliases.Add(lAlias, lJoinSource);
+
+          lOnCondition := TAqDBSQLComposedCondition.Create;
+
+          for lI := 0 to lJoinParameters.MainColumns.Count - 1 do
+          begin
+            lMainColumn := TAqDBSQLColumn.Create(lJoinParameters.MainColumns[lI], lMainSource);
+            lJoinColumn := TAqDBSQLColumn.Create(lJoinParameters.JoinColumns[lI], lJoinSource);
+
+            lOnCondition.AddColumnEqual(lMainColumn, lJoinColumn);
+          end;
+
+          if Assigned(lMainSourceJoin) then
+          begin
+            lJoin := TAqDBSQLJoin.Create(lJoinParameters.JoinType, lMainSourceJoin, lJoinSource, lOnCondition);
+          end else begin
+            lJoin := TAqDBSQLJoin.Create(lJoinParameters.JoinType, lJoinSource, lOnCondition);
+          end;
+
+          AddJoin(lJoin);
+
+          lJoinsByIdentifier.AddOrSetValue(lJoinParameters.Identifier, lJoin);
+        end;
+      end;
+    end;
+
+    if pSetup.HasConditionDescriptors then
+    begin
+      AddConditionByDescriptor(Self.CustomizeCondition, pSetup.ConditionDescriptors);
+    end;
+
+    if pSetup.HasOrderBy then
+    begin
+      for lOrderBy in pSetup.OrderByList do
+      begin
+        lOrderBySource := GetSourceByIdentifier(lOrderBy.SourceIdentifier);
+
+        if Assigned(FOrderBy) and FOrderBy.Find(
+          function(pItem: IAqDBSQLOrderByItem): Boolean
+          begin
+            Result := (pItem.Value.ValueType = TAqDBSQLValueType.vtColumn) and
+              (pItem.Value.GetAsColumn.Expression = lOrderBy.ColumnName) and
+              (pItem.Value.GetAsColumn.Source = lOrderBySource);
+          end, lOrderByIndex) then
+        begin
+          lOrderByColumn := FOrderBy[lOrderByIndex].Value.GetAsColumn;
+        end else begin
+          lOrderByColumn := TAqDBSQLColumn.Create(lOrderBy.ColumnName, lOrderBySource);
+          lOrderByIndex := AddOrderBy(lOrderByColumn, lOrderBy.Ascending);
+        end;
+
+        if lOrderBy.ColumnShouldBeReturnedAsResult then
+        begin
+          if FColumns.Find(
+            function(pItem: IAqDBSQLValue): Boolean
+            begin
+              Result := (pItem = lOrderByColumn) or ((pItem.ValueType = TAqDBSQLValueType.vtColumn) and
+                (pItem.GetAsColumn.Expression = lOrderByColumn.Expression) and
+                (pItem.GetAsColumn.Source = lOrderByColumn.Source));
+            end, lI) then
+          begin
+            lOrderByColumn := FColumns[lI].GetAsColumn;
+          end else begin
+            FColumns.Add(lOrderByColumn);
+          end;
+
+          if not lOrderByColumn.IsAliasDefined then
+          begin
+            if (lOrderByColumn.Source = FSource) then
+            begin
+              lOrderByColumn.SetAlias(lOrderByColumn.Expression);
+            end else begin
+              lOrderByColumn.SetAlias('__INJECTED_ORDER_BY_' + lOrderByIndex.ToString);
+            end;
+          end;
+        end;
+
+        lOrderBy.SetGeneratedColumn(lOrderByColumn);
+      end;
+    end;
+  end;
+end;
+
+procedure TAqDBSQLSelect.ClearLimit;
 begin
   FLimit := High(FLimit);
 end;
 
-constructor TAqDBSQLSelect.Create(const pSource: TAqDBSQLSource; const pAlias: string);
+procedure TAqDBSQLSelect.ClearOffset;
+begin
+  FOffset := 0;
+end;
+
+constructor TAqDBSQLSelect.Create(const pSource: IAqDBSQLSource; const pAlias: string);
 begin
   InternalCreate(pAlias);
   FSource := pSource;
-end;
-
-destructor TAqDBSQLSelect.Destroy;
-begin
-  FOrderBy.Free;
-  FJoins.Free;
-  FColumns.Free;
-
-  inherited;
 end;
 
 function TAqDBSQLSelect.GetColumnByExpression(const pExpression: string): IAqDBSQLColumn;
@@ -1010,14 +1805,48 @@ begin
   end;
 end;
 
-function TAqDBSQLSelect.GetColumns: IAqReadList<IAqDBSQLValue>;
+function TAqDBSQLSelect.GetColumns: IAqReadableList<IAqDBSQLValue>;
 begin
-  Result := FColumns.GetIReadList;
+  Result := FColumns.GetReadOnlyList;
 end;
 
 function TAqDBSQLSelect.GetSource: IAqDBSQLSource;
 begin
   Result := FSource;
+end;
+
+function TAqDBSQLSelect.GetSourcesAliases: IAqDictionary<string, IAqDBSQLSource>;
+var
+  lJoin: IAqDBSQLJoin;
+begin
+  Result := TAqDictionary<string, IAqDBSQLSource>.Create;
+
+  if Assigned(FSource) then
+  begin
+    if not FSource.IsAliasDefined then
+    begin
+      if FSource.SourceType = TAqDBSQLSourceType.stTable then
+      begin
+        FSource.SetAlias(FSource.GetAsTable.Name);
+      end else begin
+        raise EAqInternal.CreateFmt('This source type (%s) should have an alias.',
+          [GetEnumName(TypeInfo(TAqDBSQLSourceType), Integer(FSource.SourceType))]);
+      end;
+    end;
+
+    Result.Add(FSource.Alias, FSource);
+  end;
+
+  if GetHasJoins then
+  begin
+    for lJoin in GetJoins do
+    begin
+      if lJoin.Source.IsAliasDefined then
+      begin
+        Result.Add(lJoin.Source.Alias, lJoin.Source);
+      end;
+    end;
+  end;
 end;
 
 function TAqDBSQLSelect.GetCommandType: TAqDBSQLCommandType;
@@ -1045,14 +1874,19 @@ begin
   Result := FLimit <> High(FLimit);
 end;
 
+function TAqDBSQLSelect.GetIsOffsetDefined: Boolean;
+begin
+  Result := FOffset > 0;
+end;
+
 function TAqDBSQLSelect.GetIsOrderByDefined: Boolean;
 begin
   Result := Assigned(FOrderBy) and (FOrderBy.Count > 0);
 end;
 
-function TAqDBSQLSelect.GetJoins: IAqReadList<IAqDBSQLJoin>;
+function TAqDBSQLSelect.GetJoins: IAqReadableList<IAqDBSQLJoin>;
 begin
-  Result := FJoins.GetIReadList;
+  Result := DoGetJoins.GetReadOnlyList;
 end;
 
 function TAqDBSQLSelect.GetLimit: UInt32;
@@ -1060,9 +1894,14 @@ begin
   Result := FLimit;
 end;
 
-function TAqDBSQLSelect.GetOrderBy: IAqReadList<IAqDBSQLOrderByItem>;
+function TAqDBSQLSelect.GetOffset: UInt32;
 begin
-  Result := FOrderBy.GetIReadList;
+  Result := FOffset;
+end;
+
+function TAqDBSQLSelect.GetOrderBy: IAqReadableList<IAqDBSQLOrderByItem>;
+begin
+  Result := FOrderBy.GetReadOnlyList;
 end;
 
 function TAqDBSQLSelect.GetSourceType: TAqDBSQLSourceType;
@@ -1161,7 +2000,28 @@ end;
 
 function TAqDBSQLAliasable.GetIsAliasDefined: Boolean;
 begin
-  Result := FAlias <> '';
+  Result := not FAlias.IsEmpty;
+end;
+
+procedure TAqDBSQLAliasable.SetAlias(const pAlias: string);
+begin
+  FAlias := pAlias;
+end;
+
+class function TAqDBSQLValue.FromValue(const pValue: TValue; const pType: TAqDataType): TAqDBSQLValue;
+begin
+  {TODO 3 -oTatu -cDesejável: criar overloads no drop para aceitar fluent sintax com tvalue como parâmetro}
+  case pType of
+    TAqDataType.adtUInt8..TAqDataType.adtInt64:
+      Result := TAqDBSQLIntConstant.Create(pValue.AsInt64);
+    TAqDataType.adtString:
+      Result := TAqDBSQLTextConstant.Create(pValue.AsString);
+    TAqDataType.adtDate:
+      Result := TAqDBSQLDateConstant.Create(pValue.AsType<TDate>);
+  else
+    raise EAqInternal.CreateFmt('Unexpected type when converting TValue to IAqDBSQLValue (%d).',
+      [Int32(pType)]);
+  end;
 end;
 
 function TAqDBSQLValue.GetAggregator: TAqDBSQLAggregatorType;
@@ -1241,40 +2101,79 @@ begin
   Result := FValue;
 end;
 
-{ TAqDBSQLAbstraction }
-
-class function TAqDBSQLAbstraction.MustCountReferences: Boolean;
-begin
-  Result := True;
-end;
-
 { TAqDBSQLJoin }
 
 function TAqDBSQLJoin.&On(const pColumnName: string): IAqDBSQLJoin;
+var
+  lComposedCondition: IAqDBSQLComposedCondition;
 begin
-  FCondition := TAqDBSQLComparisonCondition.Create(TAqDBSQLColumn.Create(pColumnName, FJoinSource),
-    TAqDBSQLComparison.cpEqual, nil);
+  if Assigned(FCondition) then
+  begin
+    if FCondition.ConditionType <> TAqDBSQLConditionType.ctComposed then
+    begin
+      raise EAqInternal.Create('Unexpected condition type in ' + Self.QualifiedClassName);
+    end;
+    lComposedCondition := FCondition.GetAsComposed;
+  end else
+  begin
+    lComposedCondition := TAqDBSQLComposedCondition.Create;
+    FCondition := lComposedCondition;
+  end;
+
+  lComposedCondition.AddAnd(TAqDBSQLComparisonCondition.Create(
+    TAqDBSQLColumn.Create(pColumnName, FJoinSource), TAqDBSQLComparison.cpEqual, nil));
   Result := Self;
 end;
 
-constructor TAqDBSQLJoin.Create(const pType: TAqDBSQLJoinType; pMainSource: IAqDBSQLSource; pJoinSource: IAqDBSQLSource;
+constructor TAqDBSQLJoin.Create(const pType: TAqDBSQLJoinType; pJoinSource: IAqDBSQLSource;
   pCondition: IAqDBSQLCondition);
+begin
+  Create(pType, pJoinSource);
+
+  FCondition := pCondition;
+end;
+
+constructor TAqDBSQLJoin.Create(const pType: TAqDBSQLJoinType; pPreviousJoin: IAqDBSQLJoin; pJoinSource: IAqDBSQLSource;
+  pCondition: IAqDBSQLCondition);
+begin
+  Create(pType, pJoinSource, pCondition);
+
+  FPreviousJoin := pPreviousJoin;
+end;
+
+function TAqDBSQLJoin.EqualsTo(pValue: IAqDBSQLValue): IAqDBSQLJoin;
+var
+  lConditions: IAqReadableList<IAqDBSQLCondition>;
+begin
+  if not Assigned(FCondition) or (FCondition.ConditionType <> TAqDBSQLConditionType.ctComposed) then
+  begin
+    raise EAqInternal.Create('Unexpected condition in ' + Self.QualifiedClassName);
+  end;
+
+  lConditions := FCondition.GetAsComposed.Conditions;
+
+  if (lConditions.Count = 0) or (lConditions.Last.ConditionType <> TAqDBSQLConditionType.ctComparison) then
+  begin
+    raise EAqInternal.Create('Unexpected condition type in ' + Self.QualifiedClassName);
+  end;
+
+  lConditions.Last.GetAsComparison.RightValue := pValue;
+
+  Result := Self;
+end;
+
+constructor TAqDBSQLJoin.Create(const pType: TAqDBSQLJoinType; pJoinSource, pMainSource: IAqDBSQLSource);
 begin
   inherited Create;
 
-  FMainSource := pMainSource;
+  FType := pType;
   FJoinSource := pJoinSource;
-  FCondition := pCondition;
+  FMainSource := pMainSource;
 end;
 
 function TAqDBSQLJoin.EqualsTo(const pColumnName: string): IAqDBSQLJoin;
 begin
-  if (FCondition.ConditionType = TAqDBSQLConditionType.ctComparison) then
-  begin
-    FCondition.GetAsComparison.RightValue := TAqDBSQLColumn.Create(pColumnName, FMainSource);
-  end;
-
-  Result := Self;
+  Result := EqualsTo(TAqDBSQLColumn.Create(pColumnName, GetMainSource));
 end;
 
 function TAqDBSQLJoin.GetCondition: IAqDBSQLCondition;
@@ -1282,9 +2181,100 @@ begin
   Result := FCondition;
 end;
 
+function TAqDBSQLJoin.GetHasPreviousJoin: Boolean;
+begin
+  Result := Assigned(FPreviousJoin);
+end;
+
+function TAqDBSQLJoin.GetIdentifier: string;
+  procedure RaiseNotPossibleToMountIdentifier;
+  begin
+    raise EAqInternal.Create('It wasn''t possible to mount the join identifier.');
+  end;
+
+  function GetIdentifierFromComparison(pComparison: IAqDBSQLComparisonCondition): string;
+  begin
+    if (pComparison.LeftValue.ValueType = TAqDBSQLValueType.vtColumn) and
+      (pComparison.Comparison = TAqDBSQLComparison.cpEqual) and
+      (pComparison.RightValue.ValueType = TAqDBSQLValueType.vtColumn) then
+    begin
+      Result := pComparison.LeftValue.GetAsColumn.Expression + '=' + pComparison.RightValue.GetAsColumn.Expression;
+    end else begin
+      Result := '';
+    end;
+
+    Result := Result + '|';
+  end;
+
+  function GetIdentifierFromComposedCondition(pComposedCondition: IAqDBSQLComposedCondition): string;
+  var
+    lCondition: IAqDBSQLCondition;
+  begin
+    Result := '';
+
+    for lCondition in pComposedCondition.Conditions do
+    begin
+      if lCondition.ConditionType = TAqDBSQLConditionType.ctComparison then
+      begin
+        Result := Result + GetIdentifierFromComparison(lCondition.GetAsComparison);
+      end else begin
+        RaiseNotPossibleToMountIdentifier;
+      end;
+    end;
+  end;
+begin
+  case FType of
+    jtInnerJoin:
+      Result := '(i)';
+    jtLeftJoin:
+      Result := '(l)';
+  else
+    raise EAqInternal.Create('Unexpected join type while trying to generate the join identifier.');
+  end;
+
+  if Assigned(FPreviousJoin) then
+  begin
+    Result := Result + FPreviousJoin.Identifier + '|';
+  end;
+
+  if Assigned(FCondition) then
+  begin
+    case FCondition.ConditionType of
+      ctComparison:
+        Result := GetIdentifierFromComparison(FCondition.GetAsComparison);
+      ctComposed:
+        Result := GetIdentifierFromComposedCondition(FCondition.GetAsComposed);
+    else
+      RaiseNotPossibleToMountIdentifier;
+    end;
+  end;
+
+  if FJoinSource.SourceType = stTable then
+  begin
+    Result := (Result + FJoinSource.GetAsTable.Name).ToUpper;
+  end else begin
+    RaiseNotPossibleToMountIdentifier;
+  end
+end;
+
 function TAqDBSQLJoin.GetJoinType: TAqDBSQLJoinType;
 begin
   Result := FType;
+end;
+
+function TAqDBSQLJoin.GetMainSource: IAqDBSQLSource;
+begin
+  if GetHasPreviousJoin then
+  begin
+    Result := FPreviousJoin.Source;
+  end else begin
+    Result := FMainSource;
+  end;
+end;
+
+function TAqDBSQLJoin.GetPreviousJoin: IAqDBSQLJoin;
+begin
+  Result := FPreviousJoin;
 end;
 
 function TAqDBSQLJoin.GetSource: IAqDBSQLSource;
@@ -1300,115 +2290,127 @@ begin
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDateTime;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn;
+  const pLeftBoundary, pRightBoundary: TDateTime;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLDateTimeConstant.Create(pRangeBegin), TAqDBSQLDateTimeConstant.Create(pRangeEnd)));
+    TAqDBSQLDateTimeConstant.Create(pLeftBoundary), TAqDBSQLDateTimeConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDateTime;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: TDateTime;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Currency;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn;
+  const pLeftBoundary, pRightBoundary: Currency;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLCurrencyConstant.Create(pRangeBegin), TAqDBSQLCurrencyConstant.Create(pRangeEnd)));
+    TAqDBSQLCurrencyConstant.Create(pLeftBoundary), TAqDBSQLCurrencyConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Currency;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: Currency;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TTime;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TTime;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLTimeConstant.Create(pRangeBegin), TAqDBSQLTimeConstant.Create(pRangeEnd)));
+    TAqDBSQLTimeConstant.Create(pLeftBoundary), TAqDBSQLTimeConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TTime;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: TTime;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: TDate;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: TDate;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLDateConstant.Create(pRangeBegin), TAqDBSQLDateConstant.Create(pRangeEnd)));
+    TAqDBSQLDateConstant.Create(pLeftBoundary), TAqDBSQLDateConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: TDate;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: TDate;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: string;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn;
+  const pLeftBoundary, pRightBoundary: string;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLTextConstant.Create(pRangeBegin), TAqDBSQLTextConstant.Create(pRangeEnd)));
+    TAqDBSQLTextConstant.Create(pLeftBoundary), TAqDBSQLTextConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName, pRangeBegin, pRangeEnd: string;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName, pLeftBoundary, pRightBoundary: string;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin,
-  pRangeEnd: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn;
+  const pLeftBoundary, pRightBoundary: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn, pRangeBegin, pRangeEnd));
+  AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn, pLeftBoundary, pRightBoundary));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin,
-  pRangeEnd: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Double;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn;
+  const pLeftBoundary, pRightBoundary: Double;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLDoubleConstant.Create(pRangeBegin), TAqDBSQLDoubleConstant.Create(pRangeEnd)));
+    TAqDBSQLDoubleConstant.Create(pLeftBoundary), TAqDBSQLDoubleConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Double;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: Double;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pRangeBegin, pRangeEnd: Int64;
+function TAqDBSQLComposedCondition.AddColumnBetween(pColumn: IAqDBSQLColumn; const pLeftBoundary, pRightBoundary: Int64;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   AddCondition(pLinkOperator, TAqDBSQLBetweenCondition.Create(pColumn,
-    TAqDBSQLIntConstant.Create(pRangeBegin), TAqDBSQLIntConstant.Create(pRangeEnd)));
+    TAqDBSQLIntConstant.Create(pLeftBoundary), TAqDBSQLIntConstant.Create(pRightBoundary)));
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string; const pRangeBegin, pRangeEnd: Int64;
+function TAqDBSQLComposedCondition.AddColumnBetween(const pColumnName: string;
+  const pLeftBoundary, pRightBoundary: Int64;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pRangeBegin, pRangeEnd, pLinkOperator);
+  Result := AddColumnBetween(TAqDBSQLColumn.Create(pColumnName), pLeftBoundary, pRightBoundary, pLinkOperator);
 end;
 
 function TAqDBSQLComposedCondition.AddColumnEqual(const pColumnName: string; pValue: TDateTime;
@@ -1888,7 +2890,8 @@ end;
 function TAqDBSQLComposedCondition.AddColumnLessEqualThan(const pColumnName: string; pValue: TTime;
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
-  Result := AddColumnLessEqualThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+  {TODO 3 -oTatu -cMelhoria: trocar todas as implementações de comparações específicas por um addcomparison e devidos parâmetros, como abaixo.}
+  Result := AddComparison(pColumnName, TAqDBSQLComparison.cpLessEqual, pValue, pLinkOperator);
 end;
 
 function TAqDBSQLComposedCondition.AddColumnLessEqualThan(pColumn: IAqDBSQLColumn; pValue: TTime;
@@ -1973,6 +2976,36 @@ function TAqDBSQLComposedCondition.AddColumnLessThan(const pColumnName: string; 
   const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
 begin
   Result := AddColumnLessThan(TAqDBSQLColumn.Create(pColumnName), pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(pColumn: IAqDBSQLColumn; const pValue: string;
+  const pLeftWildCard: TAqDBSQLLikeWildCard; const pRightWildCard: TAqDBSQLLikeWildCard;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(pColumn, TAqDBSQLTextConstant.Create(pValue), pLeftWildCard, pRightWildCard, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(const pColumnName: string; pValue: IAqDBSQLTextConstant;
+  const pLeftWildCard: TAqDBSQLLikeWildCard; const pRightWildCard: TAqDBSQLLikeWildCard;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(TAqDBSQLColumn.Create(pColumnName), pValue, pLeftWildCard, pRightWildCard, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLTextConstant;
+  const pLeftWildCard: TAqDBSQLLikeWildCard; const pRightWildCard: TAqDBSQLLikeWildCard;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLLikeCondition.Create(pColumn, pValue, pLeftWildCard, pRightWildCard));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(const pColumnName, pValue: string;
+  const pLeftWildCard: TAqDBSQLLikeWildCard; const pRightWildCard: TAqDBSQLLikeWildCard;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(TAqDBSQLColumn.Create(pColumnName), TAqDBSQLTextConstant.Create(pValue),
+    pLeftWildCard, pRightWildCard, pLinkOperator);
 end;
 
 function TAqDBSQLComposedCondition.AddColumnLessThan(pColumn: IAqDBSQLColumn; pValue: TDate;
@@ -2083,22 +3116,14 @@ begin
   end;
 end;
 
-destructor TAqDBSQLComposedCondition.Destroy;
-begin
-  FOperators.Free;
-  FConditions.Free;
-
-  inherited;
-end;
-
 function TAqDBSQLComposedCondition.GetAsComposed: IAqDBSQLComposedCondition;
 begin
   Result := Self;
 end;
 
-function TAqDBSQLComposedCondition.GetConditions: IAqReadList<AqDrop.DB.SQL.Intf.IAqDBSQLCondition>;
+function TAqDBSQLComposedCondition.GetConditions: IAqReadableList<AqDrop.DB.SQL.Intf.IAqDBSQLCondition>;
 begin
-  Result := FConditions.GetIReadList;
+  Result := FConditions.GetReadOnlyList;
 end;
 
 function TAqDBSQLComposedCondition.GetConditionType: TAqDBSQLConditionType;
@@ -2111,9 +3136,185 @@ begin
   Result := FConditions.Count > 0;
 end;
 
-function TAqDBSQLComposedCondition.GetLinkOperators: IAqReadList<AqDrop.DB.SQL.Intf.TAqDBSQLBooleanOperator>;
+function TAqDBSQLComposedCondition.GetLinkOperators: IAqReadableList<AqDrop.DB.SQL.Intf.TAqDBSQLBooleanOperator>;
 begin
-  Result := FOperators.GetIReadList;
+  Result := FOperators.GetReadOnlyList;
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(pColumn: IAqDBSQLColumn; const pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(pColumn, TAqDBSQLTextConstant.Create(pValue),
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(pColumn: IAqDBSQLColumn; pValue: IAqDBSQLTextConstant;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(pColumn, pValue,
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(const pColumnName, pValue: string;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(TAqDBSQLColumn.Create(pColumnName),
+    TAqDBSQLTextConstant.Create(pValue),
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: UInt64; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLUIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: Int64; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: UInt64; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: Double; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: Double; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLDoubleConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator, TAqDBSQLComparisonCondition.Create(pColumn, pComparison, pValue));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: string; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLTextConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: Int64; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLIntConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: string; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: TTime; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: TDate; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: TTime; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: Boolean; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: Boolean; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLBooleanConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: Currency; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: Currency; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLCurrencyConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: TDateTime; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLDateTimeConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(pColumn: IAqDBSQLColumn; const pComparison: TAqDBSQLComparison;
+  pValue: TDate; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  AddCondition(pLinkOperator,
+    TAqDBSQLComparisonCondition.Create(pColumn, pComparison, TAqDBSQLDateConstant.Create(pValue)));
+  Result := Self;
+end;
+
+function TAqDBSQLComposedCondition.AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pValue: TDateTime; const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddComparison(TAqDBSQLColumn.Create(pColumnName), pComparison, pValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedCondition.AddColumnLike(const pColumnName: string; pValue: IAqDBSQLTextConstant;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedCondition;
+begin
+  Result := AddColumnLike(TAqDBSQLColumn.Create(pColumnName), pValue,
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    TAqDBSQLLikeWildCard.lwcMultipleChars,
+    pLinkOperator);
 end;
 
 { TAqDBSQLCondition }
@@ -2121,7 +3322,7 @@ end;
 function TAqDBSQLCondition.GetAsBetween: IAqDBSQLBetweenCondition;
 begin
   raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
-    ' cannot be consumed as IAqDBSQLComparisonCondition.');
+    ' cannot be consumed as IAqDBSQLBetweenCondition.');
 end;
 
 function TAqDBSQLCondition.GetAsComparison: IAqDBSQLComparisonCondition;
@@ -2136,10 +3337,32 @@ begin
     ' cannot be consumed as IAqDBSQLComposedCondition.');
 end;
 
+function TAqDBSQLCondition.GetAsIn: IAqDBSQLInCondition;
+begin
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLInCondition.');
+end;
+
+function TAqDBSQLCondition.GetAsLike: IAqDBSQLLikeCondition;
+begin
+  raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
+    ' cannot be consumed as IAqDBSQLLikeCondition.');
+end;
+
 function TAqDBSQLCondition.GetAsValueIsNull: IAqDBSQLValueIsNullCondition;
 begin
   raise EAqInternal.Create('Objects of type ' + Self.QualifiedClassName +
     ' cannot be consumed as IAqDBSQLValueIsNullCondition.');
+end;
+
+procedure TAqDBSQLCondition.Negate;
+begin
+  FNegated := not FNegated;
+end;
+
+function TAqDBSQLCondition.VerifyIfIsNegated: Boolean;
+begin
+  Result := FNegated;
 end;
 
 { TAqDBSQLCommand }
@@ -2188,21 +3411,14 @@ begin
   Create(TAqDBSQLTable.Create(pTableName));
 end;
 
-destructor TAqDBSQLInsert.Destroy;
-begin
-  FAssignments.Free;
-
-  inherited;
-end;
-
 function TAqDBSQLInsert.GetAsInsert: IAqDBSQLInsert;
 begin
   Result := Self;
 end;
 
-function TAqDBSQLInsert.GetAssignments: IAqReadList<IAqDBSQLAssignment>;
+function TAqDBSQLInsert.GetAssignments: IAqReadableList<IAqDBSQLAssignment>;
 begin
-  Result := FAssignments.GetIReadList;
+  Result := FAssignments.GetReadOnlyList;
 end;
 
 function TAqDBSQLInsert.GetCommandType: TAqDBSQLCommandType;
@@ -2260,11 +3476,11 @@ end;
 
 { TAqDBSQLBetweenCondition }
 
-constructor TAqDBSQLBetweenCondition.Create(pValue, pRangeBegin, pRangeEnd: IAqDBSQLValue);
+constructor TAqDBSQLBetweenCondition.Create(pValue, pLeftBoundary, pRightBoundary: IAqDBSQLValue);
 begin
   FValue := pValue;
-  FRangeBegin := pRangeBegin;
-  FRangeEnd := pRangeEnd;
+  FLeftBoundary := pLeftBoundary;
+  FRightBoundary := pRightBoundary;
 end;
 
 function TAqDBSQLBetweenCondition.GetAsBetween: IAqDBSQLBetweenCondition;
@@ -2277,14 +3493,14 @@ begin
   Result := TAqDBSQLConditionType.ctBetween;
 end;
 
-function TAqDBSQLBetweenCondition.GetRangeEnd: IAqDBSQLValue;
+function TAqDBSQLBetweenCondition.GetRightBoundary: IAqDBSQLValue;
 begin
-  Result := FRangeEnd;
+  Result := FRightBoundary;
 end;
 
-function TAqDBSQLBetweenCondition.GetRangeBegin: IAqDBSQLValue;
+function TAqDBSQLBetweenCondition.GetLeftBoundary: IAqDBSQLValue;
 begin
-  Result := FRangeBegin;
+  Result := FLeftBoundary;
 end;
 
 function TAqDBSQLBetweenCondition.GetValue: IAqDBSQLValue;
@@ -2452,22 +3668,15 @@ begin
   FCondition := Result;
 end;
 
-destructor TAqDBSQLUpdate.Destroy;
-begin
-  FAssignments.Free;
-
-  inherited;
-end;
-
 constructor TAqDBSQLUpdate.Create(pTable: IAqDBSQLTable);
 begin
   FTable := pTable;
   FAssignments := TAqList<IAqDBSQLAssignment>.Create;
 end;
 
-function TAqDBSQLUpdate.GetAssignments: IAqReadList<IAqDBSQLAssignment>;
+function TAqDBSQLUpdate.GetAssignments: IAqReadableList<IAqDBSQLAssignment>;
 begin
-  Result := FAssignments.GetIReadList;
+  Result := FAssignments.GetReadOnlyList;
 end;
 
 function TAqDBSQLUpdate.GetAsUpdate: IAqDBSQLUpdate;
@@ -2573,6 +3782,11 @@ begin
   Result := FValue;
 end;
 
+procedure TAqDBSQLGenericConstant<T>.SetValue(const pValue: T);
+begin
+  FValue := pValue;
+end;
+
 { TAqDBSQLIntConstant }
 
 function TAqDBSQLIntConstant.GetAsIntConstant: IAqDBSQLIntConstant;
@@ -2623,20 +3837,891 @@ end;
 
 { TAqDBSQLOderByItem }
 
-constructor TAqDBSQLOrderByItem.Create(pValue: IAqDBSQLValue; const pDesc: Boolean);
+constructor TAqDBSQLOrderByItem.Create(pValue: IAqDBSQLValue; const pAscending: Boolean);
 begin
   FValue := pValue;
-  FDesc := pDesc;
+  FAscending := pAscending;
 end;
 
-function TAqDBSQLOrderByItem.GetDesc: Boolean;
+function TAqDBSQLOrderByItem.GetIsAscending: Boolean;
 begin
-  Result := FDesc;
+  Result := FAscending;
 end;
 
 function TAqDBSQLOrderByItem.GetValue: IAqDBSQLValue;
 begin
   Result := FValue;
+end;
+
+{ TAqDBSQLLikeCondition }
+
+constructor TAqDBSQLLikeCondition.Create(pLeftValue: IAqDBSQLValue; pRightValue: IAqDBSQLTextConstant;
+  const pLeftWildCard: TAqDBSQLLikeWildCard; const pRightWildCard: TAqDBSQLLikeWildCard);
+begin
+  FLeftValue := pLeftValue;
+  FRightValue := pRightValue;
+  FLeftWildCard := pLeftWildCard;
+  FRightWildCard := pRightWildCard;
+end;
+
+constructor TAqDBSQLLikeCondition.Create(pLeftValue, pRightValue: string; const pLeftWildCard,
+  pRightWildCard: TAqDBSQLLikeWildCard);
+begin
+  Create(TAqDBSQLColumn.Create(pLeftValue), TAqDBSQLTextConstant.Create(pRightValue), pLeftWildCard, pRightWildCard);
+end;
+
+function TAqDBSQLLikeCondition.GetAsLike: IAqDBSQLLikeCondition;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLLikeCondition.GetConditionType: TAqDBSQLConditionType;
+begin
+  Result := TAqDBSQLConditionType.ctLike;
+end;
+
+function TAqDBSQLLikeCondition.GetLeftValue: IAqDBSQLValue;
+begin
+  Result := FLeftValue;
+end;
+
+function TAqDBSQLLikeCondition.GetLeftWildCard: TAqDBSQLLikeWildCard;
+begin
+  Result := FLeftWildCard;
+end;
+
+function TAqDBSQLLikeCondition.GetRightValue: IAqDBSQLTextConstant;
+begin
+  Result := FRightValue;
+end;
+
+function TAqDBSQLLikeCondition.GetRightWildCard: TAqDBSQLLikeWildCard;
+begin
+  Result := FRightWildCard;
+end;
+
+procedure TAqDBSQLLikeCondition.SetLeftValue(pValue: IAqDBSQLValue);
+begin
+  FLeftValue := pValue;
+end;
+
+procedure TAqDBSQLLikeCondition.SetLeftWildCard(pValue: TAqDBSQLLikeWildCard);
+begin
+  FLeftWildCard := pValue;
+end;
+
+procedure TAqDBSQLLikeCondition.SetRightValue(pValue: IAqDBSQLTextConstant);
+begin
+  FRightValue := pValue;
+end;
+
+procedure TAqDBSQLLikeCondition.SetRightWildCard(pValue: TAqDBSQLLikeWildCard);
+begin
+  FRightWildCard := pValue;
+end;
+
+{ TAqDBSQLSelectSetup }
+
+function TAqDBSQLSelectSetup.AddJoinParameters(pJoinParameters: IAqDBSQLJoinParameters): Int32;
+begin
+  Result := DoGetJoinsParameters.Add(pJoinParameters);
+end;
+
+function TAqDBSQLSelectSetup.AddJoinParameters(const pJoinTable, pMainTableColumns, pJoinTableColumns: string;
+  const pJoinType: TAqDBSQLJoinType): IAqDBSQLJoinParameters;
+var
+  lMainTableColumns: TStringList;
+  lJoinTableColumns: TStringList;
+begin
+  lMainTableColumns := TStringList.Create;
+
+  try
+    lJoinTableColumns := TStringList.Create;
+
+    try
+      lMainTableColumns.Delimiter := ';';
+      lMainTableColumns.DelimitedText := pMainTableColumns;
+
+      lJoinTableColumns.Delimiter := ';';
+      lJoinTableColumns.DelimitedText := pJoinTableColumns;
+
+      Result := AddJoinParameters(pJoinTable, lMainTableColumns, lJoinTableColumns, pJoinType);
+    finally
+      lJoinTableColumns.Free;
+    end;
+  finally
+    lMainTableColumns.Free;
+  end;
+end;
+
+function TAqDBSQLSelectSetup.AddJoinParameters(const pJoinTable: string;
+  const pMainTableColumns, pJoinTableColumns: array of string;
+  const pJoinType: TAqDBSQLJoinType): IAqDBSQLJoinParameters;
+var
+  lMasterTableColumns: TStringList;
+  lJoinTableColumns: TStringList;
+  lColumn: string;
+begin
+  lMasterTableColumns := TStringList.Create;
+
+  try
+    lJoinTableColumns := TStringList.Create;
+
+    try
+      for lColumn in pMainTableColumns do
+      begin
+        lMasterTableColumns.Add(lColumn);
+      end;
+
+      for lColumn in pJoinTableColumns do
+      begin
+        lJoinTableColumns.Add(lColumn);
+      end;
+
+      Result := AddJoinParameters(pJoinTable, lMasterTableColumns, lJoinTableColumns, pJoinType);
+    finally
+      lJoinTableColumns.Free;
+    end;
+  finally
+    lMasterTableColumns.Free;
+  end;
+end;
+
+function TAqDBSQLSelectSetup.AddJoinParameters(const pJoinTable: string;
+  const pMainTableColumns, pJoinTableColumns: TStrings;
+  const pJoinType: TAqDBSQLJoinType): IAqDBSQLJoinParameters;
+var
+  lLastJoinParameter: IAqDBSQLJoinParameters;
+begin
+  if Assigned(FJoinsParameters) and (FJoinsParameters.Count > 0) then
+  begin
+    lLastJoinParameter := FJoinsParameters.Last;
+  end else begin
+    lLastJoinParameter := nil;
+  end;
+
+  Result := TAqDBSQLJoinParameters.Create(lLastJoinParameter, pJoinTable,
+    pMainTableColumns, pJoinTableColumns, pJoinType);
+  AddJoinParameters(Result);
+end;
+
+function TAqDBSQLSelectSetup.AddOrderBy(const pColumnName: string;
+  const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean): IAqDBSQLOrderByDescriptor;
+begin
+  Result := AddOrderBy(string.Empty, pColumnName, pColumnShouldBeReturnedAsResult, pAscending);
+end;
+
+function TAqDBSQLSelectSetup.AddOrderBy(pOrderByDescriptor: IAqDBSQLOrderByDescriptor): Int32;
+begin
+  Result := DoGetOrderbyList.Add(pOrderByDescriptor);
+end;
+
+function TAqDBSQLSelectSetup.AddOrderBy(const pIdentifier: string; pColumnName: string;
+  const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean): IAqDBSQLOrderByDescriptor;
+begin
+  Result := TAqDBSQLOrderByDescriptor.Create(pIdentifier, pColumnName, pColumnShouldBeReturnedAsResult, pAscending);
+  AddOrderBy(Result);
+end;
+
+constructor TAqDBSQLSelectSetup.Create(pInitialCondition: IAqDBSQLCondition);
+begin
+  inherited Create;
+
+  if Assigned(pInitialCondition) then
+  begin
+    GetCustomCondition.AddAnd(pInitialCondition);
+  end;
+end;
+
+function TAqDBSQLSelectSetup.DoGetJoinsParameters: IAqList<IAqDBSQLJoinParameters>;
+begin
+  if not Assigned(FJoinsParameters) then
+  begin
+    FJoinsParameters := TAqList<IAqDBSQLJoinParameters>.Create;
+  end;
+
+  Result := FJoinsParameters;
+end;
+
+function TAqDBSQLSelectSetup.DoGetOrderbyList: IAqList<IAqDBSQLOrderByDescriptor>;
+begin
+  if not Assigned(FOrderByList) then
+  begin
+    FOrderByList := TAqList<IAqDBSQLOrderByDescriptor>.Create;
+  end;
+
+  Result := FOrderByList;
+end;
+
+function TAqDBSQLSelectSetup.GetConditionDescriptors: IAqDBSQLComposedConditionDescriptor;
+begin
+  if not Assigned(FConditionDescriptors) then
+  begin
+    FConditionDescriptors := TAqDBSQLComposedConditionDescriptor.Create;
+  end;
+
+  Result := FConditionDescriptors;
+end;
+
+function TAqDBSQLSelectSetup.GetCustomCondition: IAqDBSQLComposedCondition;
+begin
+  if not Assigned(FCustomCondition) then
+  begin
+    FCustomCondition := TAqDBSQLComposedCondition.Create;
+  end;
+
+  Result := FCustomCondition;
+end;
+
+function TAqDBSQLSelectSetup.GetHasConditionDescriptors: Boolean;
+begin
+  Result := Assigned(FConditionDescriptors) and (FConditionDescriptors.Count > 0);
+end;
+
+function TAqDBSQLSelectSetup.GetHasJoinsParameters: Boolean;
+begin
+  Result := Assigned(FJoinsParameters) and (FJoinsParameters.Count > 0);
+end;
+
+function TAqDBSQLSelectSetup.GetHasOrderBy: Boolean;
+begin
+  Result := Assigned(FOrderByList) and (FOrderByList.Count > 0);
+end;
+
+function TAqDBSQLSelectSetup.GetIsCustomConditionDefied: Boolean;
+begin
+  Result := Assigned(FCustomCondition);
+end;
+
+function TAqDBSQLSelectSetup.GetJoinsParameters: IAqReadableList<IAqDBSQLJoinParameters>;
+begin
+  Result := DoGetJoinsParameters.GetReadOnlyList;
+end;
+
+function TAqDBSQLSelectSetup.GetOrderByList: IAqReadableList<IAqDBSQLOrderByDescriptor>;
+begin
+  Result := DoGetOrderbyList.GetReadOnlyList;
+end;
+
+procedure TAqDBSQLSelectSetup.TakeSetup(pSetup: IAqDBSQLSelectsetup);
+var
+  lCandidate: IAqDBSQLJoinParameters;
+  lJoinParameters: IAqList<IAqDBSQLJoinParameters>;
+  lI: Int32;
+  lOrderBy: IAqDBSQLOrderByDescriptor;
+  lOrderByList: IAqList<IAqDBSQLOrderByDescriptor>;
+begin
+  if Assigned(pSetup) then
+  begin
+    if pSetup.IsCustomConditionDefied then
+    begin
+      GetCustomCondition.AddAnd(pSetup.CustomCondition);
+    end;
+
+    if pSetup.HasConditionDescriptors then
+    begin
+      {TODO 3 -oTatu -cMelhroia: criar sistema de identificação se descritor de condição não é repetida}
+      GetConditionDescriptors.AddCondition(pSetup.ConditionDescriptors);
+    end;
+
+    if pSetup.HasJoinsParameters then
+    begin
+      lJoinParameters := DoGetJoinsParameters;
+      for lCandidate in pSetup.JoinsParameters do
+      begin
+        if not lJoinParameters.Find(
+          function(pItem: IAqDBSQLJoinParameters): Boolean
+          begin
+            Result := pItem.Identifier = lCandidate.Identifier;
+          end, lI) then
+        begin
+          lJoinParameters.Add(lCandidate);
+        end;
+      end;
+    end;
+
+    if pSetup.HasOrderBy then
+    begin
+      lOrderByList := DoGetOrderbyList;
+
+      for lOrderBy in pSetup.OrderByList do
+      begin
+        if not lOrderByList.Find(
+          function(pItem: IAqDBSQLOrderByDescriptor): Boolean
+          begin
+            Result := (pItem.SourceIdentifier = lOrderBy.SourceIdentifier) and (pItem.ColumnName = lOrderBy.ColumnName);
+          end, lI) then
+        begin
+          lOrderByList.Add(lOrderBy);
+        end;
+      end;
+    end;
+  end;
+end;
+
+{ TAqDBSQLJoinParameters }
+
+constructor TAqDBSQLJoinParameters.Create(const pJoinTable: string;
+  const pMainTableColumns, pJoinTableColumns: TStrings; const pJoinType: TAqDBSQLJoinType);
+begin
+  inherited Create;
+
+  FJoinType := pJoinType;
+  FJoinTable := pJoinTable;
+  FMainColumns := TStringList.Create;
+  FJoinColumns := TStringList.Create;
+
+  FMainColumns.Assign(pMainTableColumns);
+  FJoinColumns.Assign(pJoinTableColumns);
+end;
+
+constructor TAqDBSQLJoinParameters.Create(pMainSourceJoin: IAqDBSQLJoinParameters; const pJoinTable: string;
+  const pMainTableColumns, pJoinTableColumns: TStrings; const pJoinType: TAqDBSQLJoinType);
+begin
+  Create(pJoinTable, pMainTableColumns, pJoinTableColumns, pJoinType);
+
+  FMainSourceJoin := pMainSourceJoin;
+end;
+
+constructor TAqDBSQLJoinParameters.Create(const pJoinTable, pMainTableColumns, pJoinTableColumns: string;
+  const pJoinType: TAqDBSQLJoinType);
+var
+  lMainTableColumns: TStringList;
+  lJoinTableColumns: TStringList;
+begin
+  lMainTableColumns := nil;
+  lJoinTableColumns := nil;
+
+  try
+    lMainTableColumns := TStringList.Create;
+    lMainTableColumns.Delimiter := ';';
+    lMainTableColumns.DelimitedText := pMainTableColumns;
+
+    lJoinTableColumns := TStringList.Create;
+    lJoinTableColumns.Delimiter := ';';
+    lJoinTableColumns.DelimitedText := pJoinTableColumns;
+
+    Create(pJoinTable, lMainTableColumns, lJoinTableColumns, pJoinType);
+  finally
+    lMainTableColumns.Free;
+    lJoinTableColumns.Free;
+  end;
+end;
+
+destructor TAqDBSQLJoinParameters.Destroy;
+begin
+  FJoinColumns.Free;
+  FMainColumns.Free;
+
+  inherited;
+end;
+
+function TAqDBSQLJoinParameters.GetIdentifier: string;
+var
+  lI: Int32;
+begin
+  case FJoinType of
+    jtInnerJoin:
+      Result := '(i)';
+    jtLeftJoin:
+      Result := '(l)';
+  else
+    raise EAqInternal.Create('Unexpected join type while trying to generate the join parameter identifier.');
+  end;
+
+  if Assigned(FMainSourceJoin) then
+  begin
+    Result := Result + FMainSourceJoin.Identifier + '|';
+  end;
+
+  if (FMainColumns.Count <= 0) or (FMainColumns.Count <> FJoinColumns.Count) then
+  begin
+    raise EAqInternal.Create('Invalid number of columns in the join parameter.');
+  end;
+
+  for lI := 0 to FMainColumns.Count - 1 do
+  begin
+    Result := Result + FMainColumns[lI] + '=' + FJoinColumns[lI] + '|';
+  end;
+
+  Result := (Result + FJoinTable).ToUpper;
+end;
+
+function TAqDBSQLJoinParameters.GetJoinColumns: TStrings;
+begin
+  Result := FJoinColumns;
+end;
+
+function TAqDBSQLJoinParameters.GetJoinTable: string;
+begin
+  Result := FJoinTable;
+end;
+
+function TAqDBSQLJoinParameters.GetJoinType: TAqDBSQLJoinType;
+begin
+  Result := FJoinType;
+end;
+
+function TAqDBSQLJoinParameters.GetMainColumns: TStrings;
+begin
+  Result := FMainColumns;
+end;
+
+function TAqDBSQLJoinParameters.GetMainSourceJoin: IAqDBSQLJoinParameters;
+begin
+  Result := FMainSourceJoin;
+end;
+
+{ TAqDBSQLSimpleComparisonDescriptor }
+
+constructor TAqDBSQLSimpleComparisonDescriptor.Create(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+  pComparisonValue: IAqDBSQLValue);
+begin
+  inherited Create(pColumnName);
+
+  FComparison := pComparison;
+  FComparisonValue := pComparisonValue;
+end;
+
+function TAqDBSQLSimpleComparisonDescriptor.GetAsSimpleComparisonDescriptor: IAqDBSQLSimpleComparisonDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLSimpleComparisonDescriptor.GetComparison: TAqDBSQLComparison;
+begin
+  Result := FComparison;
+end;
+
+function TAqDBSQLSimpleComparisonDescriptor.GetComparisonValue: IAqDBSQLValue;
+begin
+  Result := FComparisonValue;
+end;
+
+function TAqDBSQLSimpleComparisonDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdComparison;
+end;
+
+{ TAqDBSQLConditionDescriptor }
+
+function TAqDBSQLConditionDescriptor.GetAsBetweenDescriptor: IAqDBSQLBetweenDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLBetweenDescriptor.');
+end;
+
+function TAqDBSQLConditionDescriptor.GetAsComposedConditionDescriptor: IAqDBSQLComposedConditionDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLComposedConditionDescriptor.');
+end;
+
+function TAqDBSQLConditionDescriptor.GetAsInDescriptor: IAqDBSQLInDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLInDescriptor.');
+end;
+
+function TAqDBSQLConditionDescriptor.GetAsIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLIsNotNullDescriptor.');
+end;
+
+function TAqDBSQLConditionDescriptor.GetAsIsNullDescriptor: IAqDBSQLIsNullDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLIsNullDescriptor.');
+end;
+
+function TAqDBSQLConditionDescriptor.GetAsLikeDescriptor: IAqDBSQLLikeDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLLikeDescriptor.');
+end;
+
+function TAqDBSQLConditionDescriptor.GetAsSimpleComparisonDescriptor: IAqDBSQLSimpleComparisonDescriptor;
+begin
+  raise EAqInternal.Create('This descriptor doesn''t implement IAqDBSQLSimpleComparisonDescriptor.');
+end;
+
+procedure TAqDBSQLConditionDescriptor.Negate;
+begin
+  FNegated := not FNegated;
+end;
+
+function TAqDBSQLConditionDescriptor.VerifyIfIsNegated: Boolean;
+begin
+  Result := FNegated;
+end;
+
+{ TAqDBSQLLikeDescriptor }
+
+constructor TAqDBSQLLikeDescriptor.Create(const pColumnName: string; pLikeValue: IAqDBSQLTextConstant);
+begin
+  inherited Create(pColumnName);
+
+  FLikeValue := pLikeValue;
+end;
+
+function TAqDBSQLLikeDescriptor.GetAsLikeDescriptor: IAqDBSQLLikeDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLLikeDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdLike;
+end;
+
+function TAqDBSQLLikeDescriptor.GetLikeValue: IAqDBSQLTextConstant;
+begin
+  Result := FLikeValue;
+end;
+
+{ TAqDBSQLOrderByDescriptor }
+
+constructor TAqDBSQLOrderByDescriptor.Create(const pSourceIdentifier, pColumnName: string;
+  const pColumnShouldBeReturnedAsResult: Boolean; const pAscending: Boolean);
+begin
+  FSourceIdentifier := pSourceIdentifier;
+  FColumnName := pColumnName;
+  FAscending := pAscending;
+  FColumnShouldBeReturnedAsResult := pColumnShouldBeReturnedAsResult;
+end;
+
+function TAqDBSQLOrderByDescriptor.GetColumnName: string;
+begin
+  Result := FColumnName;
+end;
+
+function TAqDBSQLOrderByDescriptor.GetColumnShouldBeReturnedAsResult: Boolean;
+begin
+  Result := FColumnShouldBeReturnedAsResult;
+end;
+
+function TAqDBSQLOrderByDescriptor.GetGeneratedColumn: IAqDBSQLColumn;
+begin
+  Result := FGeneratedColumn;
+end;
+
+function TAqDBSQLOrderByDescriptor.GetSourceIdentifier: string;
+begin
+  Result := FSourceIdentifier;
+end;
+
+function TAqDBSQLOrderByDescriptor.GetIsAscending: Boolean;
+begin
+  Result := FAscending;
+end;
+
+procedure TAqDBSQLOrderByDescriptor.SetGeneratedColumn(pColumn: IAqDBSQLColumn);
+begin
+  FGeneratedColumn := pColumn;
+end;
+
+function TAqDBSQLOrderByDescriptor.VerifyIfHasSourceIdentifier: Boolean;
+begin
+  Result := not FSourceIdentifier.IsEmpty;
+end;
+
+{ TAqDBSQLComposedConditionDescriptor }
+
+function TAqDBSQLComposedConditionDescriptor.AddComposedDescriptor(
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := TAqDBSQLComposedConditionDescriptor.Create;
+  AddCondition(Result, pLinkOperator)
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AddCondition(pCondition: IAqDBSQLConditionDescriptor;
+  const pLinkOperator: TAqDBSQLBooleanOperator): Int32;
+begin
+  Result := FConditions.Add(pCondition);
+  if Result > 0 then
+  begin
+    FLinks.Add(pLinkOperator);
+  end;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AddComparison(const pSourceIdentifier, pColumnName: string;
+  const pComparison: TAqDBSQLComparison; pComparisonValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLSimpleComparisonDescriptor;
+begin
+  Result := TAqDBSQLSimpleComparisonDescriptor.Create(pColumnName, pComparison, pComparisonValue);
+  Result.SourceIdentifier := pSourceIdentifier;
+  AddCondition(Result, pLinkOperator);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AddComparison(const pColumnName: string;
+  const pComparison: TAqDBSQLComparison; pComparisonValue: IAqDBSQLValue;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLSimpleComparisonDescriptor;
+begin
+  Result := AddComparison('', pColumnName, pComparison, pComparisonValue, pLinkOperator);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AddLike(const pColumnName: string; pLikeValue: IAqDBSQLTextConstant;
+  const pLinkOperator: TAqDBSQLBooleanOperator): IAqDBSQLLikeDescriptor;
+begin
+  Result := TAqDBSQLLikeDescriptor.Create(pColumnName, pLikeValue);
+  AddCondition(Result, pLinkOperator);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnEquals(const pColumnName: string;
+  pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := AndColumnEquals('', pColumnName, pComparisonValue);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnEquals(const pColumnName: string;
+  pComparisonValue: string): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := AndColumnEquals('', pColumnName, pComparisonValue);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+  pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor;
+begin
+  AddComparison(pSourceIdentifier, pColumnName, TAqDBSQLComparison.cpEqual, pComparisonValue,
+    TAqDBSQLBooleanOperator.boAnd);
+  Result := Self;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+  pComparisonValue: string): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := AndColumnEquals(pSourceIdentifier, pColumnName, TAqDBSQLTextConstant.Create(pComparisonValue));
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+  pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := AndColumnEquals(pSourceIdentifier, pColumnName, TAqDBSQLIntConstant.Create(pComparisonValue));
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnLike(const pColumnName: string;
+  pLikeValue: string): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := AndColumnLike(pColumnName, TAqDBSQLTextConstant.Create(pLikeValue));
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnLike(const pColumnName: string;
+  pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor;
+begin
+  AddLike(pColumnName, pLikeValue, TAqDBSQLBooleanOperator.boAnd);
+  Result := Self;
+end;
+
+constructor TAqDBSQLComposedConditionDescriptor.Create;
+begin
+  FConditions := TAqList<IAqDBSQLConditionDescriptor>.Create;
+  FLinks := TAqList<TAqDBSQLBooleanOperator>.Create;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.GetAsComposedConditionDescriptor: IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdComposed;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.GetCount: Int32;
+begin
+  Result := FConditions.Count;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.GetItem(const pIndex: Int32): IAqDBSQLConditionDescriptor;
+begin
+  Result := FConditions.Items[pIndex];
+end;
+
+function TAqDBSQLComposedConditionDescriptor.GetLinkOperator(const pIndex: Int32): TAqDBSQLBooleanOperator;
+begin
+  Result := FLinks[pIndex];
+end;
+
+function TAqDBSQLComposedConditionDescriptor.OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+  pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := OrColumnEquals(pSourceIdentifier, pColumnName, TAqDBSQLIntConstant.Create(pComparisonValue));
+end;
+
+function TAqDBSQLComposedConditionDescriptor.OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+  pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor;
+begin
+  AddComparison(pSourceIdentifier, pColumnName, TAqDBSQLComparison.cpEqual, pComparisonValue,
+    TAqDBSQLBooleanOperator.boOr);
+  Result := Self;
+end;
+
+function TAqDBSQLComposedConditionDescriptor.OrColumnEquals(const pColumnName: string;
+  pComparisonValue: int64): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := OrColumnEquals('', pColumnName, pComparisonValue);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.OrColumnEquals(const pColumnName: string;
+  pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := OrColumnEquals('', pColumnName, pComparisonValue);
+end;
+
+function TAqDBSQLComposedConditionDescriptor.AndColumnEquals(const pColumnName: string;
+  pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor;
+begin
+  Result := AndColumnEquals('', pColumnName, pComparisonValue);
+end;
+
+{ TAqDBSQLColumnBasedConditionDescriptor }
+
+procedure TAqDBSQLColumnBasedConditionDescriptor.ClearSourceIdentifier;
+begin
+  FSourceIdentifier.Clear;
+end;
+
+constructor TAqDBSQLColumnBasedConditionDescriptor.Create(const pColumnName: string);
+begin
+  FColumnName := pColumnName;
+end;
+
+function TAqDBSQLColumnBasedConditionDescriptor.GetColumnName: string;
+begin
+  Result := FColumnName;
+end;
+
+function TAqDBSQLColumnBasedConditionDescriptor.GetSourceIdentifier: string;
+begin
+  Result := FSourceIdentifier;
+end;
+
+procedure TAqDBSQLColumnBasedConditionDescriptor.SetSourceIdentifier(const pValue: string);
+begin
+  FSourceIdentifier := pValue;
+end;
+
+function TAqDBSQLColumnBasedConditionDescriptor.VerifyIfHasSourceIdentifier: Boolean;
+begin
+  Result := not FSourceIdentifier.IsEmpty;
+end;
+
+{ TAqDBSQLBetweenDescriptor }
+
+constructor TAqDBSQLBetweenDescriptor.Create(const pColumnName: string; pLeftBoundaryValue,
+  pRightBoundaryValue: IAqDBSQLConstant);
+begin
+  inherited Create(pColumnName);
+
+  FLeftBoundaryValue := pLeftBoundaryValue;
+  FRightBoundaryValue := pRightBoundaryValue;
+end;
+
+function TAqDBSQLBetweenDescriptor.GetAsBetweenDescriptor: IAqDBSQLBetweenDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLBetweenDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdBetween;
+end;
+
+function TAqDBSQLBetweenDescriptor.GetLeftBoundaryValue: IAqDBSQLConstant;
+begin
+  Result := FLeftBoundaryValue;
+end;
+
+function TAqDBSQLBetweenDescriptor.GetRightBoundaryValue: IAqDBSQLConstant;
+begin
+  Result := FRightBoundaryValue;
+end;
+
+{ TAqDBSQLInCondition }
+
+procedure TAqDBSQLInCondition.AddInValue(pValue: IAqDBSQLValue);
+begin
+  FInValues.Add(pValue);
+end;
+
+constructor TAqDBSQLInCondition.Create(pTestableValue: IAqDBSQLValue);
+begin
+  FTestableValue := pTestableValue;
+  FInValues := TAqList<IAqDBSQLValue>.Create;
+end;
+
+function TAqDBSQLInCondition.GetAsIn: IAqDBSQLInCondition;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLInCondition.GetConditionType: TAqDBSQLConditionType;
+begin
+  Result := TAqDBSQLConditionType.ctIn;
+end;
+
+function TAqDBSQLInCondition.GetInValues: IAqReadableList<IAqDBSQLValue>;
+begin
+  Result := FInValues.GetReadOnlyList;
+end;
+
+function TAqDBSQLInCondition.GetTestableValue: IAqDBSQLValue;
+begin
+  Result := FTestableValue;
+end;
+
+procedure TAqDBSQLInCondition.SetTestableValue(pValue: IAqDBSQLValue);
+begin
+  FTestableValue := pValue;
+end;
+
+{ TAqDBSQLInDescriptor }
+
+procedure TAqDBSQLInDescriptor.AddInValue(pValue: IAqDBSQLConstant);
+begin
+  FInValues.Add(pValue);
+end;
+
+constructor TAqDBSQLInDescriptor.Create(const pColumnName: string);
+begin
+  inherited;
+
+  FInValues := TAqList<IAqDBSQLConstant>.Create;
+end;
+
+function TAqDBSQLInDescriptor.GetAsInDescriptor: IAqDBSQLInDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLInDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdIn;
+end;
+
+function TAqDBSQLInDescriptor.GetInValues: IAqReadableList<IAqDBSQLConstant>;
+begin
+  Result := FInValues.GetReadOnlyList;
+end;
+
+{ TAqDBSQLIsNullDescriptor }
+
+function TAqDBSQLIsNullDescriptor.GetAsIsNullDescriptor: IAqDBSQLIsNullDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLIsNullDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdIsNull;
+end;
+
+{ TAqDBSQLIsNotNullDescriptor }
+
+function TAqDBSQLIsNotNullDescriptor.GetAsIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor;
+begin
+  Result := Self;
+end;
+
+function TAqDBSQLIsNotNullDescriptor.GetConditionDescriptorType: TAqDBSQLConditionDescriptorType;
+begin
+  Result := TAqDBSQLConditionDescriptorType.cdIsNotNull;
 end;
 
 end.

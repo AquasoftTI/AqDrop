@@ -43,6 +43,7 @@ type
     property DataBase: string index $80 read GetParameterValueByIndex write SetParameterValueByIndex;
     property UserName: string index $81 read GetParameterValueByIndex write SetParameterValueByIndex;
     property Password: string index $82 read GetParameterValueByIndex write SetParameterValueByIndex;
+    property RoleName: string index $83 read GetParameterValueByIndex write SetParameterValueByIndex;
   end;
 
 
@@ -131,6 +132,8 @@ begin
       Result := Params.Values['User_Name'];
     $82:
       Result := Params.Values['Password'];
+    $83:
+      Result := Params.Values['RoleName'];
   else
     Result := inherited;
   end;
@@ -145,6 +148,8 @@ begin
       Params.Values['User_Name'] := pValue;
     $82:
       Params.Values['Password'] := pValue;
+    $83:
+      Params.Values['RoleName'] := pValue;
   else
     inherited;
   end;

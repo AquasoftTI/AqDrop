@@ -9,52 +9,75 @@ uses
   System.TypInfo,
   System.SyncObjs,
   AqDrop.Core.Types,
-  AqDrop.Core.Collections,
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.InterfacedObject,
-  AqDrop.DB.SQL,
+  AqDrop.Core.Helpers.Rtti.GettersAndSetters.Intf,
   AqDrop.DB.ORM.Attributes,
   AqDrop.DB.Types;
 
 type
+  TAqDBORMTable = class;
+
   TAqDBORMColumn = class
   strict private
+    [weak]
+    FTable: TAqDBORMTable;
     FAttribute: AqColumn;
+    FValueGetter: IAqRttiValueGetter;
+
+    function VerifyIfIsHasAttribute: Boolean; inline;
     function GetAlias: string;
+    function GetStatusIsAliasDefined: Boolean; inline;
+    function GetTargetName: string;
   strict protected
-    function GetName: string; virtual; abstract;
+    function GetName: string; virtual;
+    function GetMetadataName: string; virtual; abstract;
 
     procedure SetValue(const pInstance: TObject; const pValue: TValue); virtual; abstract;
-    function GetValue(const pInstance: TObject): TValue; virtual; abstract;
     function GetTypeInfo: PTypeInfo; virtual; abstract;
     function GetType: TAqDataType; virtual; abstract;
+
+    function DoGetValueGetter: IAqRttiValueGetter; virtual; abstract;
+    function GetRttiMember: TRttiMember; virtual; abstract;
   public
-    constructor Create(const pAttribute: AqColumn);
+    constructor Create(const pTable: TAqDBORMTable; const pAttribute: AqColumn);
+
+    function GetValue(const pInstance: TObject): TValue; virtual; abstract;
 
     procedure SetObjectValue(const pInstance: TObject; pValue: TValue); overload;
     procedure SetObjectValue(const pInstance: TObject; pValue: IAqDBReadValue); overload;
     procedure SetDBValue(const pInstance: TObject; pValue: IAqDBValue);
 
+    function GetValueGetter: IAqRttiValueGetter;
+
+    property Table: TAqDBORMTable read FTable;
+    property HasAttribute: Boolean read VerifyIfIsHasAttribute;
     property Attribute: AqColumn read FAttribute;
     property Name: string read GetName;
+    property MetadataName: string read GetMetadataName;
+    property IsAliasDefined: Boolean read GetStatusIsAliasDefined;
     property Alias: string read GetAlias;
+    property TargetName: string read GetTargetName;
     property &Type: TAqDataType read GetType;
+    property RttiMember: TRttiMember read GetRttiMember;
   end;
 
   TAqDBORMColumnField = class(TAqDBORMColumn)
   strict private
     FField: TRttiField;
-
-    function ExtractColumnName(const pRttiObject: TRttiNamedObject): string;
   strict protected
-    function GetName: string; override;
+    function GetMetadataName: string; override;
 
     procedure SetValue(const pInstance: TObject; const pValue: TValue); override;
-    function GetValue(const pInstance: TObject): TValue; override;
     function GetType: TAqDataType; override;
     function GetTypeInfo: PTypeInfo; override;
+
+    function DoGetValueGetter: IAqRttiValueGetter; override;
+    function GetRttiMember: TRttiMember; override;
   public
-    constructor Create(const pField: TRttiField; const pAttribute: AqColumn);
+    constructor Create(const pTable: TAqDBORMTable; const pField: TRttiField; const pAttribute: AqColumn);
+
+    function GetValue(const pInstance: TObject): TValue; override;
 
     property Field: TRttiField read FField;
   end;
@@ -63,14 +86,18 @@ type
   strict private
     FProperty: TRttiProperty;
   strict protected
-    function GetName: string; override;
+    function GetMetadataName: string; override;
 
     procedure SetValue(const pInstance: TObject; const pValue: TValue); override;
-    function GetValue(const pInstance: TObject): TValue; override;
     function GetType: TAqDataType; override;
     function GetTypeInfo: PTypeInfo; override;
+
+    function DoGetValueGetter: IAqRttiValueGetter; override;
+    function GetRttiMember: TRttiMember; override;
   public
-    constructor Create(const pProperty: TRttiProperty; const pAttribute: AqColumn);
+    constructor Create(const pTable: TAqDBORMTable; const pProperty: TRttiProperty; const pAttribute: AqColumn);
+
+    function GetValue(const pInstance: TObject): TValue; override;
 
     property &Property: TRttiProperty read FProperty;
   end;
@@ -78,9 +105,11 @@ type
   TAqDBORMTable = class
   strict private
     FType: TRttiType;
-    FColumns: TAqList<TAqDBORMColumn>;
+    FColumns: IAqList<TAqDBORMColumn>;
+    FColumnsByMember: IAqDictionary<TRttiMember, TAqDBORMColumn>;
 
-    function GetColumns: TAqReadList<TAqDBORMColumn>;
+    procedure AddColumn(const pRttiMember: TRttiMember; const pColumn: TAqDBORMColumn); overload;
+    function GetColumns: IAqReadableList<TAqDBORMColumn>;
   private
     procedure SetType(const pType: TRttiType);
   strict protected
@@ -90,15 +119,18 @@ type
     property &Type: TRttiType read FType;
   public
     constructor Create(const pType: TRttiType);
-    destructor Destroy; override;
 
+    procedure AddColumn(const pRttiMember: TRttiMember; const pAttribute: AqColumn); overload;
     procedure AddColumn(const pField: TRttiField; const pAttribute: AqColumn); overload;
     procedure AddColumn(const pProperty: TRttiProperty; const pAttribute: AqColumn); overload;
+
+    function GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean;
+    function GetColumnByRttiMember(const pRttiMember: TRttiMember; out pColumn: TAqDBORMColumn): Boolean;
 
     function HasAutoIncrementColumn(out pColumn: TAqDBORMColumn): Boolean;
 
     property Name: string read GetName;
-    property Columns: TAqReadList<TAqDBORMColumn> read GetColumns;
+    property Columns: IAqReadableList<TAqDBORMColumn> read GetColumns;
   end;
 
   TAqDBORMTable<T: AqTable> = class(TAqDBORMTable)
@@ -114,34 +146,83 @@ type
     property Attribute: T read FAttribute;
   end;
 
+  TAqDBORM = class;
+
+  IAqDBORMDetail = interface
+    ['{53CF7EC4-08C0-4795-8ED7-16536592037C}']
+
+    function GetORM: TAqDBORM;
+    function VerifyIfLazyLoadingIsAvailable: Boolean;
+    function VerifyIfDetailsAreLoaded(const pMaster: TObject): Boolean;
+    function VerifyIfDeletedItensAreManaged: Boolean;
+
+    function GetItems(const pMaster: TObject): IAqReadableList<TObject>;
+    function AddItem(const pMaster: TObject): TObject;
+    function GetDeletedItens(const pMaster: TObject): IAqReadableList<TObject>;
+
+    property ORM: TAqDBORM read GetORM;
+    property LazyLoadingAvailable: Boolean read VerifyIfLazyLoadingIsAvailable;
+    property ManagedDeletedItens: Boolean read VerifyIfDeletedItensAreManaged;
+  end;
+
   TAqDBORM = class
+  strict private type
+    TFindThroughTablesFunction<T> = reference to function(const pTable: TAqDBORMTable; out pSubject: T): Boolean;
   strict private
+    FORMClass: TClass;
     FMainTable: TAqDBORMTable<AqTable>;
-    FSpecializations: TAqList<TAqDBORMTable<AqSpecialization>>;
+    FSpecializations: IAqList<TAqDBORMTable<AqSpecialization>>;
+    FDetails: IAqList<IAqDBORMDetail>;
+    FPrimaryKeys: IAqList<TAqDBORMCOlumn>;
+    FDetailkeys: IAqList<TAqDBORMColumn>;
 
     function GetInitialized: Boolean;
     function GetActiveTable: TAqDBORMTable<AqTable>;
+    function GetPrimaryKeys: IAqReadableList<TAqDBORMColumn>;
+    function GetUniqueKey: TAqDBORMColumn;
+    function GetDetailKeys: IAqReadableList<TAqDBORMColumn>;
     function GetHasSpecializations: Boolean;
-    function GetSpecializations: TAqReadList<TAqDBORMTable<AqSpecialization>>;
+    function GetSpecializations: IAqReadableList<TAqDBORMTable<AqSpecialization>>;
+    function FindThroughTables<T>(const pFindFunction: TFindThroughTablesFunction<T>; out pSubject: T): Boolean;
+
+    function VerifyIfHasDetail: Boolean;
+    function GetDetails: IAqList<IAqDBORMDetail>;
+    function GetReadableDetails: IAqReadableList<IAqDBORMDetail>;
 
     class var FTableSeparator: string;
   private
-    class procedure _Initialize;
+    class procedure InitializeDefaultValues;
   public
-    constructor Create;
+    constructor Create(const pClass: TClass);
     destructor Destroy; override;
 
     procedure AddTable(const pTableInfo: AqTable; const pType: TRttiType);
 
+    procedure AddDetail(const pDetail: IAqDBORMDetail);
+
     function GetTable(const pName: string; out pTable: TAqDBORMTable): Boolean;
-    function GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean;
-    function GetPrimaryKeys: IAqResultList<TAqDBORMColumn>;
+    function GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean; overload;
+    function GetColumn(const pTableName, pColumnName: string; out pColumn: TAqDBORMColumn): Boolean; overload;
+
+    function GetColumnByRttiMember(const pRttiMember: TRttiMember; out pColumn: TAqDBORMColumn): Boolean;
+
+    function GetSpecializationUnderTable(const pTableName: string;
+      out pSpecialization: TAqDBORMTable<AqSpecialization>): Boolean;
+
+    property ORMClass: TClass read FORMClass;
 
     property Initialized: Boolean read GetInitialized;
     property MainTable: TAqDBORMTable<AqTable> read FMainTable;
 
+    property PrimaryKeys: IAqReadableList<TAqDBORMColumn> read GetPrimaryKeys;
+    property UniqueKey: TAqDBORMColumn read GetUniqueKey;
+    property DetailKeys: IAqReadableList<TAqDBORMColumn> read GetDetailKeys;
+
     property HasSpecializations: Boolean read GetHasSpecializations;
-    property Specializations: TAqReadList<TAqDBORMTable<AqSpecialization>> read GetSpecializations;
+    property Specializations: IAqReadableList<TAqDBORMTable<AqSpecialization>> read GetSpecializations;
+
+    property HasDetails: Boolean read VerifyIfHasDetail;
+    property Details: IAqReadableList<IAqDBORMDetail> read GetReadableDetails;
 
     property ActiveTable: TAqDBORMTable<AqTable> read GetActiveTable;
 
@@ -149,20 +230,33 @@ type
     class property TableSeparator: string read FTableSeparator;
   end;
 
+  TAqDBORMBaseDetailInterpreter = class
+  public
+    function Interpret(const pRttiMember: TRttiMember; out pORMDetail: IAqDBORMDetail): Boolean; virtual; abstract;
+  end;
+
   TAqDBORMReader = class
   strict private
-    class var FRttiContext: TRttiContext;
-    class var FLocker: TCriticalSection;
-    class var FTypes: TAqDictionary<string, TRttiType>;
-    class var FORMs: TAqDictionary<string, TAqDBORM>;
+    FORMs: IAqDictionary<PTypeInfo, TAqDBORM>;
+    FDetailsInterpreters: IAqList<TAqDBORMBaseDetailInterpreter>;
 
-    class function GetType(const pClass: TClass): TRttiType;
-    class function CreateNewORM(const pClass: TClass): TAqDBORM;
+    function IsDataTypeMappable(const pDataType: TAqDataType): Boolean;
+    function CreateNewORM(const pClass: TClass): TAqDBORM;
+
+    class var FInstance: TAqDBORMReader;
+    class function GetInstance: TAqDBORMReader; static;
   private
-    class procedure _Initialize;
-    class procedure _Finalize;
+    class procedure InitializeInstance;
+    class procedure ReleaseInstance;
   public
-    class function GetORM(const pClass: TClass; const pUsePool: Boolean = True): TAqDBORM;
+    constructor Create;
+    destructor Destroy; override;
+
+    function GetORM(const pClass: TClass; const pUsePool: Boolean = True): TAqDBORM;
+
+    procedure AddDetailInterpreter(const pDetailInterpreter: TAqDBORMBaseDetailInterpreter);
+
+    class property Instance: TAqDBORMReader read GetInstance;
   end;
 
 implementation
@@ -170,31 +264,134 @@ implementation
 uses
   System.StrUtils,
   System.SysUtils,
+  System.Generics.Collections,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
+  AqDrop.Core.Helpers.Rtti,
+  AqDrop.Core.Helpers.Rtti.GettersAndSetters,
+  AqDrop.Core.Helpers.TRttiMember,
   AqDrop.Core.Helpers.TRttiType,
-  AqDrop.Core.Helpers.TRttiObject;
+  AqDrop.Core.Helpers.TRttiObject,
+  AqDrop.Core.Collections;
+
+type
+  TAqDBORMListDetail = class(TAqARCObject, IAqDBORMDetail)
+  strict private
+    FItemClass: TClass;
+    FItemConstructor: TRttiMethod;
+    FORM: TAqDBORM;
+    FMasterMember: TRttiMember;
+
+    function GetORM: TAqDBORM; inline;
+    function GetMemberValueAsObjectList(const pMaster: TObject): TList<TObject>;
+    function VerifyIfLazyLoadingIsAvailable: Boolean;
+    function VerifyIfDetailsAreLoaded(const pMaster: TObject): Boolean;
+    function GetItems(const pMaster: TObject): IAqReadableList<TObject>;
+    function AddItem(const pMaster: TObject): TObject;
+    function VerifyIfDeletedItensAreManaged: Boolean;
+    function GetDeletedItens(const pMaster: TObject): IAqReadableList<TObject>;
+  public
+    constructor Create(const pMasterMember: TRttiMember; const pItemClass: TClass;
+      const pItemConstructor: TRttiMethod = nil);
+  end;
+
+  TAqDBORMListDetailInterpreter = class(TAqDBORMBaseDetailInterpreter)
+  public
+    function Interpret(const pRttiMember: TRttiMember; out pORMDetail: IAqDBORMDetail): Boolean; override;
+  end;
 
 { TAqDBORMReader }
 
-class function TAqDBORMReader.CreateNewORM(const pClass: TClass): TAqDBORM;
+procedure TAqDBORMReader.AddDetailInterpreter(const pDetailInterpreter: TAqDBORMBaseDetailInterpreter);
+begin
+  FORMs.BeginWrite;
+
+  try
+    FDetailsInterpreters.Add(pDetailInterpreter);
+  finally
+    FORMs.EndWrite;
+  end;
+end;
+
+constructor TAqDBORMReader.Create;
+begin
+  FORMs := TAqDictionary<PTypeInfo, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue], TAqLockerType.lktMultiReadeExclusiveWriter);
+  FDetailsInterpreters := TAqList<TAqDBORMBaseDetailInterpreter>.Create(True);
+  AddDetailInterpreter(TAqDBORMListDetailInterpreter.Create);
+end;
+
+function TAqDBORMReader.CreateNewORM(const pClass: TClass): TAqDBORM;
+var
+  lActiveTable: TAqDBORMTable<AqTable>;
+
+  procedure TryToMapAsDetail(const pMember: TRttiMember);
+  var
+    lI: Int32;
+    lDetail: IAqDBORMDetail;
+  begin
+    lI := FDetailsInterpreters.Count;
+
+    while lI > 0 do
+    begin
+      Dec(lI);
+      if FDetailsInterpreters[lI].Interpret(pMember, lDetail) then
+      begin
+        if lDetail.ORM.DetailKeys.Count <> Result.PrimaryKeys.Count then
+        begin
+          raise EAqInternal.CreateFmt('Invalid keys count when linking %s and %s.',
+            [Result.ORMClass.QualifiedClassName, lDetail.ORM.ORMClass.QualifiedClassName]);
+        end;
+
+        Result.AddDetail(lDetail);
+        lI := 0;
+      end;
+    end;
+  end;
+
+  procedure TryToMapMember(const pRttiMember: TRttiMember; const pAutoMap: Boolean);
+  var
+    lMemberDataType: TAqDataType;
+    lHasMapping: Boolean;
+    lColumn: AqColumn;
+  begin
+    if not pRttiMember.HasAttribute<AqORMOff> then
+    begin
+      lMemberDataType := pRttiMember.MemberType.GetDataType;
+      if IsDataTypeMappable(lMemberDataType) then
+      begin
+        lHasMapping := pRttiMember.GetAttribute<AqColumn>(lColumn);
+        if not lHasMapping then
+        begin
+          lColumn := nil;
+        end;
+
+        if lHasMapping or (Result.Initialized and pAutoMap) then
+        begin
+          lActiveTable.AddColumn(pRttiMember, lColumn);
+        end;
+      end else if (lMemberDataType = TAqDataType.adtClass) then
+      begin
+        if pAutoMap or pRttiMember.HasAttribute<AqDetail> then
+        begin
+          TryToMapAsDetail(pRttiMember);
+        end;
+      end;
+    end;
+  end;
+
   procedure ReadClass(pClasse: TClass);
   var
     lClassType: TRttiType;
-    lORMOff: AqORMOff;
     lTable: AqTable;
     lField: TRttiField;
-    lActiveTable: TAqDBORMTable<AqTable>;
-    lColumn: AqColumn;
     lProperty: TRttiProperty;
-    lHasMapping: Boolean;
   begin
     if pClasse <> nil then
     begin
       ReadClass(pClasse.ClassParent);
 
-      lClassType := GetType(pClasse);
-      if not lClassType.GetAttribute<AqORMOff>(lORMOff) then
+      lClassType := TAqRtti.&Implementation.GetType(pClasse);
+      if not lClassType.HasAttribute<AqORMOff> then
       begin
         if lClassType.GetAttribute<AqTable>(lTable) then
         begin
@@ -205,44 +402,20 @@ class function TAqDBORMReader.CreateNewORM(const pClass: TClass): TAqDBORM;
 
         for lField in lClassType.GetDeclaredFields do
         begin
-          if not lField.GetAttribute<AqORMOff>(lORMOff) then
-          begin
-            lHasMapping := lField.GetAttribute<AqColumn>(lColumn);
-            if not lHasMapping then
-            begin
-              lColumn := nil;
-            end;
-
-            if lHasMapping or
-              (Result.Initialized and (tmpAutoMapFields in lActiveTable.Attribute.MappingProperties)) then
-            begin
-              lActiveTable.AddColumn(lField, lColumn);
-            end;
-          end;
+          TryToMapMember(lField,
+            Result.Initialized and (tmpAutoMapFields in lActiveTable.Attribute.MappingProperties));
         end;
 
         for lProperty in lClassType.GetDeclaredProperties do
         begin
-          if not lProperty.GetAttribute<AqORMOff>(lORMOff) then
-          begin
-            lHasMapping := lProperty.GetAttribute<AqColumn>(lColumn);
-            if not lHasMapping then
-            begin
-              lColumn := nil;
-            end;
-
-            if lHasMapping or
-              (Result.Initialized and (tmpAutoMapProperties in lActiveTable.Attribute.MappingProperties)) then
-            begin
-              lActiveTable.AddColumn(lProperty, lColumn);
-            end;
-          end;
+          TryToMapMember(lProperty,
+            Result.Initialized and (tmpAutoMapProperties in lActiveTable.Attribute.MappingProperties));
         end;
       end;
     end;
   end;
 begin
-  Result := TAqDBORM.Create;
+  Result := TAqDBORM.Create(pClass);
 
   try
     ReadClass(pClass);
@@ -252,70 +425,91 @@ begin
   end;
 end;
 
-class function TAqDBORMReader.GetORM(const pClass: TClass; const pUsePool: Boolean): TAqDBORM;
+destructor TAqDBORMReader.Destroy;
+begin
+
+  inherited;
+end;
+
+class function TAqDBORMReader.GetInstance: TAqDBORMReader;
+begin
+  InitializeInstance;
+
+  Result := FInstance;
+end;
+
+function TAqDBORMReader.GetORM(const pClass: TClass; const pUsePool: Boolean): TAqDBORM;
 begin
   if pUsePool then
   begin
-    FLocker.Enter;
+    FORMs.BeginWrite;
 
     try
-      if not FORMs.TryGetValue(pClass.QualifiedClassName, Result) then
+      if not FORMs.TryGetValue(pClass.ClassInfo, Result) then
       begin
         Result := CreateNewORM(pClass);
 
         try
-          FORMs.Add(pClass.QualifiedClassName, Result);
+          FORMs.Add(pClass.ClassInfo, Result);
         except
           Result.Free;
           raise;
         end;
       end;
     finally
-      FLocker.Leave;
+      FORMs.EndWrite;
     end;
   end else begin
     Result := CreateNewORM(pClass);
   end;
 end;
 
-class function TAqDBORMReader.GetType(const pClass: TClass): TRttiType;
+class procedure TAqDBORMReader.ReleaseInstance;
 begin
-  FLocker.Enter;
+  FreeAndNil(FInstance);
+end;
 
-  try
-    if not FTypes.TryGetValue(pClass.QualifiedClassName, Result) then
-    begin
-      Result := FRttiContext.GetType(pClass);
-
-      try
-        FTypes.Add(pClass.QualifiedClassName, Result);
-      except
-        Result.Free;
-        raise;
-      end;
-    end;
-  finally
-    FLocker.Leave;
+class procedure TAqDBORMReader.InitializeInstance;
+begin
+  if not Assigned(FInstance) then
+  begin
+    FInstance := TAqDBORMReader.Create;
   end;
 end;
 
-class procedure TAqDBORMReader._Finalize;
+function TAqDBORMReader.IsDataTypeMappable(const pDataType: TAqDataType): Boolean;
 begin
-  FORMs.Free;
-  FTypes.Free;
-  FLocker.Free;
-  FRttiContext.Free;
-end;
-
-class procedure TAqDBORMReader._Initialize;
-begin
-  FRttiContext := TRttiContext.Create;
-  FLocker := TCriticalSection.Create;
-  FTypes := TAqDictionary<string, TRttiType>.Create;
-  FORMs := TAqDictionary<string, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue]);
+  Result := pDataType in [
+    TAqDataType.adtBoolean,
+    TAqDataType.adtEnumerated,
+    TAqDataType.adtUInt8,
+    TAqDataType.adtInt8,
+    TAqDataType.adtUInt16,
+    TAqDataType.adtInt16,
+    TAqDataType.adtUInt32,
+    TAqDataType.adtInt32,
+    TAqDataType.adtUInt64,
+    TAqDataType.adtInt64,
+    TAqDataType.adtCurrency,
+    TAqDataType.adtDouble,
+    TAqDataType.adtSingle,
+    TAqDataType.adtDatetime,
+    TAqDataType.adtDate,
+    TAqDataType.adtTime,
+    TAqDataType.adtAnsiChar,
+    TAqDataType.adtChar,
+    TAqDataType.adtAnsiString,
+    TAqDataType.adtString,
+    TAqDataType.adtWideString,
+    TAqDataType.adtSet];
 end;
 
 { TAqDBORM }
+
+procedure TAqDBORM.AddDetail(const pDetail: IAqDBORMDetail);
+begin
+  GetDetails.Add(pDetail);
+end;
 
 procedure TAqDBORM.AddTable(const pTableInfo: AqTable; const pType: TRttiType);
 begin
@@ -337,126 +531,145 @@ begin
   end;
 end;
 
-constructor TAqDBORM.Create;
+constructor TAqDBORM.Create(const pClass: TClass);
 begin
+  inherited Create;
+
+  FORMClass := pClass;
   FMainTable := TAqDBORMTable<AqTable>.Create(nil, nil);
 end;
 
 destructor TAqDBORM.Destroy;
 begin
-  FSpecializations.Free;
   FMainTable.Free;
 
   inherited;
 end;
 
-function TAqDBORM.GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean;
+function TAqDBORM.FindThroughTables<T>(const pFindFunction: TFindThroughTablesFunction<T>; out pSubject: T): Boolean;
 var
-  lSeparatorPosition: Int32;
-  lTableName: string;
-  lColumnName: string;
   lITable: Int32;
-
-  function FindColumn(const pColumns: TAqReadList<TAqDBORMColumn>; out pColumn: TAqDBORMColumn): Boolean;
-  var
-    lIColumn: Int32;
-  begin
-    Result := False;
-    lIColumn := pColumns.Count;
-
-    while not Result and (lIColumn > 0) do
-    begin
-      Dec(lIColumn);
-
-      Result := string.SameText(lColumnName, pColumns[lIColumn].Name);
-
-      if Result then
-      begin
-        pColumn := pColumns[lIColumn];
-      end;
-    end;
-  end;
 begin
-  Result := False;
-  lSeparatorPosition := pName.IndexOf(FTableSeparator);
+  Result := pFindFunction(FMainTable, pSubject);
 
-  if lSeparatorPosition >= 0 then
+  if not Result and HasSpecializations then
   begin
-    lTableName := pName.LeftFromPosition(lSeparatorPosition);
-    lColumnName := pName.RightFromPosition(lSeparatorPosition);
+    lITable := 0;
 
-    if string.SameText(lTableName, FMainTable.Name) then
+    while not Result and (lITable < FSpecializations.Count) do
     begin
-      Result := FindColumn(FMainTable.Columns, pColumn);
-    end else if HasSpecializations then
-    begin
-      lITable := FSpecializations.Count;
-
-      while not Result and (lITable > 0) do
-      begin
-        Dec(lITable);
-
-        Result := string.SameText(lTableName, FSpecializations[lITable].Attribute.Name);
-
-        if Result then
-        begin
-          Result := FindColumn(FSpecializations[lITable].Columns, pColumn);
-          lITable := 0;
-        end;
-      end;
-    end;
-  end else begin
-    lColumnName := pName;
-    Result := FindColumn(FMainTable.Columns, pColumn);
-
-    if not Result and HasSpecializations then
-    begin
-      lITable := 0;
-
-      while not Result and (lITable < FSpecializations.Count) do
-      begin
-        Result := FindColumn(FSpecializations[lITable].Columns, pColumn);
-        Inc(lITable);
-      end;
+      Result := pFindFunction(FSpecializations[lITable], pSubject);
+      Inc(lITable);
     end;
   end;
 end;
 
-function TAqDBORM.GetSpecializations: TAqReadList<TAqDBORMTable<AqSpecialization>>;
+function TAqDBORM.GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean;
+var
+  lTableName: string;
+  lColumnName: string;
 begin
-  Result := FSpecializations.GetTReadList;
+  if pName.SplitInTwo(FTableSeparator, lTableName, lColumnName) then
+  begin
+    Result := GetColumn(lTableName, lColumnName, pColumn);
+  end else begin
+    Result := FindThroughTables<TAqDBORMColumn>(
+      function(const pTable: TAqDBORMTable; out pSubject: TAqDBORMColumn): Boolean
+      begin
+        Result := pTable.GetColumn(pName, pSubject);
+      end, pColumn);
+  end;
+end;
+
+function TAqDBORM.GetDetailKeys: IAqReadableList<TAqDBORMColumn>;
+var
+  lColumn: TAqDBORMColumn;
+begin
+  if not Assigned(FDetailKeys) then
+  begin
+    FDetailkeys := TAqList<TAqDBORMColumn>.Create;
+    for lColumn in FMainTable.Columns do
+    begin
+      if Assigned(lColumn.Attribute) and (lColumn.Attribute.DetailKey) then
+      begin
+        FDetailkeys.Add(lColumn);
+      end;
+    end;
+  end;
+
+  Result := FDetailkeys.GetReadOnlyList;
+end;
+
+function TAqDBORM.GetDetails: IAqList<IAqDBORMDetail>;
+begin
+  if not Assigned(FDetails) then
+  begin
+    FDetails := TAqList<IAqDBORMDetail>.Create;
+  end;
+
+  Result := FDetails;
+end;
+
+function TAqDBORM.GetSpecializations: IAqReadableList<TAqDBORMTable<AqSpecialization>>;
+begin
+  Result := FSpecializations.GetReadOnlyList;
+end;
+
+function TAqDBORM.GetSpecializationUnderTable(const pTableName: string;
+  out pSpecialization: TAqDBORMTable<AqSpecialization>): Boolean;
+var
+  lFound: Boolean;
+begin
+  lFound := False;
+
+  Result := HasSpecializations and FindThroughTables<TAqDBORMTable<AqSpecialization>>(
+    function(const pTable: TAqDBORMTable; out pSubject: TAqDBORMTable<AqSpecialization>): Boolean
+    begin
+      Result := lFound;
+      if Result then
+      begin
+        pSubject := pTable as TAqDBORMTable<AqSpecialization>;
+      end else begin
+        lFound := string.SameText(pTableName, pTable.Name);
+      end;
+    end, pSpecialization);
 end;
 
 function TAqDBORM.GetTable(const pName: string; out pTable: TAqDBORMTable): Boolean;
-var
-  lI: Int32;
 begin
-  Result := string.SameText(FMainTable.Name, pName);
-
-  if Result then
-  begin
-    pTable := FMainTable;
-  end else if HasSpecializations then
-  begin
-    lI := FSpecializations.Count;
-
-    while not Result and (lI > 0) do
+  Result := FindThroughTables<TAqDBORMTable>(
+    function(const pTable: TAqDBORMTable; out pSubject: TAqDBORMTable): Boolean
     begin
-      Dec(lI);
-
-      Result := FSpecializations[lI].Name = pName;
-
+      Result := string.SameText(pTable.Name, pName);
       if Result then
       begin
-        pTable := FSpecializations[lI];
+        pSubject := pTable;
       end;
-    end;
-  end;
+    end, pTable);
 end;
 
-class procedure TAqDBORM._Initialize;
+function TAqDBORM.GetUniqueKey: TAqDBORMColumn;
+var
+  lPKs: IAqReadableList<TAqDBORMColumn>;
+begin
+  lPKs := GetPrimaryKeys;
+
+  if (lPKs.Count <> 1) or not (lPKs.First.&Type in adtIntTypes) then
+  begin
+    raise EAqInternal.CreateFmt('The class %s doesn''t observe the Unique Key rule.', [FORMClass.QualifiedClassName]);
+  end;
+
+  Result := lPKs.First;
+end;
+
+class procedure TAqDBORM.InitializeDefaultValues;
 begin
   FTableSeparator := '.';
+end;
+
+function TAqDBORM.VerifyIfHasDetail: Boolean;
+begin
+  Result := Assigned(FDetails);
 end;
 
 function TAqDBORM.GetInitialized: Boolean;
@@ -464,42 +677,30 @@ begin
   Result := Assigned(FMainTable.Attribute);
 end;
 
-function TAqDBORM.GetPrimaryKeys: IAqResultList<TAqDBORMColumn>;
+function TAqDBORM.GetPrimaryKeys: IAqReadableList<TAqDBORMColumn>;
 var
-  lResult: TAqResultList<TAqDBORMColumn>;
-  lSpecialization: TAqDBORMTable;
-
-  procedure AddPrimaryKeys(const pTable: TAqDBORMTable);
-  var
-    lColumn: TAqDBORMColumn;
+  lColumn: TAqDBORMColumn;
+begin
+{TODO 2 -oTatu -cMelhoria: criar a opção do usuário do drop escolher qual a tabela que quer consumir as pks, atualmente tá só na tabela principal (no caso de uma especialização, teremos mais tabelas)}
+  if not Assigned(FPrimaryKeys) then
   begin
-    for lColumn in pTable.Columns do
+    FPrimaryKeys := TAqList<TAqDBORMCOlumn>.Create;
+
+    for lColumn in FMainTable.Columns do
     begin
       if Assigned(lColumn.Attribute) and (lColumn.Attribute.PrimaryKey) then
       begin
-        lResult.Add(lColumn);
+        FPrimaryKeys.Add(lColumn);
       end;
     end;
   end;
+
+  Result := FPrimaryKeys.GetReadOnlyList;
+end;
+
+function TAqDBORM.GetReadableDetails: IAqReadableList<IAqDBORMDetail>;
 begin
-  lResult := TAqResultList<TAqDBORMCOlumn>.Create(False);
-
-  try
-    AddPrimaryKeys(FMainTable);
-
-    if HasSpecializations then
-    begin
-      for lSpecialization in FSpecializations do
-      begin
-        AddPrimaryKeys(lSpecialization);
-      end;
-    end;
-  except
-    lResult.Free;
-    raise;
-  end;
-
-  Result := lResult;
+  Result := FDetails.GetReadOnlyList;
 end;
 
 function TAqDBORM.GetHasSpecializations: Boolean;
@@ -517,16 +718,35 @@ begin
   end;
 end;
 
+function TAqDBORM.GetColumn(const pTableName, pColumnName: string; out pColumn: TAqDBORMColumn): Boolean;
+begin
+  Result := FindThroughTables<TAqDBORMColumn>(
+    function(const pTable: TAqDBORMTable; out pSubject: TAqDBORMColumn): Boolean
+    begin
+      Result := string.SameText(pTableName, pTable.Name) and pTable.GetColumn(pColumnName, pSubject);
+    end, pColumn);
+end;
+
+function TAqDBORM.GetColumnByRttiMember(const pRttiMember: TRttiMember; out pColumn: TAqDBORMColumn): Boolean;
+begin
+  Result := FindThroughTables<TAqDBORMColumn>(
+    function(const pTable: TAqDBORMTable; out pSubject: TAqDBORMColumn): Boolean
+    begin
+      Result := pTable.GetColumnByRttiMember(pRttiMember, pSubject);
+    end, pColumn);
+end;
+
 { TAqDBORMColumn }
 
-constructor TAqDBORMColumn.Create(const pAttribute: AqColumn);
+constructor TAqDBORMColumn.Create(const pTable: TAqDBORMTable; const pAttribute: AqColumn);
 begin
+  FTable := pTable;
   FAttribute := pAttribute;
 end;
 
 function TAqDBORMColumn.GetAlias: string;
 begin
-  if Assigned(FAttribute) and FAttribute.IsAliasDefined then
+  if IsAliasDefined then
   begin
     Result := FAttribute.Alias;
   end else begin
@@ -534,17 +754,51 @@ begin
   end;
 end;
 
+function TAqDBORMColumn.GetName: string;
+begin
+  if Assigned(Attribute) and Attribute.IsNameDefined then
+  begin
+    Result := Attribute.Name;
+  end else begin
+    Result := GetMetadataName;
+  end;
+end;
+
+function TAqDBORMColumn.GetStatusIsAliasDefined: Boolean;
+begin
+  Result := HasAttribute and FAttribute.IsAliasDefined;
+end;
+
+function TAqDBORMColumn.GetTargetName: string;
+begin
+  if IsAliasDefined then
+  begin
+    Result := Alias;
+  end else begin
+    Result := Name;
+  end;
+end;
+
+function TAqDBORMColumn.GetValueGetter: IAqRttiValueGetter;
+begin
+  if not Assigned(FValueGetter) then
+  begin
+    FValueGetter := DoGetValueGetter;
+  end;
+
+  Result := FValueGetter;
+end;
+
 procedure TAqDBORMColumn.SetDBValue(const pInstance: TObject; pValue: IAqDBValue);
   function IsNullIfZeroActive: Boolean;
   begin
-    Result := Assigned(FAttribute) and (TAqDBColumnAttribute.caNullIfZero in FAttribute.Attributes);
+    Result := HasAttribute and (TAqDBColumnAttribute.caNullIfZero in FAttribute.Attributes);
   end;
 
   function IsNullIfEmptyActive: Boolean;
   begin
-    Result := Assigned(FAttribute) and (TAqDBColumnAttribute.caNullIfEmpty in FAttribute.Attributes);
+    Result := HasAttribute and (TAqDBColumnAttribute.caNullIfEmpty in FAttribute.Attributes);
   end;
-
 var
   lValue: TValue;
 begin
@@ -714,99 +968,91 @@ begin
 end;
 
 procedure TAqDBORMColumn.SetObjectValue(const pInstance: TObject; pValue: IAqDBReadValue);
-var
-  lValue: TValue;
 begin
-  case GetType of
-    TAqDataType.adtBoolean:
-      lValue := TValue.From<Boolean>(pValue.AsBoolean);
-    TAqDataType.adtEnumerated:
-      lValue := TValue.FromOrdinal(GetTypeInfo, pValue.AsInt64);
-    TAqDataType.adtUInt8:
-      lValue := TValue.From<UInt8>(pValue.AsUInt8);
-    TAqDataType.adtInt8:
-      lValue := TValue.From<Int8>(pValue.AsInt8);
-    TAqDataType.adtUInt16:
-      lValue := TValue.From<UInt16>(pValue.AsUInt16);
-    TAqDataType.adtInt16:
-      lValue := TValue.From<Int16>(pValue.AsInt16);
-    TAqDataType.adtUInt32:
-      lValue := TValue.From<UInt32>(pValue.AsUInt32);
-    TAqDataType.adtInt32:
-      lValue := TValue.From<Int32>(pValue.AsInt32);
-    TAqDataType.adtUInt64:
-      lValue := TValue.From<UInt64>(pValue.AsUInt64);
-    TAqDataType.adtInt64:
-      lValue := TValue.From<Int64>(pValue.AsInt64);
-    TAqDataType.adtCurrency:
-      lValue := TValue.From<Currency>(pValue.AsCurrency);
-    TAqDataType.adtDouble:
-      lValue := TValue.From<Double>(pValue.AsDouble);
-    TAqDataType.adtSingle:
-      lValue := TValue.From<Single>(pValue.AsSingle);
-    TAqDataType.adtDatetime:
-      lValue := TValue.From<TDateTime>(pValue.AsDateTime);
-    TAqDataType.adtDate:
-      lValue := TValue.From<TDate>(pValue.AsDate);
-    TAqDataType.adtTime:
-      lValue := TValue.From<TTime>(pValue.AsTime);
-{$IFNDEF AQMOBILE}
-    TAqDataType.adtAnsiChar:
-      lValue := TValue.From<AnsiChar>(AnsiChar(pValue.AsString.Chars[0]));
-{$ENDIF}
-    TAqDataType.adtChar:
-      lValue := TValue.From<Char>(pValue.AsString.Chars[0]);
-{$IFNDEF AQMOBILE}
-    TAqDataType.adtAnsiString:
-      lValue := TValue.From<AnsiString>(pValue.AsAnsiString);
-{$ENDIF}
-    TAqDataType.adtString, TAqDataType.adtWideString:
-      lValue := TValue.From<string>(pValue.AsString);
-  else
-    raise EAqInternal.Create('Unexpected type when setting value to ' + Self.Name + ' object value.');
-  end;
+  SetValue(pInstance, pValue.GetAsTValue(GetTypeInfo));
+end;
 
-  SetValue(pInstance, lValue);
+function TAqDBORMColumn.VerifyIfIsHasAttribute: Boolean;
+begin
+  Result := Assigned(FAttribute);
 end;
 
 { TAqDBORMTable }
 
 procedure TAqDBORMTable.AddColumn(const pField: TRttiField; const pAttribute: AqColumn);
 begin
-  FColumns.Add(TAqDBORMColumnField.Create(pField, pAttribute));
+  AddColumn(pField, TAqDBORMColumnField.Create(Self, pField, pAttribute));
 end;
 
 procedure TAqDBORMTable.AddColumn(const pProperty: TRttiProperty; const pAttribute: AqColumn);
 begin
-  FColumns.Add(TAqDBORMColumnProperty.Create(pProperty, pAttribute));
+  AddColumn(pProperty, TAqDBORMColumnProperty.Create(Self, pProperty, pAttribute));
+end;
+
+procedure TAqDBORMTable.AddColumn(const pRttiMember: TRttiMember; const pAttribute: AqColumn);
+begin
+  pRttiMember.Disambiguate(
+    procedure(pField: TRttiField)
+    begin
+      AddColumn(pField, pAttribute);
+    end,
+    procedure(pProperty: TRttiProperty)
+    begin
+      AddColumn(pProperty, pAttribute);
+    end);
+end;
+
+procedure TAqDBORMTable.AddColumn(const pRttiMember: TRttiMember; const pColumn: TAqDBORMColumn);
+begin
+  FColumns.Add(pColumn);
+  FColumnsByMember.Add(pRttiMember, pColumn);
 end;
 
 constructor TAqDBORMTable.Create(const pType: TRttiType);
 begin
   FType := pType;
   FColumns := TAqList<TAqDBORMColumn>.Create(True);
-end;
-
-destructor TAqDBORMTable.Destroy;
-begin
-  FColumns.Free;
-
-  inherited;
+  FColumnsByMember := TAqDictionary<TRttiMember, TAqDBORMColumn>.Create;
 end;
 
 function TAqDBORMTable.ExtractTableName(const pType: TRttiType): string;
 begin
-  if (Length(pType.Name) > 1) and StartsStr('T', AnsiUpperCase(pType.Name)) then
+  if (pType.Name.Length > 1) and pType.Name.ToUpper.StartsWith('T') then
   begin
-    Result := RightStr(pType.Name, Length(pType.Name) - 1);
+    Result := pType.Name.RightFromPosition(1, True);
   end else begin
     Result := pType.Name;
   end;
 end;
 
-function TAqDBORMTable.GetColumns: TAqReadList<TAqDBORMColumn>;
+function TAqDBORMTable.GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean;
+var
+  lIColumn: Int32;
 begin
-  Result := FColumns.GetTReadList;
+  Result := False;
+  lIColumn := FColumns.Count;
+
+  while not Result and (lIColumn > 0) do
+  begin
+    Dec(lIColumn);
+
+    Result := string.SameText(pName, FColumns[lIColumn].TargetName);
+
+    if Result then
+    begin
+      pColumn := FColumns[lIColumn];
+    end;
+  end;
+end;
+
+function TAqDBORMTable.GetColumnByRttiMember(const pRttiMember: TRttiMember; out pColumn: TAqDBORMColumn): Boolean;
+begin
+  Result := FColumnsByMember.TryGetValue(pRttiMember, pColumn);
+end;
+
+function TAqDBORMTable.GetColumns: IAqReadableList<TAqDBORMColumn>;
+begin
+  Result := FColumns.GetReadOnlyList;
 end;
 
 function TAqDBORMTable.HasAutoIncrementColumn(out pColumn: TAqDBORMColumn): Boolean;
@@ -863,31 +1109,32 @@ end;
 
 { TAqDBORMColumnField }
 
-constructor TAqDBORMColumnField.Create(const pField: TRttiField; const pAttribute: AqColumn);
+constructor TAqDBORMColumnField.Create(const pTable: TAqDBORMTable; const pField: TRttiField;
+  const pAttribute: AqColumn);
 begin
-  inherited Create(pAttribute);
+  inherited Create(pTable, pAttribute);
 
   FField := pField;
 end;
 
-function TAqDBORMColumnField.ExtractColumnName(const pRttiObject: TRttiNamedObject): string;
+function TAqDBORMColumnField.DoGetValueGetter: IAqRttiValueGetter;
 begin
-  if (Length(pRttiObject.Name) > 1) and StartsStr('F', AnsiUpperCase(pRttiObject.Name)) then
+  Result := TAqRttiFieldValueGetter.Create(FField);
+end;
+
+function TAqDBORMColumnField.GetMetadataName: string;
+begin
+  if (FField.Name.Length > 1) and FField.Name.ToUpper.StartsWith('F') then
   begin
-    Result := RightStr(pRttiObject.Name, Length(pRttiObject.Name) - 1);
+    Result := FField.Name.RightFromPosition(1, True);
   end else begin
-    Result := pRttiObject.Name;
+    Result := FField.Name;
   end;
 end;
 
-function TAqDBORMColumnField.GetName: string;
+function TAqDBORMColumnField.GetRttiMember: TRttiMember;
 begin
-  if Assigned(Attribute) and Attribute.IsNameDefined then
-  begin
-    Result := Attribute.Name;
-  end else begin
-    Result := ExtractColumnName(FField);
-  end;
+  Result := FField;
 end;
 
 function TAqDBORMColumnField.GetType: TAqDataType;
@@ -912,21 +1159,27 @@ end;
 
 { TAqDBORMColumnProperty }
 
-constructor TAqDBORMColumnProperty.Create(const pProperty: TRttiProperty; const pAttribute: AqColumn);
+constructor TAqDBORMColumnProperty.Create(const pTable: TAqDBORMTable; const pProperty: TRttiProperty;
+  const pAttribute: AqColumn);
 begin
-  inherited Create(pAttribute);
+  inherited Create(pTable, pAttribute);
 
   FProperty := pProperty;
 end;
 
-function TAqDBORMColumnProperty.GetName: string;
+function TAqDBORMColumnProperty.DoGetValueGetter: IAqRttiValueGetter;
 begin
-  if Assigned(Attribute) and Attribute.IsNameDefined then
-  begin
-    Result := Attribute.Name;
-  end else begin
-    Result := FProperty.Name;
-  end;
+  Result := TAqRttiPropertyValueGetter.Create(FProperty);
+end;
+
+function TAqDBORMColumnProperty.GetMetadataName: string;
+begin
+  Result := FProperty.Name;
+end;
+
+function TAqDBORMColumnProperty.GetRttiMember: TRttiMember;
+begin
+  Result := FProperty;
 end;
 
 function TAqDBORMColumnProperty.GetType: TAqDataType;
@@ -954,11 +1207,168 @@ begin
   FProperty.SetValue(pInstance, pValue);
 end;
 
+{ TAqDBORMDetail }
+{
+function TAqDBORMDetail.AddItem(const pMaster: TObject): TObject;
+begin
+  Result := DoAddItem(pMaster);
+end;
+
+constructor TAqDBORMDetail.Create(const pORM: TAqDBORM; const pMember: TRttiMember);
+begin
+  FORM := pORM;
+  FMember := pMember;
+end;
+
+function TAqDBORMDetail.GetDetailKeys: IAqReadableList<TAqDBORMColumn>;
+begin
+  Result := FORM.GetDetailKeys;
+end;
+
+function TAqDBORMDetail.GetItems(const pMaster: TObject): IAqReadableList<TObject>;
+begin
+  Result := DoGetItems(pMaster);
+end;
+
+function TAqDBORMDetail.VerifyIfIsDetailsAreLoaded(const pMaster: TObject): Boolean;
+begin
+  Result := DoVerifyIfIsDetailsAreLoaded(pMaster);
+end;
+
+function TAqDBORMDetail.VerifyIfLazyLoadingIsEnabled: Boolean;
+begin
+  Result := DoVerifyIfLazyLoadingIsEnabled;
+end;
+}
+{ TAqDBORMListDetailInterpreter }
+
+function TAqDBORMListDetailInterpreter.Interpret(const pRttiMember: TRttiMember;
+  out pORMDetail: IAqDBORMDetail): Boolean;
+var
+  lMemberType: TRttiType;
+  lGenericTypeNames: TArray<string>;
+  lInternalType: TRttiType;
+  lConstructor: TRttiMethod;
+
+  function FindListMemberType: Boolean;
+  begin
+    Result := False;
+    lMemberType := pRttiMember.MemberType;
+
+    while not Result and Assigned(lMemberType) do
+    begin
+      Result := lMemberType.IsGeneric and (lMemberType.GetGenericName = 'System.Generics.Collections.TList<>');
+
+      if not Result then
+      begin
+        lMemberType := lMemberType.BaseType;
+      end;
+    end;
+  end;
+
+  function CheckUniqueGenericTypeName: Boolean;
+  begin
+    lGenericTypeNames := lMemberType.GetGenericTypeNames;
+    Result := Length(lGenericTypeNames) = 1;
+  end;
+
+  function FindInternalType: Boolean;
+  begin
+    lInternalType := TAqRtti.&Implementation.FindType(lGenericTypeNames[0]);
+    Result := Assigned(lInternalType);
+  end;
+
+  function FindInternalTypeConstructor: Boolean;
+  begin
+    Result := (lInternalType.GetDataType = adtClass) and lInternalType.GetParameterlessConstructor(lConstructor);
+  end;
+begin
+  Result := FindListMemberType and
+    CheckUniqueGenericTypeName and
+    FindInternalType and
+    FindInternalTypeConstructor;
+
+  if Result then
+  begin
+    pORMDetail := TAqDBORMListDetail.Create(pRttiMember, lInternalType.AsInstance.MetaclassType, lConstructor);
+  end;
+end;
+
+{ TAqDBORMListDetail }
+
+constructor TAqDBORMListDetail.Create(const pMasterMember: TRttiMember;
+  const pItemClass: TClass; const pItemConstructor: TRttiMethod);
+begin
+  inherited Create;
+
+  FItemClass := pItemClass;
+  FORM := TAqDBORMReader.Instance.GetORM(pItemClass);
+  FMasterMember := pMasterMember;
+
+  if Assigned(pItemConstructor) then
+  begin
+    FItemConstructor := pItemConstructor;
+  end else begin
+    if not TAqRtti.&Implementation.GetType(pItemClass).GetParameterlessConstructor(FItemConstructor) then
+    begin
+      raise EAqInternal.CreateFmt('Impossible to create this detail whithout a default constructor for %s.',
+        [pItemClass.QualifiedClassName]);
+    end;
+  end;
+end;
+
+function TAqDBORMListDetail.AddItem(const pMaster: TObject): TObject;
+begin
+  Result := FItemConstructor.Invoke(FItemClass, []).AsObject;
+
+  try
+    GetMemberValueAsObjectList(pMaster).Add(Result);
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+function TAqDBORMListDetail.GetDeletedItens(const pMaster: TObject): IAqReadableList<TObject>;
+begin
+  raise EAqInternal.Create('This detail list do not support managed deleted items.');
+end;
+
+function TAqDBORMListDetail.GetItems(const pMaster: TObject): IAqReadableList<TObject>;
+begin
+  Result := TAqReadableList<TObject>.Create(GetMemberValueAsObjectList(pMaster));
+end;
+
+function TAqDBORMListDetail.GetORM: TAqDBORM;
+begin
+  Result := FORM;
+end;
+
+function TAqDBORMListDetail.VerifyIfDeletedItensAreManaged: Boolean;
+begin
+  Result := False;
+end;
+
+function TAqDBORMListDetail.VerifyIfDetailsAreLoaded(const pMaster: TObject): Boolean;
+begin
+  Result := True;
+end;
+
+function TAqDBORMListDetail.VerifyIfLazyLoadingIsAvailable: Boolean;
+begin
+  Result := False;
+end;
+
+function TAqDBORMListDetail.GetMemberValueAsObjectList(const pMaster: TObject): TList<TObject>;
+begin
+  Result := TList<TObject>(FMasterMember.UniversalGetValue(pMaster).AsObject);
+end;
+
 initialization
-  TAqDBORM._Initialize;
-  TAqDBORMReader._Initialize;
+  TAqDBORM.InitializeDefaultValues;
+  TAqDBORMReader.InitializeInstance;
 
 finalization
-  TAqDBORMReader._Finalize;
+  TAqDBORMReader.ReleaseInstance;
 
 end.

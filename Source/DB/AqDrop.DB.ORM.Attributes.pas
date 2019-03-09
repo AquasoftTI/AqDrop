@@ -3,7 +3,8 @@ unit AqDrop.DB.ORM.Attributes;
 interface
 
 uses
-  AqDrop.Core.Collections, AqDrop.Core.Attributes;
+  AqDrop.Core.Collections.Intf,
+  AqDrop.Core.Attributes;
 
 type
   TAqDBTableMappingProperty = (tmpAutoMapFields, tmpAutoMapProperties, tmpInheritPKs);
@@ -41,20 +42,19 @@ type
 
   AqSpecialization = class(AqTable)
   strict private
-    FLinks: TAqList<TAqDBLink>;
+    FLinks: IAqList<TAqDBLink>;
 
-    function GetLinks: TAqReadList<TAqDBLink>;
+    function GetLinks: IAqReadableList<TAqDBLink>;
   public
     constructor Create(const pName: string; const pMasterKey, pForeignKey: string;
       const pMappingProperties: TAqDBTableMappingProperties = [tmpAutoMapFields, tmpInheritPKs]); overload;
     constructor Create(const pName: string; const pLinks: string;
       const pMappingProperties: TAqDBTableMappingProperties = [tmpAutoMapFields, tmpInheritPKs]); overload;
-    destructor Destroy; override;
 
-    property Links: TAqReadList<TAqDBLink> read GetLinks;
+    property Links: IAqReadableList<TAqDBLink> read GetLinks;
   end;
 
-  TAqDBColumnAttribute = (caPrimaryKey, caAutoIncrement, caNullIfZero, caNullIfEmpty);
+  TAqDBColumnAttribute = (caPrimaryKey, caAutoIncrement, caNullIfZero, caNullIfEmpty, caDetailKey);
   TAqDBColumnAttributes = set of TAqDBColumnAttribute;
 
   AqColumn = class(TAqDBAttribute)
@@ -63,7 +63,7 @@ type
     FAttributes: TAqDBColumnAttributes;
     FAlias: string;
 
-    function GetStatusAttribute(const Index: Int32): Boolean;
+    function GetStatusAttribute(const pIndex: TAqDBColumnAttribute): Boolean;
     function GetIsNameDefined: Boolean;
     function GetIsAliasDefined: Boolean;
   strict protected
@@ -80,11 +80,17 @@ type
     property Name: string read FName;
     property Alias: string read FAlias;
     property Attributes: TAqDBColumnAttributes read GetAttributes;
-    property PrimaryKey: Boolean index 0 read GetStatusAttribute;
-    property AutoIncrement: Boolean index 1 read GetStatusAttribute;
+    property PrimaryKey: Boolean index TAqDBColumnAttribute.caPrimaryKey read GetStatusAttribute;
+    property AutoIncrement: Boolean index TAqDBColumnAttribute.caAutoIncrement read GetStatusAttribute;
+    property DetailKey: Boolean index TAqDBColumnAttribute.caDetailKey read GetStatusAttribute;
   end;
 
   AqPrimaryKey = class(AqColumn)
+  strict protected
+    function GetAttributes: TAqDBColumnAttributes; override;
+  end;
+
+  AqDetailKey = class(AqColumn)
   strict protected
     function GetAttributes: TAqDBColumnAttributes; override;
   end;
@@ -107,10 +113,25 @@ type
     property GeneratorName: string read FGeneratorName;
   end;
 
+  AqNullIfZeroColumn = class(AqColumn)
+  strict protected
+    function GetAttributes: TAqDBColumnAttributes; override;
+  end;
+
+  AqNullIfEmptyColumn = class(AqColumn)
+  strict protected
+    function GetAttributes: TAqDBColumnAttributes; override;
+  end;
+
+  AqDetail = class(TAqDBAttribute);
+
 implementation
 
 uses
-  System.Classes, AqDrop.Core.Exceptions, AqDrop.Core.Helpers;
+  System.Classes,
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Helpers,
+  AqDrop.Core.Collections;
 
 { AqTable }
 
@@ -164,15 +185,9 @@ begin
   Result := not FName.IsEmpty;
 end;
 
-function AqColumn.GetStatusAttribute(const Index: Int32): Boolean;
+function AqColumn.GetStatusAttribute(const pIndex: TAqDBColumnAttribute): Boolean;
 begin
-  Result := False;
-  case Index of
-    0:
-      Result := TAqDBColumnAttribute.caPrimaryKey in GetAttributes;
-    1:
-      Result := TAqDBColumnAttribute.caAutoIncrement in GetAttributes;
-  end;
+  Result := pIndex in GetAttributes;
 end;
 
 { AqSpecialization }
@@ -228,16 +243,9 @@ begin
   end;
 end;
 
-destructor AqSpecialization.Destroy;
+function AqSpecialization.GetLinks: IAqReadableList<TAqDBLink>;
 begin
-  FLinks.Free;
-
-  inherited;
-end;
-
-function AqSpecialization.GetLinks: TAqReadList<TAqDBLink>;
-begin
-  Result := FLinks.GetTReadList;
+  Result := FLinks.GetReadOnlyList;
 end;
 
 { TAqDBLink }
@@ -283,6 +291,27 @@ end;
 function AqAutoIncrementColumn.GetIsGeneratorDefined: Boolean;
 begin
   Result := not FGeneratorName.IsEmpty;
+end;
+
+{ AqNullIfZeroColumn }
+
+function AqNullIfZeroColumn.GetAttributes: TAqDBColumnAttributes;
+begin
+  Result := inherited + [TAqDBColumnAttribute.caNullIfZero];
+end;
+
+{ AqNullIfEmptyColumn }
+
+function AqNullIfEmptyColumn.GetAttributes: TAqDBColumnAttributes;
+begin
+  Result := inherited + [TAqDBColumnAttribute.caNullIfEmpty];
+end;
+
+{ AqDetailKey }
+
+function AqDetailKey.GetAttributes: TAqDBColumnAttributes;
+begin
+  Result := inherited + [TAqDBColumnAttribute.caDetailKey];
 end;
 
 end.

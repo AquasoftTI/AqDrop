@@ -2,7 +2,18 @@ unit AqDrop.Core.InterfacedObject;
 
 interface
 
+uses
+  System.SysUtils;
+
 type
+  IAqInterfacedObject = interface
+    ['{CC89B6C7-D7AB-4ECD-B12B-A8A597F06153}']
+
+    function VerifyIfARCIsEnabled: Boolean;
+
+    property ARCEnabled: Boolean read VerifyIfARCIsEnabled;
+  end;
+
   /// ------------------------------------------------------------------------------------------------------------------
   /// <summary>
   ///   EN-US:
@@ -11,82 +22,137 @@ type
   ///     Classe base para objetos que devem implementar IInterface.
   /// </summary>
   /// ------------------------------------------------------------------------------------------------------------------
-{$IFDEF AUTOREFCOUNT}
-  TAqInterfacedObject = class(TInterfacedObject)
-  strict protected
-{$ELSE}
-  TAqInterfacedObject = class(TObject, IInterface)
-  strict private
-    FReferences: Int32;
+  TAqInterfacedObject = class(TInterfacedObject, IInterface, IAqInterfacedObject)
   strict protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Int32; stdcall;
     function _Release: Int32; stdcall;
-{$ENDIF}
-    class function MustCountReferences: Boolean; virtual;
-{$IFNDEF AUTOREFCOUNT}
-    property References: Int32 read FReferences;
-  public
-    procedure AfterConstruction; override;
-    procedure BeforeDestruction; override;
 
-    class function NewInstance: TObject; override;
-{$ENDIF}
+    function _VerifyIfARCIsEnabled: Boolean; virtual;
+
+    function IAqInterfacedObject.VerifyIfARCIsEnabled = _VerifyIfARCIsEnabled;
+
+    function _EnableARCForObject: Boolean; virtual;
+    class function _EnableARCForClass: Boolean; virtual;
   end;
 
+  TAqARCObject = class(TAqInterfacedObject)
+  strict protected
+    class function _EnableARCForClass: Boolean; override;
+  end;
+
+  IAqDelegatedInterface = interface
+    ['{7D10ED7E-4ECA-4653-91EE-A0BD170FEB16}']
+
+    procedure EnableARC;
+    procedure DisableARC;
+  end;
+
+  TAqDelegatedInterface = class(TAqARCObject, IInterface, IAqDelegatedInterface)
+  strict private
+    FOwner: TObject;
+    FARCEnabled: Boolean;
+
+    function _Release: Integer; stdcall;
+    function QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+  strict protected
+    function _VerifyIfARCIsEnabled: Boolean; override;
+  public
+    constructor Create(pOwner: TObject; const pARCEnabled: Boolean = True); overload;
+
+    procedure EnableARC;
+    procedure DisableARC;
+  end;
 
 implementation
 
-{$IFNDEF AUTOREFCOUNT}
 uses
-  System.SyncObjs;
+  AqDrop.Core.Helpers;
 
-{ TAqCustomInterfacedObject }
+{ TAqInterfacedObject }
 
-procedure TAqInterfacedObject.AfterConstruction;
-begin
-  inherited;
-
-  if MustCountReferences then
-  begin
-    TInterlocked.Decrement(FReferences);
-  end;
-end;
-
-procedure TAqInterfacedObject.BeforeDestruction;
-begin
-  if MustCountReferences and (FReferences <> 0) then
-  begin
-    System.Error(reInvalidPtr);
-  end;
-
-  inherited;
-end;
-{$ENDIF}
-
-class function TAqInterfacedObject.MustCountReferences: Boolean;
+class function TAqInterfacedObject._EnableARCForClass: Boolean;
 begin
   Result := False;
 end;
 
-{$IFNDEF AUTOREFCOUNT}
-class function TAqInterfacedObject.NewInstance: TObject;
-var
-  lInterfacedObject: TAqInterfacedObject;
+function TAqInterfacedObject._EnableARCForObject: Boolean;
 begin
-  lInterfacedObject := TAqInterfacedObject(inherited NewInstance);
-
-  if lInterfacedObject.MustCountReferences then
-  begin
-    lInterfacedObject.FReferences := 1;
-  end;
-
-  Result := lInterfacedObject;
+  Result := _EnableARCForClass;
 end;
 
 function TAqInterfacedObject.QueryInterface(const IID: TGUID; out Obj): HResult;
 begin
-  if GetInterface(IID, Obj) then
+  Result := inherited;
+end;
+
+function TAqInterfacedObject._AddRef: Int32;
+var
+  lCallInheritedFunction: Boolean;
+begin
+{$IFDEF AUTOREFCOUNT}
+  lCallInheritedFunction := True;
+{$ELSE}
+  lCallInheritedFunction := _EnableARCForObject;
+{$ENDIF}
+  if lCallInheritedFunction then
+  begin
+    Result := inherited;
+  end else begin
+    Result := 0;
+  end;
+end;
+
+function TAqInterfacedObject._Release: Int32;
+var
+  lCallInheritedFunction: Boolean;
+begin
+{$IFDEF AUTOREFCOUNT}
+  lCallInheritedFunction := True;
+{$ELSE}
+  lCallInheritedFunction := _EnableARCForObject;
+{$ENDIF}
+  if lCallInheritedFunction then
+  begin
+    Result := inherited;
+  end else begin
+    Result := 0;
+  end;
+end;
+
+function TAqInterfacedObject._VerifyIfARCIsEnabled: Boolean;
+begin
+  Result := _EnableARCForObject;
+end;
+
+{ TAqARCObject }
+
+class function TAqARCObject._EnableARCForClass: Boolean;
+begin
+  Result := True;
+end;
+
+{ TAqDelegatedInterface }
+
+constructor TAqDelegatedInterface.Create(pOwner: TObject; const pARCEnabled: Boolean);
+begin
+  FOwner := pOwner;
+  FARCEnabled := pARCEnabled;
+end;
+
+procedure TAqDelegatedInterface.DisableARC;
+begin
+  FARCEnabled := False;
+end;
+
+procedure TAqDelegatedInterface.EnableARC;
+begin
+  FARCEnabled := True;
+end;
+
+function TAqDelegatedInterface.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+begin
+  if FOwner.GetInterface(IID, Obj) then
   begin
     Result := 0;
   end else begin
@@ -94,32 +160,24 @@ begin
   end;
 end;
 
-function TAqInterfacedObject._AddRef: Int32;
+function TAqDelegatedInterface._Release: Integer;
 begin
-  if MustCountReferences then
+  Result := inherited;
+
+  if FARCEnabled and (Result = 1) then
   begin
-    Result := TInterlocked.Increment(FReferences);
-  end else begin
-    Result := 0;
-  end;
-end;
-
-function TAqInterfacedObject._Release: Int32;
-begin
-  if MustCountReferences then
-  begin
-    Result := TInterlocked.Decrement(FReferences);
-
-    if Result = 0 then
-    begin
-      Destroy;
-    end;
-  end else begin
-    Result := 0;
-  end;
-end;
-
+{$IFDEF AUTOREFCOUNT}
+    FOwner.DisposeOf;
+{$ELSE}
+    FOwner.Free;
 {$ENDIF}
+  end;
+end;
+
+function TAqDelegatedInterface._VerifyIfARCIsEnabled: Boolean;
+begin
+  Result := FARCEnabled;
+end;
 
 end.
 

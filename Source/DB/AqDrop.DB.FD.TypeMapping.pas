@@ -33,7 +33,6 @@ type
   TAqFDMappedConnectionParameters = TStrings;
 {$ENDIF}
 
-
 implementation
 
 end.

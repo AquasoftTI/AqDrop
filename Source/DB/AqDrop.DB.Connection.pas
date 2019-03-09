@@ -6,9 +6,9 @@ uses
   System.Classes,
   System.SyncObjs,
   System.SysUtils,
+  AqDrop.Core.Types,
   AqDrop.Core.Manager,
   AqDrop.Core.Collections.Intf,
-  AqDrop.Core.Collections,
   AqDrop.DB.Types,
   AqDrop.DB.SQL,
   AqDrop.DB.Adapter,
@@ -29,6 +29,7 @@ type
   strict private
     FOnwsAdapter: Boolean;
 
+    FAutoConnect: Boolean;
     FTransactionCalls: UInt32;
     FAdapter: TAqDBAdapter;
     FReaders: UInt32;
@@ -41,7 +42,7 @@ type
     function OpenQuery(const pOpeningFunction: TFunc<IAqDBReader>): IAqDBReader; overload;
     function ExecuteCommand(const pExecutionFunction: TFunc<Int64>): Int64; overload;
 
-    class var FConnections: TAqList<TAqDBConnection>;
+    class var FConnections: IAqList<TAqDBConnection>;
   private
     class procedure _Initialize;
     class procedure _Finalize;
@@ -82,11 +83,13 @@ type
     procedure DoDisconnect; virtual; abstract;
 
     function CreateAdapter: TAqDBAdapter; virtual;
-    class function GetDefaultAdapter: TAqDBAdapterClass; virtual;
 
     procedure RaiseImpossibleToConnect(const pEBase: Exception);
 
     property TransactionCalls: UInt32 read FTransactionCalls;
+
+    class function GetDefaultAdapter: TAqDBAdapterClass; virtual;
+    class procedure ReleaseFromConnectionsList(const pConnection: TAqDBConnection);
   protected
     procedure SetAdapter(const pAdapter: TAqDBAdapter); overload; virtual;
     procedure SetAdapter(const pAdapter: TAqDBAdapter; const pOwnsAdapter: Boolean); overload; virtual;
@@ -173,74 +176,78 @@ type
     function OpenQuery(const pCommandID: TAqID;
       const pParametersHandler: TAqDBParametersHandlerMethod = nil): IAqDBReader; overload;
 
-    function GetAutoIncrement(const pGenerator: string = ''): Int64; virtual;
+    function GetAutoIncrementValue(const pGenerator: string = ''): Int64; virtual;
 
+
+    property AutoConnect: Boolean read FAutoConnect write FAutoConnect;
     property Adapter: TAqDBAdapter read FAdapter write SetAdapter;
     property Active: Boolean read GetActive write SetActive;
     property InTransaction: Boolean read GetInTransaction;
   end;
 
-  TAqDBPooledConnection<TBaseConnection: TAqDBConnection> = class(TAqDBConnection)
-  strict protected type
-    TAqDBContext = class
-    strict private
-      FMasterConnection: TAqDBPooledConnection<TBaseConnection>;
-      FLockerThread: TThreadID;
-      FConnection: TBaseConnection;
-      FPreparedQueries: TAqDictionary<TAqID, TAqID>;
-      FCalls: UInt32;
-      FLastUsedAt: TDateTime;
-
-      function GetIsLocked: Boolean;
-    public
-      constructor Create(const pMasterConnections: TAqDBPooledConnection<TBaseConnection>;
-        const pBaseConection: TBaseConnection);
-      destructor Destroy; override;
-
-      procedure LockConnection;
-      procedure ReleaseConnection;
-
-      function GetCommandID(const pMasterCommandID: TAqID): TAqID;
-
-      property Connection: TBaseConnection read FConnection;
-      property LockerThread: TThreadID read FLockerThread;
-      property Locked: Boolean read GetIsLocked;
-      property PreparedQueries: TAqDictionary<TAqID, TAqID> read FPreparedQueries;
-      property LastUsedAt: TDateTime read FLastUsedAt;
-    end;
-  strict private type
-    TAqDBFlushContextsThread = class(TThread)
-    strict private
-      FAutoFlushContextsTime: UInt32;
-      FPool: TAqList<TAqDBContext>;
-
-      procedure SetAutoFlushContextsTime(const pValue: UInt32);
-    protected
-      procedure Execute; override;
-    public
-      constructor Create(const pPool: TAqList<TAqDBContext>);
-
-      property AutoFlushContextsTime: UInt32 read FAutoFlushContextsTime write SetAutoFlushContextsTime;
-    end;
-
-    TAqDBPreparedQuery = class
-    strict private
-        FSQL: string;
-        FParametersInitializer: TAqDBParametersHandlerMethod;
-    public
-      constructor Create(const pSQL: string; const pParametersInitializer: TAqDBParametersHandlerMethod);
-
-      property SQL: string read FSQL write FSQL;
-      property ParametersInitializer: TAqDBParametersHandlerMethod read FParametersInitializer
-        write FParametersInitializer;
-    end;
+  TAqDBPreparedQuery = class
   strict private
-    FPool: TAqList<TAqDBContext>;
-    FConnectionBuilder: TFunc<TBaseConnection>;
-    FPreparedQueries: TAqIDDictionary<TAqDBPreparedQuery>;
-    FFlushContextsThread: TAqDBFlushContextsThread;
+      FSQL: string;
+      FParametersInitializer: TAqDBParametersHandlerMethod;
+  public
+    constructor Create(const pSQL: string; const pParametersInitializer: TAqDBParametersHandlerMethod);
 
-    procedure SolvePoolAndExecute(const pMethod: TProc<TAqDBContext>);
+    property SQL: string read FSQL write FSQL;
+    property ParametersInitializer: TAqDBParametersHandlerMethod read FParametersInitializer
+      write FParametersInitializer;
+  end;
+
+  TAqDBConnectionPool<TBaseConnection: TAqDBConnection> = class;
+
+  TAqDBPooledConnection<TBaseConnection: TAqDBConnection> = class
+  strict private
+    FMasterConnection: TAqDBConnectionPool<TBaseConnection>;
+    FLockerThread: TThreadID;
+    FConnection: TBaseConnection;
+    FPreparedQueries: IAqDictionary<TAqID, TAqID>;
+    FCalls: UInt32;
+    FLastUsedAt: TDateTime;
+
+    function GetIsLocked: Boolean;
+  public
+    constructor Create(const pMasterConnections: TAqDBConnectionPool<TBaseConnection>;
+      const pBaseConection: TBaseConnection);
+    destructor Destroy; override;
+
+    procedure LockConnection;
+    procedure ReleaseConnection;
+
+    function GetCommandID(const pMasterCommandID: TAqID): TAqID;
+
+    property Connection: TBaseConnection read FConnection;
+    property LockerThread: TThreadID read FLockerThread;
+    property Locked: Boolean read GetIsLocked;
+    property PreparedQueries: IAqDictionary<TAqID, TAqID> read FPreparedQueries;
+    property LastUsedAt: TDateTime read FLastUsedAt;
+  end;
+
+  TAqDBFlushContextsThread<TBaseConnection: TAqDBConnection> = class(TThread)
+  strict private
+    FAutoFlushContextsTime: UInt32;
+    FPool: IAqList<TAqDBPooledConnection<TBaseConnection>>;
+
+    procedure SetAutoFlushContextsTime(const pValue: UInt32);
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(const pPool: IAqList<TAqDBPooledConnection<TBaseConnection>>);
+
+    property AutoFlushContextsTime: UInt32 read FAutoFlushContextsTime write SetAutoFlushContextsTime;
+  end;
+
+  TAqDBConnectionPool<TBaseConnection: TAqDBConnection> = class(TAqDBConnection)
+  strict private
+    FPool: IAqList<TAqDBPooledConnection<TBaseConnection>>;
+    FConnectionBuilder: TFunc<TBaseConnection>;
+    FPreparedQueries: IAqIDDictionary<TAqDBPreparedQuery>;
+    FFlushContextsThread: TAqDBFlushContextsThread<TBaseConnection>;
+
+    procedure SolvePoolAndExecute(const pMethod: TProc<TAqDBPooledConnection<TBaseConnection>>);
     function GetActiveConnections: Int32;
     function GetAutoFlushContextsTime: UInt32;
     procedure SetAutoFlushContextsTime(const pValue: UInt32);
@@ -273,19 +280,20 @@ type
 
     function GetActive: Boolean; override;
 
-    function CreateNewContext: TAqDBContext; virtual;
+    function CreateNewContext: TAqDBPooledConnection<TBaseConnection>; virtual;
 
     procedure DoConnect; override;
     procedure DoDisconnect; override;
 
-    {TODO: hoje reativar}
+    {TODO 3 -oTatu -cIncompleto: reativar}
 //    function GetInTransaction: Boolean; override;
 
     class function GetDefaultAdapter: TAqDBAdapterClass; override;
   protected
     procedure SetAdapter(const pAdapter: TAqDBAdapter); override;
 
-    property PreparedQueries: TAqIDDictionary<TAqDBPreparedQuery> read FPreparedQueries;
+    property PreparedQueries: IAqIDDictionary<TAqDBPreparedQuery> read FPreparedQueries;
+    property Pool: IAqList<TAqDBPooledConnection<TBaseConnection>> read FPool;
   public
     constructor Create(const pConnectionBuilder: TFunc<TBaseConnection>); reintroduce; virtual;
     destructor Destroy; override;
@@ -303,7 +311,8 @@ implementation
 uses
   System.DateUtils,
   AqDrop.Core.Exceptions,
-  AqDrop.Core.Helpers;
+  AqDrop.Core.Helpers,
+  AqDrop.Core.Collections;
 
 { TAqDBConnection }
 
@@ -321,7 +330,12 @@ procedure TAqDBConnection.CheckConnectionActive;
 begin
   if not Active then
   begin
-    raise EAqInternal.Create('Connection is not active.');
+    if not FAutoConnect then
+    begin
+      raise EAqInternal.Create('Connection is not active.');
+    end;
+
+    Connect;
   end;
 end;
 
@@ -416,7 +430,11 @@ begin
 
   SetAdapter(CreateAdapter);
 
-  FConnections.Add(Self);
+  FConnections.ExecuteLockedForWriting(
+    procedure
+    begin
+      FConnections.Add(Self);
+    end);
 end;
 
 function TAqDBConnection.CreateAdapter: TAqDBAdapter;
@@ -454,12 +472,11 @@ begin
     FConnections.Last.Free;
   end;
 {$ENDIF}
-  FConnections.Free;
 end;
 
 class procedure TAqDBConnection._Initialize;
 begin
-  FConnections := TAqList<TAqDBConnection>.Create
+  FConnections := TAqList<TAqDBConnection>.Create(TAqLockerType.lktMultiReadeExclusiveWriter);
 end;
 
 procedure TAqDBConnection.DecrementReaders;
@@ -476,20 +493,13 @@ begin
 end;
 
 destructor TAqDBConnection.Destroy;
-var
-  lI: Int32;
 begin
   if FOnwsAdapter then
   begin
     FAdapter.Free;
   end;
 
-  lI := FConnections.IndexOf(Self);
-
-  if lI >= 0 then
-  begin
-    FConnections.Delete(lI);
-  end;
+  ReleaseFromConnectionsList(Self);
 
   inherited;
 end;
@@ -520,7 +530,7 @@ begin
     end);
 end;
 
-function TAqDBConnection.GetAutoIncrement(const pGenerator: string): Int64;
+function TAqDBConnection.GetAutoIncrementValue(const pGenerator: string): Int64;
 var
   lReader: IAqDBReader;
   lQuery: string;
@@ -609,6 +619,22 @@ end;
 procedure TAqDBConnection.RaiseImpossibleToConnect(const pEBase: Exception);
 begin
   pEBase.RaiseOuterException(EAqFriendly.Create('It wasn''t possible to stablish a connection to the DB.'));
+end;
+
+class procedure TAqDBConnection.ReleaseFromConnectionsList(const pConnection: TAqDBConnection);
+begin
+  FConnections.ExecuteLockedForWriting(
+    procedure
+    var
+      lI: Int32;
+    begin
+      lI := FConnections.IndexOf(pConnection);
+
+      if lI >= 0 then
+      begin
+        FConnections.Delete(lI);
+      end;
+    end);
 end;
 
 procedure TAqDBConnection.RollbackTransaction;
@@ -704,25 +730,25 @@ begin
 end;
 
 
-{ TAqDBPooledConnection<TBaseConnection> }
+{ TAqDBConnectionPool<TBaseConnection> }
 
-procedure TAqDBPooledConnection<TBaseConnection>.CommitTransaction;
+procedure TAqDBConnectionPool<TBaseConnection>.CommitTransaction;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       pContext.Connection.CommitTransaction;
     end);
 end;
 
-constructor TAqDBPooledConnection<TBaseConnection>.Create(const pConnectionBuilder: TFunc<TBaseConnection>);
+constructor TAqDBConnectionPool<TBaseConnection>.Create(const pConnectionBuilder: TFunc<TBaseConnection>);
 var
-  lBaseContext: TAqDBContext;
+  lBaseContext: TAqDBPooledConnection<TBaseConnection>;
 begin
   FConnectionBuilder := pConnectionBuilder;
 
   FPreparedQueries := TAqIDDictionary<TAqDBPreparedQuery>.Create(True);
-  FPool := TAqList<TAqDBContext>.Create(True, True);
+  FPool := TAqList<TAqDBPooledConnection<TBaseConnection>>.Create(True, TAqLockerType.lktMultiReadeExclusiveWriter);
 
   inherited Create;
 
@@ -736,11 +762,11 @@ begin
   AutoFlushContextsTime := 3 * SecsPerMin;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.CreateNewContext: TAqDBContext;
+function TAqDBConnectionPool<TBaseConnection>.CreateNewContext: TAqDBPooledConnection<TBaseConnection>;
 var
   lConnection: TAqDBConnection;
 begin
-  FPool.Lock;
+  FPool.BeginWrite;
 
   try
     Result := nil;
@@ -757,63 +783,63 @@ begin
         lConnection.Free;
         raise;
       end;
-      Result := TAqDBContext.Create(Self, lConnection);
+      Result := TAqDBPooledConnection<TBaseConnection>.Create(Self, lConnection);
+      ReleaseFromConnectionsList(lConnection);
+
       FPool.Add(Result);
     except
       Result.Free;
       raise;
     end;
   finally
-    FPool.Release;
+    FPool.EndWrite;
   end;
 end;
 
-destructor TAqDBPooledConnection<TBaseConnection>.Destroy;
+destructor TAqDBConnectionPool<TBaseConnection>.Destroy;
 begin
   FreeFlushContextThread;
-  FPool.Free;
-  FPreparedQueries.Free;
 
   inherited;
 end;
 
-class function TAqDBPooledConnection<TBaseConnection>.GetDefaultAdapter: TAqDBAdapterClass;
+class function TAqDBConnectionPool<TBaseConnection>.GetDefaultAdapter: TAqDBAdapterClass;
 begin
   Result := nil;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.RollbackTransaction;
+procedure TAqDBConnectionPool<TBaseConnection>.RollbackTransaction;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       pContext.Connection.RollbackTransaction;
     end);
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.GetActive: Boolean;
+function TAqDBConnectionPool<TBaseConnection>.GetActive: Boolean;
 begin
-  FPool.Lock;
+  FPool.BeginRead;
 
   try
     Result := FPool.First.Connection.Active;
   finally
-    FPool.Release;
+    FPool.EndRead;
   end;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.GetActiveConnections: Int32;
+function TAqDBConnectionPool<TBaseConnection>.GetActiveConnections: Int32;
 begin
-  FPool.Lock;
+  FPool.BeginRead;
 
   try
     Result := FPool.Count;
   finally
-    FPool.Release;
+    FPool.EndRead;
   end;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.GetAutoFlushContextsTime: UInt32;
+function TAqDBConnectionPool<TBaseConnection>.GetAutoFlushContextsTime: UInt32;
 begin
   if Assigned(FFlushContextsThread) then
   begin
@@ -823,24 +849,24 @@ begin
   end;
 end;
 
-//function TAqDBPooledConnection<TBaseConnection>.GetInTransaction: Boolean;
+//function TAqDBConnectionPool<TBaseConnection>.GetInTransaction: Boolean;
 //var
 //  lResult: Boolean;
 //begin
 //  SolvePoolAndExecute(
-//    procedure(const pContext: TAqDBContext)
+//    procedure(const pContext: TAqDBPooledConnection)
 //    begin
 //      lResult := pContext.Connection.InTransaction;
 //    end);
 //end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoOpenQuery(const pSQLCommand: IAqDBSQLSelect;
+function TAqDBConnectionPool<TBaseConnection>.DoOpenQuery(const pSQLCommand: IAqDBSQLSelect;
   const pTratadorParametros: TAqDBParametersHandlerMethod): IAqDBReader;
 var
   lResult: IAqDBReader;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.OpenQuery(pSQLCommand, pTratadorParametros);
     end);
@@ -848,13 +874,13 @@ begin
   Result := lResult;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoOpenQuery(const pCommandID: TAqID;
+function TAqDBConnectionPool<TBaseConnection>.DoOpenQuery(const pCommandID: TAqID;
   const pTratadorParametros: TAqDBParametersHandlerMethod): IAqDBReader;
 var
   lResult: IAqDBReader;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.OpenQuery(pContext.GetCommandID(pCommandID), pTratadorParametros);
     end);
@@ -862,13 +888,13 @@ begin
   Result := lResult;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoOpenQuery(const pSQL: string;
+function TAqDBConnectionPool<TBaseConnection>.DoOpenQuery(const pSQL: string;
   const pTratadorParametros: TAqDBParametersHandlerMethod): IAqDBReader;
 var
   lResult: IAqDBReader;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.OpenQuery(pSQL, pTratadorParametros);
     end);
@@ -876,16 +902,16 @@ begin
   Result := lResult;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.DoStartTransaction;
+procedure TAqDBConnectionPool<TBaseConnection>.DoStartTransaction;
 begin
   raise EAqInternal.Create('The fisical transaction methods of this class cannot be called.');
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.DoConnect;
+procedure TAqDBConnectionPool<TBaseConnection>.DoConnect;
 var
-  lContext: TAqDBContext;
+  lContext: TAqDBPooledConnection<TBaseConnection>;
 begin
-  FPool.Lock;
+  FPool.BeginRead;
 
   try
     for lContext in FPool do
@@ -893,18 +919,18 @@ begin
       lContext.Connection.Active := True;
     end;
   finally
-    FPool.Release;
+    FPool.EndRead;
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.DoCommitTransaction;
+procedure TAqDBConnectionPool<TBaseConnection>.DoCommitTransaction;
 begin
   raise EAqInternal.Create('The fisical transaction methods of this class cannot be called.');
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.DoDisconnect;
+procedure TAqDBConnectionPool<TBaseConnection>.DoDisconnect;
 begin
-  FPool.Lock;
+  FPool.BeginWrite;
 
   try
     FPool.First.Connection.Active := False;
@@ -914,16 +940,16 @@ begin
       FPool.Delete(FPool.Count - 1);
     end;
   finally
-    FPool.Release;
+    FPool.EndWrite;
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.DoUnprepareCommand(const pCommandID: TAqID);
+procedure TAqDBConnectionPool<TBaseConnection>.DoUnprepareCommand(const pCommandID: TAqID);
 var
-  lContext: TAqDBContext;
+  lContext: TAqDBPooledConnection<TBaseConnection>;
   lContextCommandID: TAqID;
 begin
-  FPool.Lock;
+  FPool.BeginRead;
 
   try
     for lContext in FPool do
@@ -937,11 +963,11 @@ begin
 
     FPreparedQueries.Remove(pCommandID);
   finally
-    FPool.Release;
+    FPool.EndRead;
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.FreeFlushContextThread;
+procedure TAqDBConnectionPool<TBaseConnection>.FreeFlushContextThread;
 begin
   if Assigned(FFlushContextsThread) then
   begin
@@ -951,13 +977,13 @@ begin
   end;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoExecuteCommand(const pSQLCommand: IAqDBSQLCommand;
+function TAqDBConnectionPool<TBaseConnection>.DoExecuteCommand(const pSQLCommand: IAqDBSQLCommand;
   const pTratadorParametros: TAqDBParametersHandlerMethod): Int64;
 var
   lResult: Int64;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.ExecuteCommand(pSQLCommand, pTratadorParametros);
     end);
@@ -965,13 +991,13 @@ begin
   Result := lResult;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoExecuteCommand(const pCommandID: TAqID;
+function TAqDBConnectionPool<TBaseConnection>.DoExecuteCommand(const pCommandID: TAqID;
   const pTratadorParametros: TAqDBParametersHandlerMethod): Int64;
 var
   lResult: Int64;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.ExecuteCommand(pContext.GetCommandID(pCommandID), pTratadorParametros);
     end);
@@ -979,13 +1005,13 @@ begin
   Result := lResult;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoExecuteCommand(const pSQL: string;
+function TAqDBConnectionPool<TBaseConnection>.DoExecuteCommand(const pSQL: string;
   const pTratadorParametros: TAqDBParametersHandlerMethod): Int64;
 var
   lResult: Int64;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.ExecuteCommand(pSQL, pTratadorParametros);
     end);
@@ -993,32 +1019,33 @@ begin
   Result := lResult;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand;
+function TAqDBConnectionPool<TBaseConnection>.DoPrepareCommand(const pSQLCommand: IAqDBSQLCommand;
   const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID;
 begin
   Result := DoPrepareCommand(FPool.First.Connection.Adapter.SQLSolver.SolveCommand(pSQLCommand),
     pParametersInitializer);
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.DoPrepareCommand(const pSQL: string;
+function TAqDBConnectionPool<TBaseConnection>.DoPrepareCommand(const pSQL: string;
   const pParametersInitializer: TAqDBParametersHandlerMethod): TAqID;
 begin
   Result := FPreparedQueries.Add(TAqDBPreparedQuery.Create(pSQL, pParametersInitializer));
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.DoRollbackTransaction;
+procedure TAqDBConnectionPool<TBaseConnection>.DoRollbackTransaction;
 begin
   raise EAqInternal.Create('The fisical transaction methods of this class cannot be called.');
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.SolvePoolAndExecute(const pMethod: TProc<TAqDBContext>);
+procedure TAqDBConnectionPool<TBaseConnection>.SolvePoolAndExecute(
+  const pMethod: TProc<TAqDBPooledConnection<TBaseConnection>>);
 var
   lI: Int32;
-  lLockedContext: TAqDBContext;
-  lAvailableContext: TAqDBContext;
+  lLockedContext: TAqDBPooledConnection<TBaseConnection>;
+  lAvailableContext: TAqDBPooledConnection<TBaseConnection>;
   lThreadID: TThreadID;
 begin
-  FPool.Lock;
+  FPool.BeginWrite;
 
   try
     lI := FPool.Count;
@@ -1026,6 +1053,7 @@ begin
     lAvailableContext := nil;
     lThreadID := TThread.CurrentThread.ThreadID;
 
+    {TODO 3 -oTatu -cMelhoria: colocar contextos locados em um dictionary a parte da lista de contextos disponíveis.}
     while not Assigned(lLockedContext) and (lI > 0) do
     begin
       Dec(lI);
@@ -1050,7 +1078,7 @@ begin
 
     lLockedContext.LockConnection;
   finally
-    FPool.Release;
+    FPool.EndWrite;
   end;
 
   try
@@ -1060,16 +1088,16 @@ begin
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.StartTransaction;
+procedure TAqDBConnectionPool<TBaseConnection>.StartTransaction;
 begin
   SolvePoolAndExecute(
-    procedure(pContext: TAqDBContext)
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       pContext.Connection.StartTransaction;
     end);
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.SetAutoFlushContextsTime(const pValue: UInt32);
+procedure TAqDBConnectionPool<TBaseConnection>.SetAutoFlushContextsTime(const pValue: UInt32);
 begin
   if pValue = 0 then
   begin
@@ -1077,18 +1105,18 @@ begin
   end else begin
     if not Assigned(FFlushContextsThread) then
     begin
-      FFlushContextsThread := TAqDBFlushContextsThread.Create(FPool);
+      FFlushContextsThread := TAqDBFlushContextsThread<TBaseConnection>.Create(FPool);
     end;
 
     FFlushContextsThread.AutoFlushContextsTime := pValue;
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.SetAdapter(const pAdapter: TAqDBAdapter);
+procedure TAqDBConnectionPool<TBaseConnection>.SetAdapter(const pAdapter: TAqDBAdapter);
 var
-  lContext: TAqDBContext;
+  lContext: TAqDBPooledConnection<TBaseConnection>;
 begin
-  FPool.Lock;
+  FPool.BeginRead;
   try
     inherited;
 
@@ -1097,14 +1125,14 @@ begin
       lContext.Connection.SetAdapter(pAdapter, False);
     end;
   finally
-    FPool.Release;
+    FPool.EndRead;
   end;
 end;
 
-{ TAqDBPooledConnection<TBaseConnection>.TAqDBContext }
+{ TAqDBPooledConnection<TBaseConnection> }
 
-constructor TAqDBPooledConnection<TBaseConnection>.TAqDBContext.Create(
-  const pMasterConnections: TAqDBPooledConnection<TBaseConnection>; const pBaseConection: TBaseConnection);
+constructor TAqDBPooledConnection<TBaseConnection>.Create(
+  const pMasterConnections: TAqDBConnectionPool<TBaseConnection>; const pBaseConection: TBaseConnection);
 begin
   FMasterConnection := pMasterConnections;
   FConnection := pBaseConection;
@@ -1121,15 +1149,14 @@ begin
     end;
 end;
 
-destructor TAqDBPooledConnection<TBaseConnection>.TAqDBContext.Destroy;
+destructor TAqDBPooledConnection<TBaseConnection>.Destroy;
 begin
   FConnection.Free;
-  FPreparedQueries.Free;
 
   inherited;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.TAqDBContext.GetCommandID(const pMasterCommandID: TAqID): TAqID;
+function TAqDBPooledConnection<TBaseConnection>.GetCommandID(const pMasterCommandID: TAqID): TAqID;
 var
   lPreparedQuery: TAqDBPreparedQuery;
 begin
@@ -1151,14 +1178,14 @@ begin
   end;
 end;
 
-function TAqDBPooledConnection<TBaseConnection>.TAqDBContext.GetIsLocked: Boolean;
+function TAqDBPooledConnection<TBaseConnection>.GetIsLocked: Boolean;
 begin
   Result := FLockerThread <> 0;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.TAqDBContext.ReleaseConnection;
+procedure TAqDBPooledConnection<TBaseConnection>.ReleaseConnection;
 begin
-  Self.FMasterConnection.FPool.Lock;
+  Self.FMasterConnection.Pool.BeginWrite;
 
   try
     if FCalls > 0 then
@@ -1171,13 +1198,13 @@ begin
       end;
     end;
   finally
-    Self.FMasterConnection.FPool.Release;
+    Self.FMasterConnection.Pool.EndWrite;
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.TAqDBContext.LockConnection;
+procedure TAqDBPooledConnection<TBaseConnection>.LockConnection;
 begin
-  Self.FMasterConnection.FPool.Lock;
+  Self.FMasterConnection.Pool.BeginWrite;
 
   try
     if (FLockerThread <> 0) and (FLockerThread <> TThread.CurrentThread.ThreadID) then
@@ -1188,24 +1215,24 @@ begin
     FLockerThread := TThread.CurrentThread.ThreadID;
     Inc(FCalls);
   finally
-    Self.FMasterConnection.FPool.Release;
+    Self.FMasterConnection.Pool.EndWrite;
   end;
 end;
 
-{ TAqDBPooledConnection<TBaseConnection>.TAqDBFlushContextsThread }
+{ TAqDBFlushContextsThread<TBaseConnection> }
 
-constructor TAqDBPooledConnection<TBaseConnection>.TAqDBFlushContextsThread.Create(
-  const pPool: TAqList<TAqDBContext>);
+constructor TAqDBFlushContextsThread<TBaseConnection>.Create(
+  const pPool: IAqList<TAqDBPooledConnection<TBaseConnection>>);
 begin
   inherited Create(False);
   FPool := pPool;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.TAqDBFlushContextsThread.Execute;
+procedure TAqDBFlushContextsThread<TBaseConnection>.Execute;
 var
   lNextAttempt: TDateTime;
   lI: Int32;
-  lContext: TAqDBContext;
+  lContext: TAqDBPooledConnection<TBaseConnection>;
   lDateTimeCut: TDateTime;
 begin
   lNextAttempt := 0;
@@ -1215,7 +1242,7 @@ begin
     if lNextAttempt <= Now then
     begin
       lDateTimeCut := Now.IncSecond(-FAutoFlushContextsTime);
-      FPool.Lock;
+      FPool.BeginWrite;
 
       try
         lI := 0;
@@ -1231,7 +1258,7 @@ begin
           end;
         end;
       finally
-        FPool.Release;
+        FPool.EndWrite;
       end;
 
       lNextAttempt := Now.IncSecond((FAutoFlushContextsTime div 4) + 1);
@@ -1240,21 +1267,21 @@ begin
   end;
 end;
 
-procedure TAqDBPooledConnection<TBaseConnection>.TAqDBFlushContextsThread.SetAutoFlushContextsTime(
+procedure TAqDBFlushContextsThread<TBaseConnection>.SetAutoFlushContextsTime(
   const pValue: UInt32);
 begin
-  FPool.Lock;
+  FPool.BeginRead;
 
   try
     FAutoFlushContextsTime := pValue;
   finally
-    FPool.Release;
+    FPool.EndRead;
   end;
 end;
 
-{ TAqDBPooledConnection<TBaseConnection>.TAqDBPreparedQuery }
+{ TAqDBPreparedQuery }
 
-constructor TAqDBPooledConnection<TBaseConnection>.TAqDBPreparedQuery.Create(const pSQL: string;
+constructor TAqDBPreparedQuery.Create(const pSQL: string;
   const pParametersInitializer: TAqDBParametersHandlerMethod);
 begin
   FSQL := pSQL;

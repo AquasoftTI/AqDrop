@@ -5,11 +5,12 @@ interface
 {$I '..\Core\AqDrop.Core.Defines.inc'}
 
 uses
+  System.TypInfo,
   System.Rtti,
   Data.SqlTimSt,
   Data.FmtBcd,
-  AqDrop.Core.Collections,
-  AqDrop.Core.Types;
+  AqDrop.Core.Types,
+  AqDrop.Core.Collections;
 
 type
   IAqDBReadValue = interface
@@ -41,6 +42,7 @@ type
     function GetAsSingle: Single;
     function GetAsDouble: Double;
     function GetAsCurrency: Currency;
+    function GetAsTValue(const pAsType: PTypeInfo): TValue;
 
     property Name: string read GetName write SetName;
 

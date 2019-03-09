@@ -3,7 +3,9 @@ unit AqDrop.Core.Manager;
 interface
 
 uses
-  AqDrop.Core.InterfacedObject, AqDrop.Core.Collections, AqDrop.Core.Manager.Intf;
+  AqDrop.Core.InterfacedObject,
+  AqDrop.Core.Collections.Intf,
+  AqDrop.Core.Manager.Intf;
 
 type
   /// ------------------------------------------------------------------------------------------------------------------
@@ -16,7 +18,7 @@ type
   /// ------------------------------------------------------------------------------------------------------------------
   TAqCustomManager<T: class> = class(TAqInterfacedObject, IAqManager<T>)
   strict private
-    FDependents: TAqList<T>;
+    FDependents: IAqList<T>;
   strict protected
     procedure AddDependent(const pDependent: T); virtual;
     procedure RemoveDependent(const pDependent: T); virtual;
@@ -45,6 +47,9 @@ type
 
 implementation
 
+uses
+  AqDrop.Core.Collections;
+
 { TAqCustomManager<T> }
 
 procedure TAqCustomManager<T>.AddDependent(const pDependent: T);
@@ -58,8 +63,15 @@ begin
 end;
 
 destructor TAqCustomManager<T>.Destroy;
+var
+  lDependent: T;
 begin
-  FDependents.Free;
+{$IFNDEF AUTOREFCOUNT}
+  while FDependents.Count > 0 do
+  begin
+    FDependents.Delete(FDependents.Count - 1);
+  end;
+{$ENDIF}
 
   inherited;
 end;

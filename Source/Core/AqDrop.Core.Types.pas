@@ -4,7 +4,19 @@ interface
 
 {$I 'AqDrop.Core.Defines.inc'}
 
+uses
+  System.TypInfo;
+
 type
+  TAqID = NativeUInt;
+
+  TAqIDHelper = record helper for TAqID
+  strict private
+    function VerifyIfIsEmpty: Boolean; inline;
+  public
+    property IsEmpty: Boolean read VerifyIfIsEmpty;
+  end;
+
 {$IFNDEF AQMOBILE}
   TAqAnsiCharSet = set of AnsiChar;
 {$ENDIF}
@@ -39,12 +51,108 @@ type
     adtRecord,
     adtInterface);
 
+  TAqDataTypeHelper = record helper for TAqDataType
+    function ToString: string;
+    class function FromTypeInfo(const pType: PTypeInfo): TAqDataType; static;
+    class function FromType<T>: TAqDataType; static;
+  end;
+
 const
   adtIntTypes = [adtUInt8..adtInt64];
 
 type
+  TAqEntityID = type Int64;
+
   TAqUnixDateTime = type Int64;
 
+  TAqGenericEvent<T> = procedure(pArg: T) of object;
+
 implementation
+
+uses
+  AqDrop.Core.Exceptions;
+
+{ TAqDataTypeHelper }
+
+class function TAqDataTypeHelper.FromType<T>: TAqDataType;
+begin
+  Result := FromTypeInfo(TypeInfo(T));
+end;
+
+class function TAqDataTypeHelper.FromTypeInfo(const pType: PTypeInfo): TAqDataType;
+begin
+  case pType^.Kind of
+    tkUnknown:
+      Result := TAqDataType.adtUnknown;
+    tkInteger:
+      Result := TAqDataType.adtInt32;
+    tkChar:
+      Result := TAqDataType.adtAnsiChar;
+    tkEnumeration:
+      begin
+        if pType = TypeInfo(Boolean) then
+        begin
+          Result := TAqDataType.adtBoolean;
+        end else begin
+          Result := TAqDataType.adtEnumerated;
+        end;
+      end;
+    tkFloat:
+      begin
+        if pType = TypeInfo(TDateTime) then
+        begin
+          Result := TAqDataType.adtDatetime;
+        end else if pType = TypeInfo(TDate) then
+        begin
+          Result := TAqDataType.adtDate;
+        end else if pType = TypeInfo(TTime) then
+        begin
+          Result := TAqDataType.adtTime;
+        end else if pType = TypeInfo(Currency) then
+        begin
+          Result := TAqDataType.adtCurrency;
+        end else begin
+          Result := TAqDataType.adtDouble;
+        end;
+      end;
+    tkSet:
+      Result := TAqDataType.adtSet;
+    tkClass:
+      Result := TAqDataType.adtClass;
+    tkMethod:
+      Result := TAqDataType.adtMethod;
+    tkWChar:
+      Result := TAqDataType.adtChar;
+    tkLString:
+      Result := TAqDataType.adtAnsiString;
+    tkWString:
+      Result := TAqDataType.adtWideString;
+    tkVariant:
+      Result := TAqDataType.adtVariant;
+    tkRecord:
+      Result := TAqDataType.adtRecord;
+    tkInterface:
+      Result := TAqDataType.adtInterface;
+    tkInt64:
+      Result := TAqDataType.adtInt64;
+    tkUString:
+      Result := TAqDataType.adtString;
+  else
+    raise EAqInternal.CreateFmt('Unexpected data type while getting the AqDataType (%s - %s)',
+      [pType^.Name, GetEnumName(TypeInfo(TTypeKind), Integer(pType^.Kind))]);
+  end;
+end;
+
+function TAqDataTypeHelper.ToString: string;
+begin
+  Result := GetEnumName(TypeInfo(TAqDataType), Integer(Self));
+end;
+
+{ TAqIDHelper }
+
+function TAqIDHelper.VerifyIfIsEmpty: Boolean;
+begin
+  Result := Self = 0;
+end;
 
 end.

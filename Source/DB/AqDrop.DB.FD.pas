@@ -5,7 +5,10 @@ unit AqDrop.DB.FD;
 interface
 
 uses
+  System.SysUtils,
+  System.TypInfo,
   System.Classes,
+  System.Rtti,
   Data.SqlTimSt,
   Data.FmtBcd,
   Data.DB,
@@ -22,7 +25,7 @@ uses
 {$ENDIF}
   AqDrop.Core.Types,
   AqDrop.Core.InterfacedObject,
-  AqDrop.Core.Collections,
+  AqDrop.Core.Collections.Intf,
   AqDrop.DB.Types,
   AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
@@ -145,10 +148,7 @@ type
     property FDDataConverter: TAqFDDataConverter read FFDDataConverter write SetFDDataConverter;
   end;
 
-  TAqFDObject = class(TAqInterfacedObject)
-  strict protected
-    class function MustCountReferences: Boolean; override;
-  end;
+  TAqFDObject = class(TAqARCObject);
 
   TAqFDParameter = class;
   TAqFDParameters = class;
@@ -190,6 +190,7 @@ type
     function GetAsSingle: Single;
     function GetAsDouble: Double;
     function GetAsCurrency: Currency;
+    function GetAsTValue(const pAsType: PTypeInfo): TValue;
 
     procedure SetAsString(const pValue: string);
 {$IFNDEF AQMOBILE}
@@ -268,6 +269,7 @@ type
     function GetAsSingle: Single;
     function GetAsDouble: Double;
     function GetAsCurrency: Currency;
+    function GetAsTValue(const pAsType: PTypeInfo): TValue;
   end;
 
   TAqFDReader = class(TAqFDObject, IAqDBReader)
@@ -293,7 +295,7 @@ type
   TAqFDCustomConnection = class(TAqDBConnection)
   strict private
     FFDConnection: TAqFDMappedConnection;
-    FPreparedQueries: TAqIDDictionary<TAqFDMappedQuery>;
+    FPreparedQueries: IAqIDDictionary<TAqFDMappedQuery>;
 
     function CreateQuery(const pSQL: string): TAqFDMappedQuery;
 
@@ -353,10 +355,11 @@ type
 implementation
 
 uses
-  System.SysUtils,
   System.DateUtils,
   AqDrop.Core.Exceptions,
-  AqDrop.Core.Helpers;
+  AqDrop.Core.Collections,
+  AqDrop.Core.Helpers,
+  AqDrop.DB.Common;
 
 { TAqFDCustomConnection }
 
@@ -387,7 +390,6 @@ end;
 
 destructor TAqFDCustomConnection.Destroy;
 begin
-  FPreparedQueries.Free;
   FFDConnection.Free;
 
   inherited;
@@ -712,6 +714,11 @@ end;
 function TAqFDParameter.GetAsTimeStampOffset: TSQLTimeStampOffset;
 begin
   raise EAqInternal.Create('TSQLTimeStampOffset not implemented in Drop to FD.');
+end;
+
+function TAqFDParameter.GetAsTValue(const pAsType: PTypeInfo): TValue;
+begin
+  Result := TAqDBValueConverter.ConvertToTValue(Self as IAqDBReadValue, pAsType);
 end;
 
 function TAqFDParameter.GetAsUInt16: UInt16;
@@ -1445,6 +1452,11 @@ begin
 
 end;
 
+function TAqFDField.GetAsTValue(const pAsType: PTypeInfo): TValue;
+begin
+  Result := TAqDBValueConverter.ConvertToTValue(Self as IAqDBReadValue, pAsType);
+end;
+
 function TAqFDField.GetAsUInt16: UInt16;
 begin
   Result := FReader.Connection.FDAdapter.FDDataConverter.FieldToUInt16(FField);
@@ -1570,13 +1582,6 @@ procedure TAqFDAdapter.SetFDDataConverter(const pDataConverter: TAqFDDataConvert
 begin
   FreeAndNil(FFDDataConverter);
   FFDDataConverter := pDataConverter;
-end;
-
-{ TAqFDObject }
-
-class function TAqFDObject.MustCountReferences: Boolean;
-begin
-  Result := True;
 end;
 
 end.

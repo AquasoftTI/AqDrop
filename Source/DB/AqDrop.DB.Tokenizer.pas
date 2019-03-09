@@ -3,10 +3,8 @@ unit AqDrop.DB.Tokenizer;
 interface
 
 uses
-  AqDrop.Core.Collections,
-  AqDrop.Core.Tokenizer,
-  AqDrop.Core.Automaton,
-  AqDrop.Core.Automaton.Text;
+  AqDrop.Core.Collections.Intf,
+  AqDrop.Core.Tokenizer;
 
 type
   TAqDBTokenizerDictionaryID = (diOther, diDigits, diCharacters, diPlus, diMinus, diAsterisk, diSlash, diSharp,
@@ -18,15 +16,14 @@ type
     MinID = diOther;
     MaxID = diGreaterThan;
   public type
-    TDictionaryContent = TAqList<Char>;
+    TDictionaryContent = IAqList<Char>;
   strict private
-    class var FDictionaries: TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>;
+    class var FDictionaries: IAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>;
 
     class procedure Initialize;
     class function GetDictionary(pIndex: TAqDBTokenizerDictionaryID): TDictionaryContent; static;
   private
     class procedure _Initialize;
-    class procedure _Finalize;
   public
     class property Dictionary[Index: TAqDBTokenizerDictionaryID]: TDictionaryContent read GetDictionary; default;
   end;
@@ -36,6 +33,7 @@ type
     ttParameter, ttNamedParameter, ttEqual, ttDot, ttAt, ttLessThan, ttLessEqualThan, ttGreaterThan,
     ttGreaterEqualThan);
 
+{TODO: colocar no padrão de InstanciaDefault}
   /// <summary>
   ///   Tokenizer para sentenças SQL.
   /// </summary>
@@ -52,51 +50,51 @@ type
 implementation
 
 uses
-  AqDrop.Core.Exceptions;
+  AqDrop.Core.Collections,
+  AqDrop.Core.Exceptions,
+  AqDrop.Core.Automaton,
+  AqDrop.Core.Automaton.Text;
 
 { TAqBDTokenizer }
 
 constructor TAqBDTokenizer.Create;
-type
-  TTransition = TAqAutomatonTransition<TAqDBTokenizerDictionaryID, Char, TAqDBTokenType>;
-  TState = TAqAutomatonState<TAqDBTokenizerDictionaryID, Char, TAqDBTokenType>;
 var
-  lTransition: TTransition;
-  lFinalStateSpace: TState;
-  lFinalStateWord: TState;
-  lFinalStateInteger: TState;
-  lIntermediateStateDot: TState;
-  lFinalStateReal: TState;
-  lIntermediateStateLineBreak: TState;
-  lFinalStateLineBreak: TState;
-  lFinalStateDivision: TState;
-  lFinalStateAddition: TState;
-  lFinalStateSubtraction: TState;
-  lFinalStateMultiplication: TState;
-  lFinalStateCommentLine1: TState;
-  lFinalStateCommentLine2: TState;
-  lFinalStateCommentLine3: TState;
-  lIntermediateStateComment1: TState;
-  lIntermediateStateComment2: TState;
-  lFinalStateComment: TState;
-  lFinalStateLeftParenthesis: TState;
-  lFinalStateRightParenthesis: TState;
-  lFinalStateComma: TState;
-  lFinalStateSemicolon: TState;
-  lIntermediateStateString: TState;
-  lFinalStateString: TState;
-  lIntermediateStateDoubleQuotes: TState;
-  lFinalSteteDoubleQuotes: TState;
-  lFinalStateColon: TState;
-  lFinalStateNamedParameter: TState;
-  lFinalStateParameter: TState;
-  lFianlStateEqual: TState;
-  lFinalStateDot: TState;
-  lFinalStateAt: TState;
-  lFinalStateLessThan: TState;
-  lFinalStateLessEqualThan: TState;
-  lFinalStateGreaterThan: TState;
-  lFinalStateGreaterEqualThan: TState;
+  lTransition: TTokenizerTransition;
+  lFinalStateSpace: TTokenizerState;
+  lFinalStateWord: TTokenizerState;
+  lFinalStateInteger: TTokenizerState;
+  lIntermediateStateDot: TTokenizerState;
+  lFinalStateReal: TTokenizerState;
+  lIntermediateStateLineBreak: TTokenizerState;
+  lFinalStateLineBreak: TTokenizerState;
+  lFinalStateDivision: TTokenizerState;
+  lFinalStateAddition: TTokenizerState;
+  lFinalStateSubtraction: TTokenizerState;
+  lFinalStateMultiplication: TTokenizerState;
+  lFinalStateCommentLine1: TTokenizerState;
+  lFinalStateCommentLine2: TTokenizerState;
+  lFinalStateCommentLine3: TTokenizerState;
+  lIntermediateStateComment1: TTokenizerState;
+  lIntermediateStateComment2: TTokenizerState;
+  lFinalStateComment: TTokenizerState;
+  lFinalStateLeftParenthesis: TTokenizerState;
+  lFinalStateRightParenthesis: TTokenizerState;
+  lFinalStateComma: TTokenizerState;
+  lFinalStateSemicolon: TTokenizerState;
+  lIntermediateStateString: TTokenizerState;
+  lFinalStateString: TTokenizerState;
+  lIntermediateStateDoubleQuotes: TTokenizerState;
+  lFinalSteteDoubleQuotes: TTokenizerState;
+  lFinalStateColon: TTokenizerState;
+  lFinalStateNamedParameter: TTokenizerState;
+  lFinalStateParameter: TTokenizerState;
+  lFianlStateEqual: TTokenizerState;
+  lFinalStateDot: TTokenizerState;
+  lFinalStateAt: TTokenizerState;
+  lFinalStateLessThan: TTokenizerState;
+  lFinalStateLessEqualThan: TTokenizerState;
+  lFinalStateGreaterThan: TTokenizerState;
+  lFinalStateGreaterEqualThan: TTokenizerState;
   lDictionaryID: TAqDBTokenizerDictionaryID;
 begin
   inherited;
@@ -276,13 +274,13 @@ end;
 class procedure TAqDBTokenizerDictionaries.Initialize;
   function CreateNewContent(const pID: TAqDBTokenizerDictionaryID): TDictionaryContent;
   begin
-    Result := TDictionaryContent.Create;
+    Result := TAqList<Char>.Create;
 
     FDictionaries.Add(pID, Result);
   end;
 
 var
-  lList: TAqList<Char>;
+  lList: IAqList<Char>;
   lChar: Char;
 begin
   FDictionaries.Clear;
@@ -304,7 +302,7 @@ begin
   begin
     lList.Add(lChar);
   end;
-  
+
   CreateNewContent(diPlus).Add('+');
   CreateNewContent(diMinus).Add('-');
   CreateNewContent(diAsterisk).Add('*');
@@ -330,15 +328,9 @@ begin
   CreateNewContent(diGreaterThan).Add('>');
 end;
 
-class procedure TAqDBTokenizerDictionaries._Finalize;
-begin
-  FDictionaries.Free;
-end;
-
 class procedure TAqDBTokenizerDictionaries._Initialize;
 begin
-  FDictionaries :=
-    TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>.Create([TAqKeyValueOwnership.kvoValue]);
+  FDictionaries := TAqDictionary<TAqDBTokenizerDictionaryID, TDictionaryContent>.Create;
 
   Initialize;
 end;
@@ -348,7 +340,6 @@ initialization
 
 finalization
   TAqBDTokenizer._Finalize;
-  TAqDBTokenizerDictionaries._Finalize;
 
 end.
 

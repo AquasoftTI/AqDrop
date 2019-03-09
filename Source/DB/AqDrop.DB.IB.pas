@@ -21,6 +21,7 @@ implementation
 
 uses
   System.SysUtils,
+  AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers;
 
 { TAqDBIBSQLSolver }
@@ -47,7 +48,14 @@ end;
 
 function TAqDBIBSQLSolver.SolveLimit(pSelect: IAqDBSQLSelect): string;
 begin
-  if pSelect.IsLimitDefined then
+  if pSelect.IsOffsetDefined then
+  begin
+    if not pSelect.IsLimitDefined then
+    begin
+      raise EAqInternal.Create('Offset defined for a non limited select on IB.');
+    end;
+    Result := ' rows ' + (pSelect.Offset + 1).ToString + ' to ' + (pSelect.Offset + pSelect.Limit).ToString;
+  end else if pSelect.IsLimitDefined then
   begin
     Result := ' rows ' + pSelect.Limit.ToString;
   end else begin

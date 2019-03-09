@@ -3,11 +3,10 @@ unit AqDrop.Core.Calendar;
 interface
 
 uses
-  AqDrop.Core.Observable,
   AqDrop.Core.Helpers;
 
 type
-  TAqCalendarEvent = class(TAqObservable)
+  TAqCalendarEvent = class
   strict private
     FStart: TDateTime;
     FLength: TDateTime;
@@ -36,7 +35,7 @@ type
   public
     constructor Create;
 
-    function ActiveAt(pDateTime: TDateTime): Boolean; virtual;
+    function ActiveAt(const pDateTime: TDateTime): Boolean; virtual;
 
     property StartDate: TDate read GetStartDate write SetStartDate;
     property StartTime: TTime read GetStartTime write SetStartTime;
@@ -50,7 +49,7 @@ type
 
   TAqCalendarEventRecurrenceClass = class of TAqCalendarEventRecurrence;
 
-  TAqCalendarEventRecurrence = class(TAqObservable)
+  TAqCalendarEventRecurrence = class
   strict private
     FCalendarEvent: TAqCalendarEvent;
     FEnd: TDate;
@@ -182,10 +181,10 @@ type
   public
     destructor Destroy; override;
 
-    [AqNotifyObserversTag]
     procedure DeactivateRecurrence; virtual;
 
-    function ActiveAt(pDateTime: TDateTime): Boolean; override;
+    function ActiveAt(const pDateTime: TDateTime): Boolean; override;
+    function GetNextOcurrence(const pDateTime: TDateTime): TDateTime;
 
     property Recurrence: TAqCalendarEventRecurrence read FRecurrence;
     property DailyRecurrence: TAqCalendarEventDailyRecurrence read GetDailyRecurrence;
@@ -226,7 +225,7 @@ begin
   FLength := EncodeTime(1, 0, 0, 0);
 end;
 
-function TAqCalendarEvent.ActiveAt(pDateTime: TDateTime): Boolean;
+function TAqCalendarEvent.ActiveAt(const pDateTime: TDateTime): Boolean;
 begin
   Result := (FStart <= pDateTime) and (pDateTime < EndDateTime);
 end;
@@ -298,12 +297,12 @@ begin
     raise EAqFriendly.Create(StrFimDoEventoNaoPodeSerInferiorAoInIcioDoEvento);
   end;
 
-  SetAndNotify<TDateTime>(FLength, Value - FStart);
+  FLength := Value - FStart;
 end;
 
 procedure TAqCalendarEvent.SetStartDateTime(Value: TDateTime);
 begin
-  SetAndNotify<TDateTime>(FStart, Value);
+  FStart := Value;
 end;
 
 procedure TAqCalendarEvent.SetStartDate(const Value: TDate);
@@ -313,7 +312,7 @@ end;
 
 procedure TAqCalendarEvent.SetAllDay(const Value: Boolean);
 begin
-  SetAndNotify<Boolean>(FAllDay, Value);
+  FAllDay := Value;
 end;
 
 procedure TAqCalendarEvent.SetLength(const Value: TDateTime);
@@ -323,7 +322,7 @@ begin
     raise EAqFriendly.Create(StrDuracaoDoEventoNaoPodeSerNegativa);
   end;
 
-  SetAndNotify<TDateTime>(FLength, Value);
+  FLength := Value;
 end;
 
 procedure TAqCalendarEvent.SetEndTime(const Value: TTime);
@@ -368,7 +367,7 @@ begin
     raise EAqFriendly.Create(StrOFimDaRecorrenciaNaoPodeAcontecerAntesDoPrimeiroDiaDoEvento);
   end;
 
-  SetAndNotify<TDate>(FEnd, Value);
+  FEnd := Value;
 end;
 
 procedure TAqCalendarEventRecurrence.SetInterval(const Value: UInt8);
@@ -378,7 +377,7 @@ begin
     raise EAqFriendly.Create(StrAIntermitenciaEntreOcorrenciasDeveEstarEntre1E100);
   end;
 
-  SetAndNotify<UInt8>(FInterval, Value);
+  FInterval := Value;
 end;
 
 procedure TAqCalendarEventRecurrence.SetOccurrences(const Value: UInt32);
@@ -408,8 +407,6 @@ begin
     FreeAndNil(FRecurrence);
     FRecurrence := TAqCalendarEventRecurrenceClass(T).Create(Self);
     Result := T(FRecurrence);
-
-    Notify;
   end;
 end;
 
@@ -425,7 +422,7 @@ begin
   inherited;
 end;
 
-function TAqRecurrentCalendarEvent.ActiveAt(pDateTime: TDateTime): Boolean;
+function TAqRecurrentCalendarEvent.ActiveAt(const pDateTime: TDateTime): Boolean;
 var
   lTime: TTime;
 begin
@@ -456,6 +453,30 @@ end;
 function TAqRecurrentCalendarEvent.GetMonthlyRecurrence: TAqCalendarEventMonthlyRecurrence;
 begin
   Result := ActivateRecurrence<TAqCalendarEventMonthlyRecurrence>;
+end;
+
+function TAqRecurrentCalendarEvent.GetNextOcurrence(const pDateTime: TDateTime): TDateTime;
+var
+  lLastTestableDate: TDate;
+begin
+  if ActiveAt(pDateTime) then
+  begin
+    Result := pDateTime;
+  end else if IsRecurrent then
+  begin
+    Result := pDateTime.DateOf + StartTime;
+    lLastTestableDate := (DaysPerYear[False] * 30);
+
+    while not ActiveAt(Result) do
+    begin
+      Result := Result.IncDay;
+
+      if (Result - pDateTime) > lLastTestableDate then
+      begin
+        raise EAqInternal.Create('Invalid recurrence parameters.');
+      end;
+    end;
+  end;
 end;
 
 function TAqRecurrentCalendarEvent.GetMonthlyOnTheWeekRecurrence: TAqCalendarEventMonthlyOnTheWeekRecurrence;
@@ -591,7 +612,7 @@ begin
       StrNaoEPossivelAtivarUmaRecorrenciaSemanalSemInformarPeloMenosUmDiaDaSemanaParaARecorrencia);
   end;
 
-  SetAndNotify<TAqWeekDays>(FDaysOfTheWeek, Value);
+  FDaysOfTheWeek := Value;
 end;
 
 procedure TAqCalendarEventWeeklyRecurrence.SetOccurrences(const Value: UInt32);
@@ -696,9 +717,8 @@ end;
 
 function TAqCalendarEventMonthlyOnTheWeekRecurrence.GetOccurrences: UInt32;
 begin
-  Result := (((&End.GetMonthsDifference(CalendarEvent.StartDate)+
-   IfThen(&End >= CalcMonthOccurrence(&End), 1)) - 1)
-   div Interval) + 1;
+  Result := (((&End.GetMonthsDifference(CalendarEvent.StartDate) +
+    IfThen(&End >= CalcMonthOccurrence(&End), 1)) - 1) div Interval) + 1;
 end;
 
 function TAqCalendarEventMonthlyOnTheWeekRecurrence.GetWeek: UInt8;
