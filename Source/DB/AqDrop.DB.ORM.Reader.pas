@@ -5,6 +5,7 @@ interface
 {$I '..\Core\AqDrop.Core.Defines.Inc'}
 
 uses
+  System.SysUtils,
   System.Rtti,
   System.TypInfo,
   System.SyncObjs,
@@ -12,13 +13,16 @@ uses
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Helpers.Rtti.GettersAndSetters.Intf,
-  AqDrop.DB.ORM.Attributes,
-  AqDrop.DB.Types;
+  AqDrop.DB.Types,
+  AqDrop.DB.ORM.Attributes;
 
 type
   TAqDBORMTable = class;
 
   TAqDBORMColumn = class
+  strict private const
+    NULLABLE_IF_ZERO_TYPES = adtIntTypes + [adtCurrency, adtDouble, adtSingle, adtDatetime, adtDate, adtTime];
+    NULLABLE_IF_EMPTY_TYPES = adtStringTypes + adtCharTypes + [adtGUID];
   strict private
     [weak]
     FTable: TAqDBORMTable;
@@ -44,11 +48,17 @@ type
 
     function GetValue(const pInstance: TObject): TValue; virtual; abstract;
 
+    function TestIfValueIsNull(const pValue: TValue): Boolean;
+
     procedure SetObjectValue(const pInstance: TObject; pValue: TValue); overload;
     procedure SetObjectValue(const pInstance: TObject; pValue: IAqDBReadValue); overload;
     procedure SetDBValue(const pInstance: TObject; pValue: IAqDBValue);
 
     function GetValueGetter: IAqRttiValueGetter;
+
+    function GetStatusIsNullableIfZero: Boolean;
+    function GetStatusisNullIablefEmpty: Boolean;
+    function GetStatusIsNullable: Boolean;
 
     property Table: TAqDBORMTable read FTable;
     property HasAttribute: Boolean read VerifyIfIsHasAttribute;
@@ -59,6 +69,9 @@ type
     property Alias: string read GetAlias;
     property TargetName: string read GetTargetName;
     property &Type: TAqDataType read GetType;
+    property IsNullableIfZero: Boolean read GetStatusIsNullableIfZero;
+    property IsNullableIfEmpty: Boolean read GetStatusisNullIablefEmpty;
+    property IsNullable: Boolean read GetStatusIsNullable;
     property RttiMember: TRttiMember read GetRttiMember;
   end;
 
@@ -160,6 +173,8 @@ type
     function AddItem(const pMaster: TObject): TObject;
     function GetDeletedItens(const pMaster: TObject): IAqReadableList<TObject>;
 
+    procedure Unload(const pMaster: TObject);
+
     property ORM: TAqDBORM read GetORM;
     property LazyLoadingAvailable: Boolean read VerifyIfLazyLoadingIsAvailable;
     property ManagedDeletedItens: Boolean read VerifyIfDeletedItensAreManaged;
@@ -173,8 +188,6 @@ type
     FMainTable: TAqDBORMTable<AqTable>;
     FSpecializations: IAqList<TAqDBORMTable<AqSpecialization>>;
     FDetails: IAqList<IAqDBORMDetail>;
-    FPrimaryKeys: IAqList<TAqDBORMCOlumn>;
-    FDetailkeys: IAqList<TAqDBORMColumn>;
 
     function GetInitialized: Boolean;
     function GetActiveTable: TAqDBORMTable<AqTable>;
@@ -183,7 +196,9 @@ type
     function GetDetailKeys: IAqReadableList<TAqDBORMColumn>;
     function GetHasSpecializations: Boolean;
     function GetSpecializations: IAqReadableList<TAqDBORMTable<AqSpecialization>>;
-    function FindThroughTables<T>(const pFindFunction: TFindThroughTablesFunction<T>; out pSubject: T): Boolean;
+    function FindThroughTables(const pFindFunction: TFunc<TAqDBORMTable, Boolean>): Boolean; overload;
+    function FindThroughTables<T>(const pFindFunction: TFindThroughTablesFunction<T>;
+      out pSubject: T): Boolean; overload;
 
     function VerifyIfHasDetail: Boolean;
     function GetDetails: IAqList<IAqDBORMDetail>;
@@ -203,6 +218,7 @@ type
     function GetTable(const pName: string; out pTable: TAqDBORMTable): Boolean;
     function GetColumn(const pName: string; out pColumn: TAqDBORMColumn): Boolean; overload;
     function GetColumn(const pTableName, pColumnName: string; out pColumn: TAqDBORMColumn): Boolean; overload;
+    function GetColumns: IAqResultList<TAqDBORMColumn>;
 
     function GetColumnByRttiMember(const pRttiMember: TRttiMember; out pColumn: TAqDBORMColumn): Boolean;
 
@@ -263,9 +279,9 @@ implementation
 
 uses
   System.StrUtils,
-  System.SysUtils,
   System.Generics.Collections,
   AqDrop.Core.Exceptions,
+  AqDrop.Core.RequirementTests,
   AqDrop.Core.Helpers,
   AqDrop.Core.Helpers.Rtti,
   AqDrop.Core.Helpers.Rtti.GettersAndSetters,
@@ -290,6 +306,8 @@ type
     function AddItem(const pMaster: TObject): TObject;
     function VerifyIfDeletedItensAreManaged: Boolean;
     function GetDeletedItens(const pMaster: TObject): IAqReadableList<TObject>;
+
+    procedure Unload(const pMaster: TObject);
   public
     constructor Create(const pMasterMember: TRttiMember; const pItemClass: TClass;
       const pItemConstructor: TRttiMethod = nil);
@@ -315,7 +333,7 @@ end;
 
 constructor TAqDBORMReader.Create;
 begin
-  FORMs := TAqDictionary<PTypeInfo, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue], TAqLockerType.lktMultiReadeExclusiveWriter);
+  FORMs := TAqDictionary<PTypeInfo, TAqDBORM>.Create([TAqKeyValueOwnership.kvoValue], TAqLockerType.lktMultiReaderExclusiveWriter);
   FDetailsInterpreters := TAqList<TAqDBORMBaseDetailInterpreter>.Create(True);
   AddDetailInterpreter(TAqDBORMListDetailInterpreter.Create);
 end;
@@ -501,7 +519,8 @@ begin
     TAqDataType.adtAnsiString,
     TAqDataType.adtString,
     TAqDataType.adtWideString,
-    TAqDataType.adtSet];
+    TAqDataType.adtSet,
+    TAqDataType.adtGUID];
 end;
 
 { TAqDBORM }
@@ -546,21 +565,36 @@ begin
   inherited;
 end;
 
-function TAqDBORM.FindThroughTables<T>(const pFindFunction: TFindThroughTablesFunction<T>; out pSubject: T): Boolean;
+function TAqDBORM.FindThroughTables(const pFindFunction: TFunc<TAqDBORMTable, Boolean>): Boolean;
 var
-  lITable: Int32;
+  lIterator: IAqIterator<TAqDBORMTable<AqSpecialization>>;
 begin
-  Result := pFindFunction(FMainTable, pSubject);
+  Result := pFindFunction(FMainTable);
 
   if not Result and HasSpecializations then
   begin
-    lITable := 0;
+    lIterator := Specializations.GetIterator;
 
-    while not Result and (lITable < FSpecializations.Count) do
+    while not Result and lIterator.MoveToNext do
     begin
-      Result := pFindFunction(FSpecializations[lITable], pSubject);
-      Inc(lITable);
+      Result := pFindFunction(lIterator.CurrentItem);
     end;
+  end;
+end;
+
+function TAqDBORM.FindThroughTables<T>(const pFindFunction: TFindThroughTablesFunction<T>; out pSubject: T): Boolean;
+var
+  lSubject: T;
+begin
+  Result := FindThroughTables(
+    function(pTable: TAqDBORMTable): Boolean
+    begin
+      Result := pFindFunction(pTable, lSubject);
+    end);
+
+  if Result then
+  begin
+    pSubject := lSubject;
   end;
 end;
 
@@ -584,20 +618,17 @@ end;
 function TAqDBORM.GetDetailKeys: IAqReadableList<TAqDBORMColumn>;
 var
   lColumn: TAqDBORMColumn;
+  lDetailkeys: IAqList<TAqDBORMColumn>;
 begin
-  if not Assigned(FDetailKeys) then
+  lDetailkeys := TAqList<TAqDBORMColumn>.Create;
+  for lColumn in FMainTable.Columns do
   begin
-    FDetailkeys := TAqList<TAqDBORMColumn>.Create;
-    for lColumn in FMainTable.Columns do
+    if Assigned(lColumn.Attribute) and (lColumn.Attribute.DetailKey) then
     begin
-      if Assigned(lColumn.Attribute) and (lColumn.Attribute.DetailKey) then
-      begin
-        FDetailkeys.Add(lColumn);
-      end;
+      lDetailkeys.Add(lColumn);
     end;
   end;
-
-  Result := FDetailkeys.GetReadOnlyList;
+  Result := lDetailkeys;
 end;
 
 function TAqDBORM.GetDetails: IAqList<IAqDBORMDetail>;
@@ -680,22 +711,20 @@ end;
 function TAqDBORM.GetPrimaryKeys: IAqReadableList<TAqDBORMColumn>;
 var
   lColumn: TAqDBORMColumn;
+  lPrimaryKeys: IAqList<TAqDBORMColumn>;
 begin
 {TODO 2 -oTatu -cMelhoria: criar a opção do usuário do drop escolher qual a tabela que quer consumir as pks, atualmente tá só na tabela principal (no caso de uma especialização, teremos mais tabelas)}
-  if not Assigned(FPrimaryKeys) then
-  begin
-    FPrimaryKeys := TAqList<TAqDBORMCOlumn>.Create;
+  lPrimaryKeys := TAqList<TAqDBORMCOlumn>.Create;
 
-    for lColumn in FMainTable.Columns do
+  for lColumn in FMainTable.Columns do
+  begin
+    if Assigned(lColumn.Attribute) and (lColumn.Attribute.PrimaryKey) then
     begin
-      if Assigned(lColumn.Attribute) and (lColumn.Attribute.PrimaryKey) then
-      begin
-        FPrimaryKeys.Add(lColumn);
-      end;
+      lPrimaryKeys.Add(lColumn);
     end;
   end;
 
-  Result := FPrimaryKeys.GetReadOnlyList;
+  Result := lPrimaryKeys;
 end;
 
 function TAqDBORM.GetReadableDetails: IAqReadableList<IAqDBORMDetail>;
@@ -736,6 +765,33 @@ begin
     end, pColumn);
 end;
 
+function TAqDBORM.GetColumns: IAqResultList<TAqDBORMColumn>;
+var
+  lResultList: TAqResultList<TAqDBORMColumn>;
+begin
+  lResultList := TAqResultList<TAqDBORMColumn>.Create;
+
+  try
+    FindThroughTables(
+      function(pTable: TAqDBORMTable): Boolean
+      var
+        lColumn: TAqDBORMColumn;
+      begin
+        for lColumn in pTable.Columns do
+        begin
+          lResultList.Add(lColumn);
+        end;
+
+        Result := False;
+      end);
+  except
+    lResultList.Free;
+    raise;
+  end;
+
+  Result := lResultList;
+end;
+
 { TAqDBORMColumn }
 
 constructor TAqDBORMColumn.Create(const pTable: TAqDBORMTable; const pAttribute: AqColumn);
@@ -769,6 +825,21 @@ begin
   Result := HasAttribute and FAttribute.IsAliasDefined;
 end;
 
+function TAqDBORMColumn.GetStatusIsNullable: Boolean;
+begin
+  Result := IsNullableIfZero or IsNullableIfEmpty;
+end;
+
+function TAqDBORMColumn.GetStatusIsNullableIfZero: Boolean;
+begin
+  Result := HasAttribute and (caNullIfZero in Attribute.Attributes) and (&Type in NULLABLE_IF_ZERO_TYPES);
+end;
+
+function TAqDBORMColumn.GetStatusisNullIablefEmpty: Boolean;
+begin
+  Result := HasAttribute and (caNullIfEmpty in Attribute.Attributes) and (&Type in NULLABLE_IF_EMPTY_TYPES);
+end;
+
 function TAqDBORMColumn.GetTargetName: string;
 begin
   if IsAliasDefined then
@@ -790,15 +861,6 @@ begin
 end;
 
 procedure TAqDBORMColumn.SetDBValue(const pInstance: TObject; pValue: IAqDBValue);
-  function IsNullIfZeroActive: Boolean;
-  begin
-    Result := HasAttribute and (TAqDBColumnAttribute.caNullIfZero in FAttribute.Attributes);
-  end;
-
-  function IsNullIfEmptyActive: Boolean;
-  begin
-    Result := HasAttribute and (TAqDBColumnAttribute.caNullIfEmpty in FAttribute.Attributes);
-  end;
 var
   lValue: TValue;
 begin
@@ -810,28 +872,28 @@ begin
     TAqDataType.adtEnumerated:
       pValue.AsInt64 := lValue.AsOrdinal;
     TAqDataType.adtUInt8:
-      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtUInt8);
       end else begin
         pValue.AsUInt8 := lValue.AsInteger;
       end;
     TAqDataType.adtInt8:
-      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtInt8);
       end else begin
         pValue.AsInt8 := lValue.AsInteger;
       end;
     TAqDataType.adtUInt16:
-      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtUInt16);
       end else begin
         pValue.AsUInt16 := lValue.AsInteger;
       end;
     TAqDataType.adtInt16:
-      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtInt16);
       end else begin
@@ -839,14 +901,14 @@ begin
       end;
     TAqDataType.adtUInt32:
 {$IF CompilerVersion >= 25}
-      if (lValue.AsUInt64 = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtUInt32);
       end else begin
         pValue.AsUInt32 := lValue.AsUInt64;
       end;
 {$ELSE}
-      if (lValue.AsInt64 = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtInt32);
       end else begin
@@ -854,7 +916,7 @@ begin
       end;
 {$IFEND}
     TAqDataType.adtInt32:
-      if (lValue.AsInteger = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtInt32);
       end else begin
@@ -862,14 +924,14 @@ begin
       end;
     TAqDataType.adtUInt64:
 {$IF CompilerVersion >= 25}
-      if (lValue.AsUInt64 = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtUInt64);
       end else begin
         pValue.AsUInt64 := lValue.AsUInt64;
       end;
 {$ELSE}
-      if (lValue.AsInt64 = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtInt32);
       end else begin
@@ -877,49 +939,49 @@ begin
       end;
 {$IFEND}
     TAqDataType.adtInt64:
-      if (lValue.AsInt64 = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtInt64);
       end else begin
         pValue.AsInt64 := lValue.AsInt64;
       end;
     TAqDataType.adtCurrency:
-      if (lValue.AsCurrency = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtCurrency);
       end else begin
         pValue.AsCurrency := lValue.AsCurrency;
       end;
     TAqDataType.adtDouble:
-      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtDouble);
       end else begin
         pValue.AsDouble := lValue.AsExtended;
       end;
     TAqDataType.adtSingle:
-      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtSingle);
       end else begin
         pValue.AsSingle := lValue.AsExtended;
       end;
     TAqDataType.adtDatetime:
-      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtDatetime);
       end else begin
         pValue.AsDateTime := lValue.AsExtended;
       end;
     TAqDataType.adtDate:
-      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtDate);
       end else begin
         pValue.AsDate := lValue.AsExtended;
       end;
     TAqDataType.adtTime:
-      if (lValue.AsExtended = 0) and IsNullIfZeroActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtTime);
       end else begin
@@ -927,7 +989,7 @@ begin
       end;
 {$IFNDEF AQMOBILE}
     TAqDataType.adtAnsiChar:
-      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtAnsiChar);
       end else begin
@@ -935,7 +997,7 @@ begin
       end;
 {$ENDIF}
     TAqDataType.adtChar:
-      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtChar);
       end else begin
@@ -943,7 +1005,7 @@ begin
       end;
 {$IFNDEF AQMOBILE}
     TAqDataType.adtAnsiString:
-      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtAnsiString);
       end else begin
@@ -951,11 +1013,18 @@ begin
       end;
 {$ENDIF}
     TAqDataType.adtString, TAqDataType.adtWideString:
-      if lValue.AsString.IsEmpty and IsNullIfEmptyActive then
+      if TestIfValueIsNull(lValue) then
       begin
         pValue.SetNull(TAqDataType.adtWideString);
       end else begin
         pValue.AsString := lValue.AsString;
+      end;
+    TAqDataType.adtGUID:
+      if TestIfValueIsNull(lValue) then
+      begin
+        pValue.SetNull(TAqDataType.adtGUID);
+      end else begin
+        pValue.AsGUID := lValue.AsType<TGUID>;
       end;
   else
     raise EAqInternal.Create('Unexpected type when setting value to ' + Self.Name + ' DB Value.');
@@ -970,6 +1039,25 @@ end;
 procedure TAqDBORMColumn.SetObjectValue(const pInstance: TObject; pValue: IAqDBReadValue);
 begin
   SetValue(pInstance, pValue.GetAsTValue(GetTypeInfo));
+end;
+
+function TAqDBORMColumn.TestIfValueIsNull(const pValue: TValue): Boolean;
+begin
+  Result := IsNullable;
+
+  if Result then
+  begin
+    case GetType of
+      adtUInt8..adtInt64:
+        Result := pValue.AsOrdinal = 0;
+      adtCurrency, adtDouble, adtSingle, adtDatetime, adtDate, adtTime:
+        Result := pValue.AsExtended = 0;
+      adtAnsiChar, adtChar, adtAnsiString, adtString, adtWideString:
+        Result := pValue.AsString.IsEmpty;
+      adtGUID:
+        Result := TAqGUIDFunctions.IsEmpty(pValue.AsType<TGUID>);
+    end;
+  end;
 end;
 
 function TAqDBORMColumn.VerifyIfIsHasAttribute: Boolean;
@@ -1344,6 +1432,11 @@ begin
   Result := FORM;
 end;
 
+procedure TAqDBORMListDetail.Unload(const pMaster: TObject);
+begin
+  GetMemberValueAsObjectList(pMaster).Clear;
+end;
+
 function TAqDBORMListDetail.VerifyIfDeletedItensAreManaged: Boolean;
 begin
   Result := False;
@@ -1360,8 +1453,14 @@ begin
 end;
 
 function TAqDBORMListDetail.GetMemberValueAsObjectList(const pMaster: TObject): TList<TObject>;
+var
+  lObject: TObject;
 begin
-  Result := TList<TObject>(FMasterMember.UniversalGetValue(pMaster).AsObject);
+  lObject := FMasterMember.UniversalGetValue(pMaster).AsObject;
+
+  TAqRequirement.Test(Assigned(lObject), 'Detail object not assigned.');
+
+  Result := TList<TObject>(lObject);
 end;
 
 initialization

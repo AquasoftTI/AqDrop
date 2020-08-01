@@ -9,6 +9,7 @@ uses
 type
   TAqDBFBSQLSolver = class(TAqDBSQLSolver)
   strict protected
+    function SolveGUIDConstant(pConstant: IAqDBSQLGUIDConstant): string; override;
     function SolveLimit(pSelect: IAqDBSQLSelect): string; override;
     function SolveOffset(pSelect: IAqDBSQLSelect): string; override;
     function SolveBooleanConstant(pConstant: IAqDBSQLBooleanConstant): string; override;
@@ -48,6 +49,11 @@ end;
 function TAqDBFBSQLSolver.SolveGeneratorName(const pTableName, pFieldName: string): string;
 begin
   Result := Format('GEN_%s_ID', [pTableName]);
+end;
+
+function TAqDBFBSQLSolver.SolveGUIDConstant(pConstant: IAqDBSQLGUIDConstant): string;
+begin
+  Result := StringOf(pConstant.Value.ToByteArray()).Quote;
 end;
 
 function TAqDBFBSQLSolver.SolveLikeLeftValue(pLeftValue: IAqDBSQLValue): string;

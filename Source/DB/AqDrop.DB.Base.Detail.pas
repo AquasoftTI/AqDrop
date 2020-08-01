@@ -68,9 +68,11 @@ type
 implementation
 
 uses
+  System.SysUtils,
   System.Rtti,
   AqDrop.Core.Exceptions,
   AqDrop.Core.InterfacedObject,
+  AqDrop.Core.RequirementTests,
   AqDrop.Core.Helpers.TArray,
   AqDrop.Core.Helpers.TRttiObject,
   AqDrop.Core.Helpers.TRttiMember,
@@ -94,6 +96,8 @@ type
     function AddItem(const pMaster: TObject): TObject;
     function VerifyIfDeletedItensAreManaged: Boolean;
     function GetDeletedItens(const pMaster: TObject): IAqReadableList<TObject>;
+
+    procedure Unload(const pMaster: TObject);
   public
     constructor Create(const pORM: TAqDBORM; const pMasterMember: TRttiMember);
   end;
@@ -177,13 +181,24 @@ begin
 end;
 
 function TAqDBORMDetail.GetMemberValueAsList(const pMaster: TObject): TAqDBDetailList<TAqDBDetail>;
+var
+  lObject: TObject;
 begin
-  Result := TAqDBDetailList<TAqDBDetail>(FMasterMember.UniversalGetValue(pMaster).AsObject);
+  lObject := FMasterMember.UniversalGetValue(pMaster).AsObject;
+
+  TAqRequirement.Test(Assigned(lObject), 'Detail object not assigned.');
+
+  Result := TAqDBDetailList<TAqDBDetail>(lObject);
 end;
 
 function TAqDBORMDetail.GetORM: TAqDBORM;
 begin
   Result := FORM;
+end;
+
+procedure TAqDBORMDetail.Unload(const pMaster: TObject);
+begin
+  GetMemberValueAsList(pMaster).Unload;
 end;
 
 function TAqDBORMDetail.VerifyIfDeletedItensAreManaged: Boolean;
@@ -216,7 +231,7 @@ begin
   lType := TAqRtti.&Implementation.GetType(T);
   lMethods := lType.GetMethods;
 
-  if not TAqArray<TRttiMethod>.SearchItem(lMethods,
+  if not TAqArray<TRttiMethod>.Find(lMethods,
     function(pItem: TRttiMethod): Boolean
     var
       lParams: TArray<TRttiParameter>;

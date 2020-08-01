@@ -8,14 +8,13 @@ uses
   System.Generics.Collections,
   System.SyncObjs,
   AqDrop.Core.Types,
-  AqDrop.Core.Clonable.Intf,
+  AqDrop.Core.Clonable.Attributes,
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.InterfacedObject;
 
 type
   TAqKeyValueOwnership = (kvoKey, kvoValue);
   TAqKeyValueOwnerships = set of TAqKeyValueOwnership;
-  TAqLockerType = (lktNone, lktCriticalSection, lktMultiReadeExclusiveWriter);
 
   TAqKeyValuePair<K, V> = class(TAqARCObject, IAqKeyValuePair<K, V>)
   strict private
@@ -25,6 +24,8 @@ type
 
     function GetKey: K;
     function GetValue: V;
+
+    function ExtractValue: V;
   public
     constructor Create(const pKey: K; const pValue: V; const pOwnerships: TAqKeyValueOwnerships = []);
     destructor Destroy; override;
@@ -72,17 +73,47 @@ type
     class function CreateLocker(const pLockerType: TAqLockerType): IAqLocker;
   end;
 
-  TAqIterator<T> = class(TAqARCObject, IAqIterator<T>)
+  TAqBaseIterator<T> = class(TAqARCObject, IAqIterator<T>)
   strict private
-    FList: IAqReadableList<T>;
-    FCurrentPosition: Int32;
+    FCurrentIndex: Int32;
+  strict protected
+    function DoGetCurrentItem: T; virtual; abstract;
+    function DoGetCount: Int32; virtual; abstract;
+
+    property CurrentIndex: Int32 read FCurrentIndex;
+    property Count: Int32 read DoGetCount;
   public
-    constructor Create(pList: IAqReadableList<T>);
+    procedure AfterConstruction; override;
 
     function MoveToNext: Boolean;
     function VerifyIfIsFinished: Boolean;
     procedure Reset;
+    function GetCurrentIndex: Int32;
     function GetCurrentItem: T;
+
+    procedure RequiresIterations(const pMinimumIterations: Int32 = 1);
+  end;
+
+  TAqIterator<T> = class(TAqBaseIterator<T>)
+  strict private
+    FList: IAqReadableList<T>;
+  strict protected
+    function DoGetCurrentItem: T; override;
+    function DoGetCount: Int32; override;
+  public
+    constructor Create(pList: IAqReadableList<T>);
+  end;
+
+  TAqNativeIterator<T> = class(TAqBaseIterator<T>)
+  strict private
+    FOwnsList: Boolean;
+    FList: TList<T>;
+  strict protected
+    function DoGetCurrentItem: T; override;
+    function DoGetCount: Int32; override;
+  public
+    constructor Create(const pList: TList<T>; const pOwnsList: Boolean = False);
+    destructor Destroy; override;
   end;
 
   ///-------------------------------------------------------------------------------------------------------------------
@@ -161,6 +192,8 @@ type
     function GetEnumerator: TEnumerator<TTo>;
     function GetIterator: IAqIterator<TTo>;
 
+    function ToArray: TArray<TTo>;
+
     property Count: Int32 read GetCount;
     property Items[const pIndex: Int32]: TTo read GetItem; default;
 
@@ -191,6 +224,8 @@ type
     procedure ListNotifier(pSender: TObject; const pItem: T; pAction: TCollectionNotification); virtual;
 
     procedure ExecWithReleaseOff(const pMethod: TProc);
+
+    procedure CreateLocker(const pLockerType: TAqLockerType);
 
     property FreeObjects: Boolean read FFreeObjects write FFReeObjects;
   public
@@ -247,6 +282,14 @@ type
     procedure Sort(const pComparerFunction: TFunc<T, T, Int32>); overload;
     procedure Sort(pComparer: IComparer<T>); overload;
 
+    function BinarySearch(const pItem: T): Boolean; overload;
+    function BinarySearch(const pItem: T; out pIndex: Int32): Boolean; overload;
+    function BinarySearch(const pItem: T; const pComparerFunction: TFunc<T, T, Int32>): Boolean; overload;
+    function BinarySearch(const pItem: T; const pComparerFunction: TFunc<T, T, Int32>;
+      out pIndex: Int32): Boolean; overload;
+    function BinarySearch(const pItem: T; pComparer: IComparer<T>): Boolean; overload;
+    function BinarySearch(const pItem: T; pComparer: IComparer<T>; out pIndex: Int32): Boolean; overload;
+
     procedure BeginRead;
     procedure EndRead;
     procedure BeginWrite;
@@ -256,6 +299,9 @@ type
     procedure ExecuteLockedForReading(const pMethod: TProc<IAqWritableList<T>>); overload;
     procedure ExecuteLockedForWriting(const pMethod: TProc); overload;
     procedure ExecuteLockedForWriting(const pMethod: TProc<IAqWritableList<T>>); overload;
+
+    procedure LockAndDelete(const pIndex: Int32);
+    procedure LockAndDeleteItem(const pItem: T);
 
     property Comparer: IComparer<T> read GetComparer write SetComparer;
 
@@ -333,6 +379,8 @@ type
     /// </returns>
     function Add(const pItem: T): Int32; virtual;
 
+    function LockAndAdd(const pItem: T): Int32;
+
     function Extract(const pIndex: Int32 = 0): T;
     procedure ExtractAllTo(pList: IAqList<T>);
     function GetExtractableList: IAqExtractableList<T>; inline;
@@ -344,6 +392,7 @@ type
     FNewItemMethod: TFunc<T>;
   strict protected
     function CreateNew: T;
+    function DoAdd: T; virtual;
   public
     constructor Create(const pNewItemMethod: TFunc<T>); overload;
     constructor Create(const pNewItemMethod: TFunc<T>; const pFreeObjects: Boolean); overload;
@@ -386,25 +435,30 @@ type
 
   TAqInterfacedDictionary<TKey, TValue> = class(TObjectDictionary<TKey, TValue>, IInterface)
   strict private
-    FOwnerships: TAqKeyValueOwnerships;
     FDelegatedInterface: IInterface;
 
     property DelegatedInterface: IInterface read FDelegatedInterface implements IInterface;
-  strict protected
-    property Ownerships: TAqKeyValueOwnerships read FOwnerships;
   public
-    constructor Create(const pOwnerships: TAqKeyValueOwnerships = []);
+    constructor Create;
   end;
 
   /// ------------------------------------------------------------------------------------------------------------------
   TAqDictionary<TKey, TValue> = class(TAqInterfacedDictionary<TKey, TValue>, IAqDictionary<TKey, TValue>)
   strict private
+    FOwnerships: TAqKeyValueOwnerships;
     FLocker: IAqLocker;
 
     function VerifyIfHasLocker: Boolean;
     procedure AssertUsingLocker;
 
+    procedure ExecWithOwnershipsOff(const pMethod: TProc);
+    procedure ReleaseKeyIfNecessary(const pKey: TKey);
     procedure ReleaseValueIfNecessary(const pValue: TValue);
+  strict protected
+    property Ownerships: TAqKeyValueOwnerships read FOwnerships;
+  protected
+    procedure KeyNotify(const Key: TKey; Action: TCollectionNotification); override;
+    procedure ValueNotify(const Value: TValue; Action: TCollectionNotification); override;
   public
     constructor Create; overload;
     constructor Create(const pOwnerships: TAqKeyValueOwnerships); overload;
@@ -423,11 +477,18 @@ type
     procedure ExecuteLockedForWriting(const pMethod: TProc); overload;
     procedure ExecuteLockedForWriting(const pMethod: TProc<IAqDictionary<TKey, TValue>>); overload;
 
+    function TryExtract(const pKey: TKey; out pValue: TValue): Boolean;
+    function Extract(const pKey: TKey): TValue;
+
+    function LockAndCheckIfContainsKey(const pKey: TKey): Boolean;
     function LockAndTryGetValue(const pKey: TKey; out pValue: TValue): Boolean;
+    function LockAndTryExtract(const pKey: TKey; out pValue: TValue): Boolean;
+    function LockAndExtract(const pKey: TKey): TValue;
     function LockAndAdd(const pKey: TKey; const pValue: TValue): Boolean;
     procedure LockAndAddOrSetValue(const pKey: TKey; const pValue: TValue);
+    procedure LockAndRemove(const pID: TKey);
 
-    function Add(const pKey: Tkey; const pValue: TValue): Boolean;
+    function Add(const pKey: TKey; const pValue: TValue): Boolean;
 
     function GetOrCreate(const pKey: TKey; const pCreateItemMethod: TFunc<TValue>;
       const pCreateItemLockerBehaviour: TAqCreateItemLockerBehaviour = HoldLockerWhileCreating): TValue;
@@ -438,6 +499,7 @@ type
   TAqIDGenerator = class
   public
     class function Generate: TAqID;
+    class function GetEmpty: TAqID;
   end;
 
   TAqIDDictionary<TValue> = class(TAqDictionary<TAqID, TValue>, IAqIDDictionary<TValue>)
@@ -457,6 +519,17 @@ type
   public
     constructor Create(const pComparerFunction: TFunc<T, T, Int32>);
     function Compare(const Left, Right: T): Int32; override;
+  end;
+
+  TAqStack<T> = class(TAqARCObject, IAqStack<T>)
+  strict private
+    FStack: TStack<T>;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    procedure Push(pItem: T); inline;
+    function Pop(out pItem: T): Boolean;
   end;
 
 resourcestring
@@ -482,6 +555,7 @@ uses
   System.TypInfo,
   System.Math,
   AqDrop.Core.Exceptions,
+  AqDrop.Core.RequirementTests,
   AqDrop.Core.Helpers.Rtti,
   AqDrop.Core.Generics.Releaser;
 
@@ -608,6 +682,46 @@ begin
   FLocker.BeginWrite;
 end;
 
+function TAqWritableList<T>.BinarySearch(const pItem: T; const pComparerFunction: TFunc<T, T, Int32>): Boolean;
+var
+  lIndex: Int32;
+begin
+  Result := BinarySearch(pItem, pComparerFunction, lIndex);
+end;
+
+function TAqWritableList<T>.BinarySearch(const pItem: T; out pIndex: Int32): Boolean;
+begin
+  Result := GetInternalList.BinarySearch(pItem, pIndex);
+end;
+
+function TAqWritableList<T>.BinarySearch(const pItem: T): Boolean;
+var
+  lIndex: Int32;
+begin
+  Result := GetInternalList.BinarySearch(pItem, lIndex);
+end;
+
+function TAqWritableList<T>.BinarySearch(const pItem: T; pComparer: IComparer<T>; out pIndex: Int32): Boolean;
+begin
+  Result := GetInternalList.BinarySearch(pItem, pIndex, pComparer);
+end;
+
+function TAqWritableList<T>.BinarySearch(const pItem: T; pComparer: IComparer<T>): Boolean;
+var
+  lIndex: Int32;
+begin
+  Result := GetInternalList.BinarySearch(pItem, lIndex, pComparer);
+end;
+
+function TAqWritableList<T>.BinarySearch(const pItem: T; const pComparerFunction: TFunc<T, T, Int32>;
+  out pIndex: Int32): Boolean;
+var
+  lComparer: IComparer<T>;
+begin
+  lComparer := TAqComparer<T>.Create(pComparerFunction);
+  GetInternalList.BinarySearch(pItem, pIndex, lComparer);
+end;
+
 procedure TAqWritableList<T>.Clear;
 begin
   GetInternalList.Clear;
@@ -628,6 +742,14 @@ begin
   Create(False, pLockerType);
 end;
 
+procedure TAqWritableList<T>.CreateLocker(const pLockerType: TAqLockerType);
+begin
+  if Assigned(FLocker) then
+    raise EAqInternal.Create('Locker already exists.');
+
+  FLocker := TAqLockerFactory.CreateLocker(pLockerType);
+end;
+
 constructor TAqWritableList<T>.Create(const pFreeObjects: Boolean; const pLockerType: TAqLockerType);
 var
   lInternalList: TList<T>;
@@ -636,7 +758,7 @@ begin
 
   inherited Create(lInternalList, True);
 
-  FLocker := TAqLockerFactory.CreateLocker(pLockerType);
+  CreateLocker(pLockerType);
 
   lInternalList.OnNotify := ListNotifier;
   FFreeObjects := pFreeObjects;
@@ -647,6 +769,28 @@ begin
   if FFreeObjects and (pAction = cnRemoved) then
   begin
     TAqGenericReleaser.TryToRelease<T>(pItem);
+  end;
+end;
+
+procedure TAqWritableList<T>.LockAndDelete(const pIndex: Int32);
+begin
+  BeginWrite;
+
+  try
+    Delete(pIndex);
+  finally
+    EndWrite;
+  end;
+end;
+
+procedure TAqWritableList<T>.LockAndDeleteItem(const pItem: T);
+begin
+  BeginWrite;
+
+  try
+    DeleteItem(pItem);
+  finally
+    EndWrite;
   end;
 end;
 
@@ -767,6 +911,17 @@ begin
   end;
 end;
 
+function TAqList<T>.LockAndAdd(const pItem: T): Int32;
+begin
+  BeginWrite;
+
+  try
+    Result := Add(pItem);
+  finally
+    EndWrite;
+  end;
+end;
+
 procedure TAqList<T>.SetItem(const pIndex: Int32; const pItem: T);
 begin
   try
@@ -867,6 +1022,18 @@ begin
   Result := GetInternalList.IndexOf(ConvertToFrom(pValue));
 end;
 
+function TAqBaseList<TFrom, TTo>.ToArray: TArray<TTo>;
+var
+  lI: Integer;
+begin
+  SetLength(Result, Count);
+
+  for lI := 0 to Count - 1 do
+  begin
+    Result[lI] := Items[lI];
+  end;
+end;
+
 function TAqBaseList<TFrom, TTo>.Find(const pMatchFunction: TFunc<TTo, Boolean>; out pIndex: Int32): Boolean;
 var
   lI: Int32;
@@ -937,6 +1104,11 @@ begin
       Result := (Result shl 8) + UInt8(Random(High(UInt8) + 1));
     end;
   until not Result.IsEmpty;
+end;
+
+class function TAqIDGenerator.GetEmpty: TAqID;
+begin
+  Result := 0;
 end;
 
 { TAqIDDictionary<TValue> }
@@ -1056,6 +1228,28 @@ begin
     end);
 end;
 
+procedure TAqDictionary<TKey, TValue>.ExecWithOwnershipsOff(const pMethod: TProc);
+var
+  lOwnerships: TAqKeyValueOwnerships;
+begin
+  lOwnerships := FOwnerships;
+
+  try
+    FOwnerships := [];
+    pMethod;
+  finally
+    FOwnerships := lOwnerships;
+  end;
+end;
+
+function TAqDictionary<TKey, TValue>.Extract(const pKey: TKey): TValue;
+begin
+  if not TryExtract(pKey, Result) then
+  begin
+    raise EAqInternal.Create('Fail while trying to extract an Item from a dictionary.');
+  end;
+end;
+
 function TAqDictionary<TKey, TValue>.GetCount: Int32;
 begin
   Result := Self.Count;
@@ -1135,16 +1329,30 @@ begin
           ReleaseValueIfNecessary(lNewItem);
         end;
       end;
-    end else begin
-      Result := pCreateItemMethod();
+    end else
+    begin
+      if not TryGetValue(pKey, Result) then
+      begin
+        Result := pCreateItemMethod();
 
-      try
-        Add(pKey, Result);
-      except
-        ReleaseValueIfNecessary(Result);
-        raise;
+        try
+          Add(pKey, Result);
+        except
+          ReleaseValueIfNecessary(Result);
+          raise;
+        end;
       end;
     end;
+  end;
+end;
+
+procedure TAqDictionary<TKey, TValue>.KeyNotify(const Key: TKey; Action: TCollectionNotification);
+begin
+  inherited;
+
+  if Action = TCollectionNotification.cnRemoved then
+  begin
+    ReleaseKeyIfNecessary(Key);
   end;
 end;
 
@@ -1170,19 +1378,65 @@ begin
     end);
 end;
 
-function TAqDictionary<TKey, TValue>.LockAndTryGetValue(const pKey: TKey; out pValue: TValue): Boolean;
-var
-  lResult: Boolean;
-  lValue: TValue;
+function TAqDictionary<TKey, TValue>.LockAndCheckIfContainsKey(const pKey: TKey): Boolean;
 begin
-  ExecuteLockedForReading(
+  BeginRead;
+
+  try
+    Result := ContainsKey(pKey);
+  finally
+    EndRead;
+  end;
+end;
+
+function TAqDictionary<TKey, TValue>.LockAndExtract(const pKey: TKey): TValue;
+begin
+  BeginWrite;
+
+  try
+    Result := Extract(pKey);
+  finally
+    EndWrite;
+  end;
+end;
+
+procedure TAqDictionary<TKey, TValue>.LockAndRemove(const pID: TKey);
+begin
+  ExecuteLockedForWriting(
     procedure
     begin
-      lResult := TryGetValue(pKey, lValue);
+      Remove(pID);
     end);
+end;
 
-  Result := lResult;
-  pValue := lValue;
+function TAqDictionary<TKey, TValue>.LockAndTryExtract(const pKey: TKey; out pValue: TValue): Boolean;
+begin
+  BeginWrite;
+
+  try
+    Result := TryExtract(pKey, pValue);
+  finally
+    EndWrite;
+  end;
+end;
+
+function TAqDictionary<TKey, TValue>.LockAndTryGetValue(const pKey: TKey; out pValue: TValue): Boolean;
+begin
+  BeginRead;
+
+  try
+    Result := TryGetValue(pKey, pValue);
+  finally
+    EndRead;
+  end;
+end;
+
+procedure TAqDictionary<TKey, TValue>.ReleaseKeyIfNecessary(const pKey: TKey);
+begin
+  if TAqKeyValueOwnership.kvoKey in Ownerships then
+  begin
+    TAqGenericReleaser.TryToRelease<TKey>(pKey);
+  end;
 end;
 
 procedure TAqDictionary<TKey, TValue>.ReleaseValueIfNecessary(const pValue: TValue);
@@ -1190,6 +1444,35 @@ begin
   if TAqKeyValueOwnership.kvoValue in Ownerships then
   begin
     TAqGenericReleaser.TryToRelease<TValue>(pValue);
+  end;
+end;
+
+function TAqDictionary<TKey, TValue>.TryExtract(const pKey: TKey; out pValue: TValue): Boolean;
+var
+  lValue: TValue;
+begin
+  Result := ContainsKey(pKey);
+
+  if Result then
+  begin
+    ExecWithOwnershipsOff(
+      procedure
+      begin
+        lValue := Items[pKey];
+        Remove(pKey);
+      end);
+
+    pValue := lValue;
+  end;
+end;
+
+procedure TAqDictionary<TKey, TValue>.ValueNotify(const Value: TValue; Action: TCollectionNotification);
+begin
+  inherited;
+
+  if Action = TCollectionNotification.cnRemoved then
+  begin
+    ReleaseValueIfNecessary(Value);
   end;
 end;
 
@@ -1222,11 +1505,11 @@ begin
   Create(pOwnerships, TAqLockerType.lktNone);
 end;
 
-constructor TAqDictionary<TKey, TValue>.Create(const pOwnerships: TAqKeyValueOwnerships;
-  const pLockerType: TAqLockerType);
+constructor TAqDictionary<TKey, TValue>.Create(const pOwnerships: TAqKeyValueOwnerships; const pLockerType: TAqLockerType);
 begin
-  inherited Create(pOwnerships);
+  inherited Create;
 
+  FOwnerships := pOwnerships;
   FLocker := TAqLockerFactory.CreateLocker(pLockerType);
 end;
 
@@ -1293,6 +1576,12 @@ begin
   inherited;
 end;
 
+function TAqKeyValuePair<K, V>.ExtractValue: V;
+begin
+  Result := FValue;
+  FValue := Default(V);
+end;
+
 function TAqKeyValuePair<K, V>.GetKey: K;
 begin
   Result := FKey;
@@ -1305,34 +1594,18 @@ end;
 
 { TAqInterfacedDictionary<TKey, TValue> }
 
-constructor TAqInterfacedDictionary<TKey, TValue>.Create(const pOwnerships: TAqKeyValueOwnerships);
-var
-  lSet: TDictionaryOwnerships;
+constructor TAqInterfacedDictionary<TKey, TValue>.Create;
 begin
-  FOwnerships := pOwnerships;
   FDelegatedInterface := TAqDelegatedInterface.Create(Self);
 
-  lSet := [];
-
-  if TAqKeyValueOwnership.kvoKey in pOwnerships then
-  begin
-    Include(lSet, doOwnsKeys);
-  end;
-
-  if TAqKeyValueOwnership.kvoValue in pOwnerships then
-  begin
-    Include(lSet, doOwnsValues);
-  end;
-
-  inherited Create(lSet);
+  inherited Create;
 end;
 
 { TAqManagedList<T> }
 
 function TAqManagedList<T>.Add: T;
 begin
-  Result := CreateNew;
-  GetInternalList.Add(Result);
+  Result := DoAdd;
 end;
 
 constructor TAqManagedList<T>.Create(const pNewItemMethod: TFunc<T>);
@@ -1371,6 +1644,12 @@ end;
 function TAqManagedList<T>.CreateNew: T;
 begin
   Result := FNewItemMethod();
+end;
+
+function TAqManagedList<T>.DoAdd: T;
+begin
+  Result := CreateNew;
+  GetInternalList.Add(Result);
 end;
 
 { TAqBaseList<TFrom, TTo>.TEnumerator }
@@ -1445,29 +1724,19 @@ end;
 
 constructor TAqIterator<T>.Create(pList: IAqReadableList<T>);
 begin
+  inherited Create;
+
   FList := pList;
-  Reset;
 end;
 
-function TAqIterator<T>.GetCurrentItem: T;
+function TAqIterator<T>.DoGetCount: Int32;
 begin
-  Result := FList[FCurrentPosition];
+  Result := FList.Count;
 end;
 
-function TAqIterator<T>.MoveToNext: Boolean;
+function TAqIterator<T>.DoGetCurrentItem: T;
 begin
-  Inc(FCurrentPosition);
-  Result := FCurrentPosition < FList.Count;
-end;
-
-procedure TAqIterator<T>.Reset;
-begin
-  FCurrentPosition := -1;
-end;
-
-function TAqIterator<T>.VerifyIfIsFinished: Boolean;
-begin
-  Result := FCurrentPosition >= FList.Count;
+  Result := FList[CurrentIndex];
 end;
 
 { TAqLockerFactory }
@@ -1479,7 +1748,7 @@ begin
       Result := nil;
     lktCriticalSection:
       Result := TAqCriticalSectionLocker.Create;
-    lktMultiReadeExclusiveWriter:
+    lktMultiReaderExclusiveWriter:
       Result := TAqMultiReadExclusiveWriteLocker.Create;
   else
     raise EAqInternal.Create('Unexpected locker type.');
@@ -1552,6 +1821,106 @@ end;
 procedure TAqMultiReadExclusiveWriteLocker.EndWrite;
 begin
   FMultiReadeExclusiveWriterSynchronizer.EndWrite;
+end;
+
+{ TAqBaseIterator<T> }
+
+procedure TAqBaseIterator<T>.AfterConstruction;
+begin
+  inherited;
+
+  Reset;
+end;
+
+function TAqBaseIterator<T>.GetCurrentIndex: Int32;
+begin
+  Result := FCurrentIndex;
+end;
+
+function TAqBaseIterator<T>.GetCurrentItem: T;
+begin
+  Result := DoGetCurrentItem;
+end;
+
+function TAqBaseIterator<T>.MoveToNext: Boolean;
+begin
+  Inc(FCurrentIndex);
+  Result := FCurrentIndex < Count;
+end;
+
+procedure TAqBaseIterator<T>.RequiresIterations(const pMinimumIterations: Int32);
+begin
+  TAqRequirement.Test(Count >= pMinimumIterations,
+    'The iterator doesn''t have the minimum of iterations required.');
+end;
+
+procedure TAqBaseIterator<T>.Reset;
+begin
+  FCurrentIndex := -1;
+end;
+
+function TAqBaseIterator<T>.VerifyIfIsFinished: Boolean;
+begin
+  Result := FCurrentIndex >= Count;
+end;
+
+{ TAqNativeIterator<T> }
+
+constructor TAqNativeIterator<T>.Create(const pList: TList<T>; const pOwnsList: Boolean);
+begin
+  inherited Create;
+
+  FOwnsList := pOwnsList;
+  FList := pList;
+end;
+
+destructor TAqNativeIterator<T>.Destroy;
+begin
+  if FOwnsList then
+  begin
+    FList.Free;
+  end;
+
+  inherited;
+end;
+
+function TAqNativeIterator<T>.DoGetCount: Int32;
+begin
+  Result := FList.Count;
+end;
+
+function TAqNativeIterator<T>.DoGetCurrentItem: T;
+begin
+  Result := FList[CurrentIndex];
+end;
+
+{ TAqStack<T> }
+
+constructor TAqStack<T>.Create;
+begin
+  FStack := TStack<T>.Create;
+end;
+
+destructor TAqStack<T>.Destroy;
+begin
+  FStack.Free;
+
+  inherited;
+end;
+
+function TAqStack<T>.Pop(out pItem: T): Boolean;
+begin
+  Result := FStack.Count > 0;
+
+  if Result then
+  begin
+    pItem := FStack.Extract;
+  end;
+end;
+
+procedure TAqStack<T>.Push(pItem: T);
+begin
+  FStack.Push(pItem);
 end;
 
 end.

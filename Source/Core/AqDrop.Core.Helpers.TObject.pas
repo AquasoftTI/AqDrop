@@ -60,6 +60,7 @@ uses
   System.SysUtils,
   Data.DBXJSONReflect,
   AqDrop.Core.Types,
+  AqDrop.Core.Clonable.Attributes,
   AqDrop.Core.Clonable.Intf,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers.TValue,

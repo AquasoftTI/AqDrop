@@ -14,9 +14,11 @@ type
   strict protected
     function DoTryToRelease(const pType: PTypeInfo; const pData: Pointer): Boolean; virtual; abstract;
   public
-    class function TryToRelease<T>(pValue: T): Boolean;
+    class function TryToRelease<T>(pValue: T): Boolean; overload;
+    class function TryToRelease(const pType: PTypeInfo; const pData: Pointer): Boolean; overload;
 
     class procedure SetImplementation(const pImplementation: TAqGenericReleaser);
+    class function VerifyIfHasImplementationSetted: Boolean;
   end;
 
 implementation
@@ -39,6 +41,11 @@ begin
   FImplementation := pImplementation;
 end;
 
+class function TAqGenericReleaser.TryToRelease(const pType: PTypeInfo; const pData: Pointer): Boolean;
+begin
+  Result := FImplementation.DoTryToRelease(pType, pData);
+end;
+
 class function TAqGenericReleaser.TryToRelease<T>(pValue: T): Boolean;
 begin
   if Assigned(FImplementation) then
@@ -47,6 +54,11 @@ begin
   end else begin
     raise EAqInternal.Create('No implementation provided for TAqGenericReleaser features.');
   end;
+end;
+
+class function TAqGenericReleaser.VerifyIfHasImplementationSetted: Boolean;
+begin
+  Result := Assigned(FImplementation);
 end;
 
 initialization

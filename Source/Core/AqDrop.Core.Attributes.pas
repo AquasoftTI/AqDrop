@@ -1,5 +1,7 @@
 unit AqDrop.Core.Attributes;
 
+//#revisado
+
 interface
 
 type

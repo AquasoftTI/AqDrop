@@ -1,0 +1,98 @@
+package AqDrop.Core.D10Rio;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'Aquasoft DROP - Core Library'}
+{$RUNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  DbxCommonDriver,
+  dbrtl,
+  bindengine,
+  bindcomp,
+  RESTComponents;
+
+contains
+  AqDrop.Core.Attributes in '..\AqDrop.Core.Attributes.pas',
+  AqDrop.Core.Automaton in '..\AqDrop.Core.Automaton.pas',
+  AqDrop.Core.Automaton.Text in '..\AqDrop.Core.Automaton.Text.pas',
+  AqDrop.Core.Bindings in '..\AqDrop.Core.Bindings.pas',
+  AqDrop.Core.Cache.Intf in '..\AqDrop.Core.Cache.Intf.pas',
+  AqDrop.Core.Cache.Monitor in '..\AqDrop.Core.Cache.Monitor.pas',
+  AqDrop.Core.Calendar in '..\AqDrop.Core.Calendar.pas',
+  AqDrop.Core.Clonable.Attributes in '..\AqDrop.Core.Clonable.Attributes.pas',
+  AqDrop.Core.Clonable.Intf in '..\AqDrop.Core.Clonable.Intf.pas',
+  AqDrop.Core.Collections.Intf in '..\AqDrop.Core.Collections.Intf.pas',
+  AqDrop.Core.Collections in '..\AqDrop.Core.Collections.pas',
+  AqDrop.Core.DataCursor.Intf in '..\AqDrop.Core.DataCursor.Intf.pas',
+  AqDrop.Core.DataCursor in '..\AqDrop.Core.DataCursor.pas',
+  AqDrop.Core.Exceptions in '..\AqDrop.Core.Exceptions.pas',
+  AqDrop.Core.ExecutionQueue in '..\AqDrop.Core.ExecutionQueue.pas',
+  AqDrop.Core.FileLog in '..\AqDrop.Core.FileLog.pas',
+  AqDrop.Core.Generics.Arguments.Intf in '..\AqDrop.Core.Generics.Arguments.Intf.pas',
+  AqDrop.Core.Generics.Arguments in '..\AqDrop.Core.Generics.Arguments.pas',
+  AqDrop.Core.Generics.Converters in '..\AqDrop.Core.Generics.Converters.pas',
+  AqDrop.Core.Generics.Releaser.Impl in '..\AqDrop.Core.Generics.Releaser.Impl.pas',
+  AqDrop.Core.Generics.Releaser in '..\AqDrop.Core.Generics.Releaser.pas',
+  AqDrop.Core.Helpers.Exception in '..\AqDrop.Core.Helpers.Exception.pas',
+  AqDrop.Core.Helpers.JSON in '..\AqDrop.Core.Helpers.JSON.pas',
+  AqDrop.Core.Helpers in '..\AqDrop.Core.Helpers.pas',
+  AqDrop.Core.Helpers.Rtti.GettersAndSetters.Intf in '..\AqDrop.Core.Helpers.Rtti.GettersAndSetters.Intf.pas',
+  AqDrop.Core.Helpers.Rtti.GettersAndSetters in '..\AqDrop.Core.Helpers.Rtti.GettersAndSetters.pas',
+  AqDrop.Core.Helpers.Rtti.Impl in '..\AqDrop.Core.Helpers.Rtti.Impl.pas',
+  AqDrop.Core.Helpers.Rtti in '..\AqDrop.Core.Helpers.Rtti.pas',
+  AqDrop.Core.Helpers.TArray in '..\AqDrop.Core.Helpers.TArray.pas',
+  AqDrop.Core.Helpers.TObject in '..\AqDrop.Core.Helpers.TObject.pas',
+  AqDrop.Core.Helpers.TRttiMember in '..\AqDrop.Core.Helpers.TRttiMember.pas',
+  AqDrop.Core.Helpers.TRttiObject in '..\AqDrop.Core.Helpers.TRttiObject.pas',
+  AqDrop.Core.Helpers.TRttiType in '..\AqDrop.Core.Helpers.TRttiType.pas',
+  AqDrop.Core.Helpers.TRttiTypeName in '..\AqDrop.Core.Helpers.TRttiTypeName.pas',
+  AqDrop.Core.Helpers.TThread in '..\AqDrop.Core.Helpers.TThread.pas',
+  AqDrop.Core.Helpers.TValue in '..\AqDrop.Core.Helpers.TValue.pas',
+  AqDrop.Core.HTTP.Intf in '..\AqDrop.Core.HTTP.Intf.pas',
+  AqDrop.Core.HTTP in '..\AqDrop.Core.HTTP.pas',
+  AqDrop.Core.HTTP.Types in '..\AqDrop.Core.HTTP.Types.pas',
+  AqDrop.Core.InterfacedObject in '..\AqDrop.Core.InterfacedObject.pas',
+  AqDrop.Core.InterfaceSupport in '..\AqDrop.Core.InterfaceSupport.pas',
+  AqDrop.Core.Log in '..\AqDrop.Core.Log.pas',
+  AqDrop.Core.Manager.Intf in '..\AqDrop.Core.Manager.Intf.pas',
+  AqDrop.Core.Manager in '..\AqDrop.Core.Manager.pas',
+  AqDrop.Core.Monitor in '..\AqDrop.Core.Monitor.pas',
+  AqDrop.Core.Observers.Intf in '..\AqDrop.Core.Observers.Intf.pas',
+  AqDrop.Core.Observers in '..\AqDrop.Core.Observers.pas',
+  AqDrop.Core.RecursionBlocker in '..\AqDrop.Core.RecursionBlocker.pas',
+  AqDrop.Core.RequirementTests in '..\AqDrop.Core.RequirementTests.pas',
+  AqDrop.Core.ResourcesControl in '..\AqDrop.Core.ResourcesControl.pas',
+  AqDrop.Core.REST.Intf in '..\AqDrop.Core.REST.Intf.pas',
+  AqDrop.Core.REST in '..\AqDrop.Core.REST.pas',
+  AqDrop.Core.SerializationServices in '..\AqDrop.Core.SerializationServices.pas',
+  AqDrop.Core.Tokenizer in '..\AqDrop.Core.Tokenizer.pas',
+  AqDrop.Core.Types in '..\AqDrop.Core.Types.pas',
+  AqDrop.Core.RegisterDefaultImplementations in '..\AqDrop.Core.RegisterDefaultImplementations.pas';
+
+end.

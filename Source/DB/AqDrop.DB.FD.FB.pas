@@ -19,7 +19,9 @@ type
   TAqFDFBDataConverter = class(TAqFDDataConverter)
   public
     function FieldToBoolean(const pField: TField): Boolean; override;
+    function FieldToGUID(const pField: TField): TGUID; override;
     procedure BooleanToParam(const pParameter: TAqFDMappedParam; const pValue: Boolean); override;
+    procedure GUIDToParam(const pParameter: TAqFDMappedParam; const pValue: TGUID); override;
 
     function AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType; override;
   end;
@@ -44,16 +46,20 @@ type
     property UserName: string index $81 read GetParameterValueByIndex write SetParameterValueByIndex;
     property Password: string index $82 read GetParameterValueByIndex write SetParameterValueByIndex;
     property RoleName: string index $83 read GetParameterValueByIndex write SetParameterValueByIndex;
+    property CharacterSet: string index $84 read GetParameterValueByIndex write SetParameterValueByIndex;
   end;
 
 
 implementation
 
 uses
+  System.Types,
+  System.SysUtils,
 {$IF CompilerVersion >= 26}
   FireDAC.Stan.Param,
 {$ENDIF}
   AqDrop.Core.Exceptions,
+  AqDrop.Core.Helpers,
   AqDrop.DB.Types;
 
 { TAqFDFBDataConverter }
@@ -85,6 +91,35 @@ begin
     Result := False;
   end else begin
     Result := inherited;
+  end;
+end;
+
+function TAqFDFBDataConverter.FieldToGUID(const pField: TField): TGUID;
+var
+  lBytes: TArray<UInt8>;
+begin
+  if pField.IsNull then
+  begin
+    Result := inherited;
+  end else
+  begin
+    lBytes := pField.AsBytes;
+    Result := TGUID.Create(lBytes);
+  end;
+end;
+
+procedure TAqFDFBDataConverter.GUIDToParam(const pParameter: TAqFDMappedParam; const pValue: TGUID);
+var
+  lBytes: TBytes;
+begin
+  if TAqGUIDFunctions.IsEmpty(pValue) then
+  begin
+    inherited;
+  end else
+  begin
+    pParameter.DataType := ftString;
+    lBytes := pValue.ToByteArray;
+    pParameter.SetData(@lBytes[0], 16);
   end;
 end;
 
@@ -134,6 +169,8 @@ begin
       Result := Params.Values['Password'];
     $83:
       Result := Params.Values['RoleName'];
+    $84:
+      Result := Params.Values['CharacterSet'];
   else
     Result := inherited;
   end;
@@ -150,6 +187,8 @@ begin
       Params.Values['Password'] := pValue;
     $83:
       Params.Values['RoleName'] := pValue;
+    $84:
+      Params.Values['CharacterSet'] := pValue;
   else
     inherited;
   end;

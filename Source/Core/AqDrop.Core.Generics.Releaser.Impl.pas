@@ -10,6 +10,8 @@ type
   TAqGenericReleaserImplementation = class(TAqGenericReleaser)
   strict protected
     function DoTryToRelease(const pType: PTypeInfo; const pData: Pointer): Boolean; override;
+  public
+    class procedure RegisterAsDefaultImplementation;
   end;
 
 implementation
@@ -39,7 +41,15 @@ begin
   end;
 end;
 
+class procedure TAqGenericReleaserImplementation.RegisterAsDefaultImplementation;
+begin
+  if not TAqGenericReleaser.VerifyIfHasImplementationSetted then
+  begin
+    TAqGenericReleaser.SetImplementation(TAqGenericReleaserImplementation.Create);
+  end;
+end;
+
 initialization
-  TAqGenericReleaser.SetImplementation(TAqGenericReleaserImplementation.Create);
+  TAqGenericReleaserImplementation.RegisterAsDefaultImplementation;
 
 end.

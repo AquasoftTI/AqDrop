@@ -40,6 +40,14 @@ type
 
     procedure RegisterConverter<TFrom, TTo>(const pConverter: TFunc<TFrom, TTo>);
 
+    function HasConverter(const pFromType, pToType: PTypeInfo): Boolean; overload;
+    function HasConverter<TFrom, TTo>: Boolean; overload;
+    function HasConverter<TTo>(const pFrom: TValue): Boolean; overload;
+
+    function TryConvert(const pFrom: TValue; const pToType: PTypeInfo; out pValue: TValue): Boolean; overload;
+    function TryConvert<TTo>(const pFrom: TValue; out pValue: TTo): Boolean; overload;
+    function TryConvert<TFrom, TTo>(const pFrom: TFrom; out pValue: TTo): Boolean; overload;
+
     function Convert(const pFrom: TValue; const pToType: PTypeInfo): TValue; overload;
     function Convert<TTo>(const pFrom: TValue): TTo; overload;
     function Convert<TFrom, TTo>(const pFrom: TFrom): TTo; overload;
@@ -61,6 +69,9 @@ type
     procedure RegisterConvertersFromDateTime;
     procedure RegisterConvertersFromDate;
     procedure RegisterConvertersFromTime;
+
+    procedure RegisterMinorStandarConverters;
+
     procedure RegisterStandardConverters;
     {$endregion}
 
@@ -75,6 +86,7 @@ implementation
 uses
   System.Math,
   System.StrUtils,
+  System.Variants,
   AqDrop.Core.Types,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Collections,
@@ -90,22 +102,13 @@ end;
 { TAqTypeConverters }
 
 function TAqTypeConverters.Convert(const pFrom: TValue; const pToType: PTypeInfo): TValue;
-var
-  lConverter: TAqTypeConverter;
 begin
-  FConverters.BeginRead;
-  try
-    if not FConverters.TryGetValue(GetDictionaryKey(pFrom.TypeInfo, pToType), lConverter) then
-    begin
-      raise EAqInternal.CreateFmt('Converter not found (%s := %s).', [
-        GetTypeName(pFrom.TypeInfo),
-        GetTypeName(pToType)]);
-    end;
-  finally
-    FConverters.EndRead;
+  if not TryConvert(pFrom, pToType, Result) then
+  begin
+    raise EAqInternal.CreateFmt('Converter not found (%s := %s).', [
+      GetTypeName(pToType),
+      GetTypeName(pFrom.TypeInfo)]);
   end;
-
-  Result := lConverter.Execute(pFrom);
 end;
 
 function TAqTypeConverters.Convert<TFrom, TTo>(const pFrom: TFrom): TTo;
@@ -120,7 +123,7 @@ end;
 
 constructor TAqTypeConverters.Create;
 begin
-  FConverters := TAqDictionary<string, TAqTypeConverter>.Create([kvoValue], TAqLockerType.lktMultiReadeExclusiveWriter);
+  FConverters := TAqDictionary<string, TAqTypeConverter>.Create([kvoValue], TAqLockerType.lktMultiReaderExclusiveWriter);
 end;
 
 class function TAqTypeConverters.GetDefaultInstance: TAqTypeConverters;
@@ -145,6 +148,21 @@ begin
   Result := IntToHex(NativeInt(pType), 2);
 end;
 
+function TAqTypeConverters.HasConverter(const pFromType, pToType: PTypeInfo): Boolean;
+begin
+  Result := FConverters.LockAndCheckIfContainsKey(GetDictionaryKey(pFromType, pToType));
+end;
+
+function TAqTypeConverters.HasConverter<TFrom, TTo>: Boolean;
+begin
+  Result := HasConverter(TypeInfo(TFrom), TypeInfo(TTo));
+end;
+
+function TAqTypeConverters.HasConverter<TTo>(const pFrom: TValue): Boolean;
+begin
+  Result := HasConverter(pFrom.TypeInfo, TypeInfo(TTo));
+end;
+
 class procedure TAqTypeConverters.InitializeDefaultInstance;
 begin
   if not Assigned(FDefaultInstance) then
@@ -155,14 +173,8 @@ end;
 
 procedure TAqTypeConverters.RegisterConverter<TFrom, TTo>(const pConverter: TFunc<TFrom, TTo>);
 begin
-  FConverters.BeginWrite;
-
-  try
-    FConverters.AddOrSetValue(GetDictionaryKey<TFrom, TTo>,
-      TAqTypeConverterByMethod<TFrom,TTo>.Create(pConverter));
-  finally
-    FConverters.EndWrite;
-  end;
+  FConverters.LockAndAddOrSetValue(GetDictionaryKey<TFrom, TTo>,
+    TAqTypeConverterByMethod<TFrom,TTo>.Create(pConverter));
 end;
 
 procedure TAqTypeConverters.RegisterConvertersFromBoolean;
@@ -354,6 +366,17 @@ begin
     begin
       Result := pValue;
     end);
+  RegisterConverter<TDate, Variant>(
+    function(pValue: TDate): Variant
+    begin
+      if pValue = 0 then
+      begin
+        Result := System.Variants.Null;
+      end else
+      begin
+        Result := pValue;
+      end;
+    end);
 end;
 
 procedure TAqTypeConverters.RegisterConvertersFromDateTime;
@@ -394,6 +417,17 @@ begin
 {$ELSE}
       Result := System.Frac(pValue);
 {$ENDIF}
+    end);
+  RegisterConverter<TDateTime, Variant>(
+    function(pValue: TDateTime): Variant
+    begin
+      if pValue = 0 then
+      begin
+        Result := System.Variants.Null;
+      end else
+      begin
+        Result := pValue;
+      end;
     end);
 end;
 
@@ -597,6 +631,17 @@ begin
     function(pValue: TAqEntityID): Currency
     begin
       Result := pValue;
+    end);
+  RegisterConverter<TAqEntityID, Variant>(
+    function(pValue: TAqEntityID): Variant
+    begin
+      if pValue > 0 then
+      begin
+        Result := pValue;
+      end else
+      begin
+        Result := System.Variants.Null;
+      end;
     end);
 end;
 
@@ -961,6 +1006,12 @@ begin
     begin
       Result := pValue.ToTime;
     end);
+
+  RegisterConverter<string, TGUID>(
+    function(pValue: string): TGUID
+    begin
+      Result := TGUID.Create(pValue);
+    end);
 end;
 
 procedure TAqTypeConverters.RegisterConvertersFromTime;
@@ -1270,6 +1321,15 @@ begin
     end);
 end;
 
+procedure TAqTypeConverters.RegisterMinorStandarConverters;
+begin
+  RegisterConverter<TGUID, string>(
+    function(pValue: TGUID): string
+    begin
+      Result := pValue.ToString;
+    end);
+end;
+
 procedure TAqTypeConverters.RegisterStandardConverters;
 begin
   RegisterConvertersFromString;
@@ -1288,11 +1348,55 @@ begin
   RegisterConvertersFromDate;
   RegisterConvertersFromTime;
   RegisterConvertersFromEntityID;
+  RegisterMinorStandarConverters;
 end;
 
 class procedure TAqTypeConverters.ReleaseDefaultInstance;
 begin
   FreeAndNil(FDefaultInstance);
+end;
+
+function TAqTypeConverters.TryConvert(const pFrom: TValue; const pToType: PTypeInfo; out pValue: TValue): Boolean;
+var
+  lConverter: TAqTypeConverter;
+begin
+  Result := pFrom.TypeInfo = pToType;
+
+  if Result then
+  begin
+    pValue := pFrom;
+  end else
+  begin
+    FConverters.BeginRead;
+
+    try
+      Result := FConverters.TryGetValue(GetDictionaryKey(pFrom.TypeInfo, pToType), lConverter);
+
+      if Result then
+      begin
+        pValue := lConverter.Execute(pFrom);
+      end;
+    finally
+      FConverters.EndRead;
+    end;
+  end;
+end;
+
+function TAqTypeConverters.TryConvert<TFrom, TTo>(const pFrom: TFrom; out pValue: TTo): Boolean;
+begin
+  Result := TryConvert<TTo>(TValue.From<TFrom>(pFrom), pValue);
+end;
+
+function TAqTypeConverters.TryConvert<TTo>(const pFrom: TValue; out pValue: TTo): Boolean;
+var
+  lValue: TValue;
+begin
+  Result := TryConvert(pFrom, TypeInfo(TTo), lValue);
+
+  if Result then
+  begin
+    pValue := lValue.AsType<TTo>;
+  end;
 end;
 
 { TAqTypeConverterByMethod<TFrom, TTo> }

@@ -827,8 +827,7 @@ begin
   end;
 end;
 
-function TAqAutomaton<TIdentifier, TValue, TOutput>.AddFinalState(const pOutput: TOutput)
-  : TAqAutomatonState<TIdentifier, TValue, TOutput>;
+function TAqAutomaton<TIdentifier, TValue, TOutput>.AddFinalState(const pOutput: TOutput): TAqAutomatonState<TIdentifier, TValue, TOutput>;
 begin
   Result := TAqAutomatonState<TIdentifier, TValue, TOutput>.Create(Self, FStates.Count, pOutput);
 

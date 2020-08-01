@@ -8,12 +8,16 @@ uses
   System.TypInfo;
 
 type
-  TAqID = NativeUInt;
+  TAqID = type NativeUInt;
 
   TAqIDHelper = record helper for TAqID
   strict private
     function VerifyIfIsEmpty: Boolean; inline;
   public
+    function ToString: string;
+
+    class function GetEmptyID: TAqID; static; inline;
+
     property IsEmpty: Boolean read VerifyIfIsEmpty;
   end;
 
@@ -49,7 +53,8 @@ type
     adtMethod,
     adtVariant,
     adtRecord,
-    adtInterface);
+    adtInterface,
+    adtGUID);
 
   TAqDataTypeHelper = record helper for TAqDataType
     function ToString: string;
@@ -59,6 +64,8 @@ type
 
 const
   adtIntTypes = [adtUInt8..adtInt64];
+  adtCharTypes = [adtAnsiChar, adtChar];
+  adtStringTypes = [adtAnsiString, adtString, adtWideString];
 
 type
   TAqEntityID = type Int64;
@@ -70,6 +77,8 @@ type
 implementation
 
 uses
+  System.SysUtils,
+  AqDrop.Core.Helpers,
   AqDrop.Core.Exceptions;
 
 { TAqDataTypeHelper }
@@ -130,7 +139,15 @@ begin
     tkVariant:
       Result := TAqDataType.adtVariant;
     tkRecord:
-      Result := TAqDataType.adtRecord;
+      begin
+        if pType = TypeInfo(TGUID) then
+        begin
+          Result := TAqDataType.adtGUID;
+        end else
+        begin
+          Result := TAqDataType.adtRecord;
+        end;
+      end;
     tkInterface:
       Result := TAqDataType.adtInterface;
     tkInt64:
@@ -150,9 +167,19 @@ end;
 
 { TAqIDHelper }
 
+class function TAqIDHelper.GetEmptyID: TAqID;
+begin
+  Result := 0;
+end;
+
+function TAqIDHelper.ToString: string;
+begin
+  Result := NativeInt(Self).ToString;
+end;
+
 function TAqIDHelper.VerifyIfIsEmpty: Boolean;
 begin
-  Result := Self = 0;
+  Result := Self = GetEmptyID;
 end;
 
 end.

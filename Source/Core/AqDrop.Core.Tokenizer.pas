@@ -119,7 +119,7 @@ type
     ///   PT-BR:
     ///     Construtor da classe.
     /// </summary>
-    constructor Create;
+    constructor Create; virtual;
     /// <summary>
     ///   EN-US:
     ///     Class destructor.

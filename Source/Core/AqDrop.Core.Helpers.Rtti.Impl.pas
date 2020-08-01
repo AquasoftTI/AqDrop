@@ -13,13 +13,15 @@ type
   strict private
     FContext: TRttiContext;
     FTypesCache: IAqDictionary<PTypeInfo, TRttiType>;
-    FTypesPerName: IAqDictionary<string, PTypeInfo>;
+    FTypesPerName: IAqDictionary<string, TRttiType>;
   strict protected
-    function DoGetType(pType: PTypeInfo): TRttiType; override;
-    function DoFindType(pQualifiedName: string): TRttiType; override;
+    function DoGetType(const pType: PTypeInfo): TRttiType; override;
+    function DoTryFindType(const pQualifiedName: string; out pType: TRttiType): Boolean; override;
   public
     constructor Create;
     destructor Destroy; override;
+
+    class procedure RegisterAsDefaultImplementation;
   end;
 
 implementation
@@ -32,8 +34,8 @@ uses
 constructor TAqRttiImplementation.Create;
 begin
   FContext := TRttiContext.Create;
-  FTypesCache := TAqDictionary<PTypeInfo, TRttiType>.Create([kvoValue], TAqLockerType.lktMultiReadeExclusiveWriter);
-  FTypesPerName := TAqDictionary<string, PTypeInfo>.Create(TAqLockerType.lktMultiReadeExclusiveWriter);
+  FTypesCache := TAqDictionary<PTypeInfo, TRttiType>.Create([kvoValue], TAqLockerType.lktMultiReaderExclusiveWriter);
+  FTypesPerName := TAqDictionary<string, TRttiType>.Create(TAqLockerType.lktMultiReaderExclusiveWriter);
 end;
 
 destructor TAqRttiImplementation.Destroy;
@@ -44,33 +46,26 @@ begin
   inherited;
 end;
 
-function TAqRttiImplementation.DoFindType(pQualifiedName: string): TRttiType;
-var
-  lTypeInfo: PTypeinfo;
+function TAqRttiImplementation.DoTryFindType(const pQualifiedName: string; out pType: TRttiType): Boolean;
 begin
-  Result := nil;
-
-  lTypeInfo := FTypesPerName.GetOrCreate(pQualifiedName,
-    function: PTypeInfo
-    var
-      lRttiType: TRttiType;
+  pType := FTypesPerName.GetOrCreate(pQualifiedName,
+    function: TRttiType
     begin
-      Result := nil;
-      lRttiType := FContext.FindType(pQualifiedName);
-
-      if Assigned(lRttiType) then
-      begin
-        Result := lRttiType.Handle;
-      end;
+      Result := FContext.FindType(pQualifiedName);
     end, TAqCreateItemLockerBehaviour.RelaseAndIgnoreNewIfClonflicted);
 
-  if Assigned(lTypeInfo) then
+  Result := Assigned(pType);
+end;
+
+class procedure TAqRttiImplementation.RegisterAsDefaultImplementation;
+begin
+  if not TAqRtti.VerifyIfHasImplementationSetted then
   begin
-    Result := GetType(lTypeInfo);
+    TAqRtti.SetImplementation(TAqRttiImplementation.Create);
   end;
 end;
 
-function TAqRttiImplementation.DoGetType(pType: PTypeInfo): TRttiType;
+function TAqRttiImplementation.DoGetType(const pType: PTypeInfo): TRttiType;
 begin
   Result := FTypesCache.GetOrCreate(pType,
     function: TRttiType
@@ -80,6 +75,6 @@ begin
 end;
 
 initialization
-  TAqRtti.SetImplementation(TAqRttiImplementation.Create);
+  TAqRttiImplementation.RegisterAsDefaultImplementation;
 
 end.

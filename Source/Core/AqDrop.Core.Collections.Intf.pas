@@ -9,11 +9,15 @@ uses
   AqDrop.Core.Types;
 
 type
+  TAqLockerType = (lktNone, lktCriticalSection, lktMultiReaderExclusiveWriter);
+
   IAqKeyValuePair<K, V> = interface
     ['{FF1F3ECB-DE5B-47E5-AB59-B512FB5AE003}']
 
     function GetKey: K;
     function GetValue: V;
+
+    function ExtractValue: V;
 
     property Key: K read GetKey;
     property Value: V read GetValue;
@@ -37,8 +41,12 @@ type
     function MoveToNext: Boolean;
     function VerifyIfIsFinished: Boolean;
     procedure Reset;
+    function GetCurrentIndex: Int32;
     function GetCurrentItem: T;
 
+    procedure RequiresIterations(const pMinimumIterations: Int32 = 1);
+
+    property CurrentIndex: Int32 read GetCurrentIndex;
     property CurrentItem: T read GetCurrentItem;
     property IsFinished: Boolean read VerifyIfIsFinished;
   end;
@@ -122,6 +130,8 @@ type
     function GetEnumerator: TEnumerator<T>;
     function GetIterator: IAqIterator<T>;
 
+    function ToArray: TArray<T>;
+
     /// <summary>
     ///   EN-US:
     ///     Returns the items count of the list.
@@ -203,10 +213,23 @@ type
     procedure BeginWrite;
     procedure EndWrite;
 
+    procedure CreateLocker(const pLockerType: TAqLockerType);
+
     procedure ExecuteLockedForReading(const pMethod: TProc); overload;
     procedure ExecuteLockedForReading(const pMethod: TProc<IAqWritableList<T>>); overload;
     procedure ExecuteLockedForWriting(const pMethod: TProc); overload;
     procedure ExecuteLockedForWriting(const pMethod: TProc<IAqWritableList<T>>); overload;
+
+    procedure LockAndDelete(const pIndex: Int32);
+    procedure LockAndDeleteItem(const pItem: T);
+
+    function BinarySearch(const pItem: T): Boolean; overload;
+    function BinarySearch(const pItem: T; out pIndex: Int32): Boolean; overload;
+    function BinarySearch(const pItem: T; const pComparerFunction: TFunc<T, T, Int32>): Boolean; overload;
+    function BinarySearch(const pItem: T; const pComparerFunction: TFunc<T, T, Int32>;
+      out pIndex: Int32): Boolean; overload;
+    function BinarySearch(const pItem: T; pComparer: IComparer<T>): Boolean; overload;
+    function BinarySearch(const pItem: T; pComparer: IComparer<T>; out pIndex: Int32): Boolean; overload;
 
     property Comparer: IComparer<T> read GetComparer write SetComparer;
   end;
@@ -218,6 +241,7 @@ type
     procedure Insert(const pIndex: Int32; const pItem: T);
 
     function Add(const pItem: T): Int32;
+    function LockAndAdd(const pItem: T): Int32;
 
     function Extract(const pIndex: Int32 = 0): T;
     procedure ExtractAllTo(pList: IAqList<T>);
@@ -249,6 +273,8 @@ type
     function GetItem(const Key: TKey): TValue;
     procedure SetItem(const Key: TKey; const Value: TValue);
     function TryGetValue(const Key: TKey; out Value: TValue): Boolean;
+    function TryExtract(const pKey: TKey; out pValue: TValue): Boolean;
+    function Extract(const pKey: TKey): TValue;
     procedure Remove(const Key: TKey);
     function GetKeys: TDictionary<TKey, TValue>.TKeyCollection;
     function GetValues: TDictionary<TKey, TValue>.TValueCollection;
@@ -267,14 +293,18 @@ type
     procedure ExecuteLockedForWriting(const pMethod: TProc); overload;
     procedure ExecuteLockedForWriting(const pMethod: TProc<IAqDictionary<TKey, TValue>>); overload;
 
+    function LockAndCheckIfContainsKey(const pKey: TKey): Boolean;
     function LockAndTryGetValue(const pKey: TKey; out pValue: TValue): Boolean;
+    function LockAndTryExtract(const pKey: TKey; out pValue: TValue): Boolean;
+    function LockAndExtract(const pKey: TKey): TValue;
     function LockAndAdd(const pKey: TKey; const pValue: TValue): Boolean;
     procedure LockAndAddOrSetValue(const pKey: TKey; const pValue: TValue);
+    procedure LockAndRemove(const pKey: TKey);
 
     function GetOrCreate(const pKey: TKey; const pCreateItemMethod: TFunc<TValue>;
       const pCreateItemLockerBehaviour: TAqCreateItemLockerBehaviour = HoldLockerWhileCreating): TValue;
 
-    function Add(const pKey: Tkey; const pValue: TValue): Boolean;
+    function Add(const pKey: TKey; const pValue: TValue): Boolean;
 
     property HasLocker: Boolean read VerifyIfHasLocker;
     property Keys: TDictionary<TKey,TValue>.TKeyCollection read GetKeys;
@@ -283,11 +313,21 @@ type
     property Count: Int32 read GetCount;
   end;
 
+  {TODO: Refatorar para que iddictionary estenda de uma interface mais abstrata.
+     Hoje a interface IAqDictionary possui os métodos lockandadd e lockandaddorsetvalue em uma assinatura que permite fornecer o ID,
+     o ideal seria criar uma interface comum, e estensões serem criadas com assinaturas pertinentes aos objetivos de cada interface.}
   IAqIDDictionary<TValue> = interface(IAqDictionary<TAqID, TValue>)
     ['{BCAE60F6-F78E-4E5D-B2C4-0906FD8E6C14}']
 
     function Add(const pValue: TValue): TAqID; overload;
     function Add(const pCreateItemMethod: TFunc<TAqID, TValue>): TAqID; overload;
+  end;
+
+  IAqStack<T> = interface
+    ['{8322E958-07A4-4701-ADB3-6C525C54EDFB}']
+
+    procedure Push(pItem: T);
+    function Pop(out pItem: T): Boolean;
   end;
 
 {TODO 3 -oTatu -cDesejável: criar interface específica para cache, com controle de descarte de cache (cache expire) built in}

@@ -10,13 +10,14 @@ type
   TAqDBSQLCommandType = (ctSelect, ctInsert, ctUpdate, ctDelete);
   TAqDBSQLSourceType = (stTable, stSelect);
   TAqDBSQLValueType = (vtColumn, vtOperation, vtSubselect, vtConstant, vtParameter);
-  TAqDBSQLConstantValueType = (cvText, cvInt, cvDouble, cvCurrency, cvDateTime, cvDate, cvTime, cvBoolean, cvUInt);
+  TAqDBSQLConstantValueType = (cvText, cvInt, cvDouble, cvCurrency, cvDateTime, cvDate, cvTime, cvBoolean, cvUInt, cvGUID);
   TAqDBSQLAggregatorType = (atNone, atCount, atSum, atAvg, atMax, atMin);
-  TAqDBSQLConditionType = (ctComparison, ctValueIsNull, ctComposed, ctLike, ctBetween, ctIn);
+  TAqDBSQLConditionType = (ctComparison, ctValueIsNull, ctComposed, ctLike, ctBetween, ctIn, ctExists);
   TAqDBSQLOperator = (opSum, opSubtraction, opMultiplication, opDivision, opDiv, opMod);
   TAqDBSQLComparison = (cpEqual, cpGreaterThan, cpGreaterEqual, cpLessThan, cpLessEqual, cpNotEqual);
   TAqDBSQLConditionDescriptorType = (cdComposed, cdComparison, cdLike, cdBetween, cdIn, cdIsNull, cdIsNotNull);
-  TAqDBSQLJoinType = (jtInnerJoin, jtLeftJoin);
+  TAqDBSQLJoinType = (jtInnerJoin, jtLeftJoin); // please, keep the order of this enumerated from the most restrictive to the least restrictive, this order is used to update the priority of join type in TakeSetup methods
+  TAqDBSQLJoinConditionType = (jctComposed, jctCustom);
   TAqDBSQLBooleanOperator = (boAnd, boOr, boXor);
   TAqDBSQLLikeWildCard = (lwcNone, lwcSingleChar, lwcMultipleChars);
 
@@ -36,6 +37,7 @@ type
   IAqDBSQLLikeCondition = interface;
   IAqDBSQLBetweenCondition = interface;
   IAqDBSQLInCondition = interface;
+  IAqDBSQLExistsCondition = interface;
 
   IAqDBSQLTextConstant = interface;
   IAqDBSQLIntConstant = interface;
@@ -46,6 +48,7 @@ type
   IAqDBSQLDateConstant = interface;
   IAqDBSQLTimeConstant = interface;
   IAqDBSQLBooleanConstant = interface;
+  IAqDBSQLGUIDConstant = interface;
 
   IAqDBSQLComposedConditionDescriptor = interface;
   IAqDBSQLSimpleComparisonDescriptor = interface;
@@ -54,6 +57,10 @@ type
   IAqDBSQLInDescriptor = interface;
   IAqDBSQLIsNullDescriptor = interface;
   IAqDBSQLIsNotNullDescriptor = interface;
+
+  IAqDBSQLJoin = interface;
+  IAqDBSQLJoinWithComposedCondition = interface;
+  IAqDBSQLJoinWithCustomCondition = interface;
 
   IAqDBSQLSource = interface;
   IAqDBSQLTable = interface;
@@ -96,10 +103,13 @@ type
     function GetExpression: string;
     function GetIsSourceDefined: Boolean;
     function GetSource: IAqDBSQLSource;
+    function GetDefaultValue: String;
+    function SetDefaultValue(const pValor: String): IAqDBSQLColumn;
 
     property Expression: string read GetExpression;
     property IsSourceDefined: Boolean read GetIsSourceDefined;
     property Source: IAqDBSQLSource read GetSource;
+    property DefaultValue: String read GetDefaultValue;
   end;
 
   IAqDBSQLOperation = interface(IAqDBSQLValue)
@@ -129,6 +139,7 @@ type
     function GetAsTimeConstant: IAqDBSQLTimeConstant;
     function GetAsBooleanConstant: IAqDBSQLBooleanConstant;
     function GetAsUIntConstant: IAqDBSQLUIntConstant;
+    function GetAsGUIDConstant: IAqDBSQLGUIDConstant;
   end;
 
   IAqDBSQLTextConstant = interface(IAqDBSQLConstant)
@@ -212,6 +223,15 @@ type
     property Value: Boolean read GetValue write SetValue;
   end;
 
+  IAqDBSQLGUIDConstant = interface(IAqDBSQLConstant)
+    ['{85AD6162-B8BF-412F-93E4-446194106044}']
+
+    function GetValue: TGUID;
+    procedure SetValue(const pValue: TGUID);
+
+    property Value: TGUID read GetValue write SetValue;
+  end;
+
   IAqDBSQLSubselect = interface(IAqDBSQLValue)
     ['{77EB53C3-9B6F-4D3A-9FDD-758564209645}']
     function GetSelect: IAqDBSQLSelect;
@@ -255,8 +275,9 @@ type
     function GetAsLike: IAqDBSQLLikeCondition;
     function GetAsBetween: IAqDBSQLBetweenCondition;
     function GetAsIn: IAqDBSQLInCondition;
+    function GetAsExists: IAqDBSQLExistsCondition;
 
-    procedure Negate;
+    function Negate: IAqDBSQLCondition;
 
     property ConditionType: TAqDBSQLConditionType read GetConditionType;
     property IsNegated: Boolean read VerifyIfIsNegated;
@@ -308,6 +329,14 @@ type
 
     property TestableValue: IAqDBSQLValue read GetTestableValue write SetTestableValue;
     property InValues: IAqReadableList<IAqDBSQLValue> read GetInValues;
+  end;
+
+  IAqDBSQLExistsCondition = interface(IAqDBSQLCondition)
+    ['{09F76451-6F68-4D60-A5A0-312B8401D943}']
+
+    function GetSelect: IAqDBSQLSelect;
+
+    property Select: IAqDBSQLSelect read GetSelect;
   end;
 
   IAqDBSQLValueIsNullCondition = interface(IAqDBSQLCondition)
@@ -450,6 +479,12 @@ type
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
     function AddColumnEqual(const pColumnName: string; pValue: Boolean;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(pColumn: IAqDBSQLColumn; pValue: TGUID;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
+      IAqDBSQLComposedCondition; overload;
+    function AddColumnEqual(const pColumnName: string; pValue: TGUID;
       const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd):
       IAqDBSQLComposedCondition; overload;
 
@@ -752,24 +787,45 @@ type
   end;
 
   IAqDBSQLJoin = interface
-    ['{311D15C5-7692-4E3B-AA83-179B624AC20C}']
+    ['{A39F1E2D-A0B9-487B-816C-5C2E4738D162}']
     function GetSource: IAqDBSQLSource;
-    function GetCondition: IAqDBSQLCondition;
     function GetJoinType: TAqDBSQLJoinType;
+    function GetConditionType: TAqDBSQLJoinConditionType;
     function GetHasPreviousJoin: Boolean;
     function GetPreviousJoin: IAqDBSQLJoin;
     function GetIdentifier: string;
 
-    function &On(const pColumnName: string): IAqDBSQLJoin;
-    function EqualsTo(pValue: IAqDBSQLValue): IAqDBSQLJoin; overload;
-    function EqualsTo(const pColumnName: string): IAqDBSQLJoin; overload;
+    function GetAsJoinWithComposedCondition: IAqDBSQLJoinWithComposedCondition;
+    function GetAsJoinWithCustomCondition: IAqDBSQLJoinWithCustomCondition;
+
+    procedure UpdateJoinTypeWithHighestPriority(const pJoinType: TAqDBSQLJoinType);
 
     property JoinType: TAqDBSQLJoinType read GetJoinType;
+    property ConditionType: TAqDBSQLJoinConditionType read GetConditionType;
     property Source: IAqDBSQLSource read GetSource;
-    property Condition: IAqDBSQLCondition read GetCondition;
     property HasPreviousJoin: Boolean read GetHasPreviousJoin;
     property PreviousJoin: IAqDBSQLJoin read GetPreviousJoin;
     property Identifier: string read GetIdentifier;
+  end;
+
+  IAqDBSQLJoinWithComposedCondition = interface(IAqDBSQLJoin)
+    ['{BF4441B2-95F6-4894-B750-672854DBA6F2}']
+
+    function GetCondition: IAqDBSQLCondition;
+
+    function &On(const pColumnName: string): IAqDBSQLJoinWithComposedCondition;
+    function EqualsTo(pValue: IAqDBSQLValue): IAqDBSQLJoinWithComposedCondition; overload;
+    function EqualsTo(const pColumnName: string): IAqDBSQLJoinWithComposedCondition; overload;
+
+    property Condition: IAqDBSQLCondition read GetCondition;
+  end;
+
+  IAqDBSQLJoinWithCustomCondition = interface(IAqDBSQLJoin)
+    ['{B3BC588C-7C24-4B65-8D3C-5E99FFC276D1}']
+
+    function GetCustomCondition: string;
+
+    property CustomCondition: string read GetCustomCondition;
   end;
 
   IAqDBSQLOrderByItem = interface
@@ -794,7 +850,7 @@ type
     function GetAsIsNotNullDescriptor: IAqDBSQLIsNotNullDescriptor;
 
     function VerifyIfIsNegated: Boolean;
-    procedure Negate;
+    function Negate: IAqDBSQLConditionDescriptor;
 
     property ConditionDescriptorType: TAqDBSQLConditionDescriptorType read GetConditionDescriptorType;
     property IsNegated: Boolean read VerifyIfIsNegated;
@@ -816,11 +872,17 @@ type
     function AddComparison(const pSourceIdentifier, pColumnName: string; const pComparison: TAqDBSQLComparison;
       pComparisonValue: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator =
       TAqDBSQLBooleanOperator.boAnd): IAqDBSQLSimpleComparisonDescriptor; overload;
-    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison; pComparisonValue: IAqDBSQLValue;
-      const pLinkOperator: TAqDBSQLBooleanOperator =
+    function AddComparison(const pColumnName: string; const pComparison: TAqDBSQLComparison;
+      pComparisonValue: IAqDBSQLValue; const pLinkOperator: TAqDBSQLBooleanOperator =
       TAqDBSQLBooleanOperator.boAnd): IAqDBSQLSimpleComparisonDescriptor; overload;
+    function AddLike(const pSourceIdentifier, pColumnName: string; pLikeValue: IAqDBSQLTextConstant;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLLikeDescriptor; overload;
     function AddLike(const pColumnName: string; pLikeValue: IAqDBSQLTextConstant;
-      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLLikeDescriptor;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLLikeDescriptor; overload;
+    function AddIsNull(const pColumnName: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLIsNullDescriptor; overload;
+    function AddIsNull(const pSourceIdentifier, pColumnName: string;
+      const pLinkOperator: TAqDBSQLBooleanOperator = TAqDBSQLBooleanOperator.boAnd): IAqDBSQLIsNullDescriptor; overload;
 
     {Métodos para sintaxe fluente}
     function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
@@ -835,6 +897,81 @@ type
       pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
     function AndColumnEquals(const pColumnName: string;
       pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: TDateTime): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: TDateTime): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: TGUID): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnEquals(const pColumnName: string;
+      pComparisonValue: TGUID): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnIsLessOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Double): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pColumnName: string;
+      pComparisonValue: Double): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsLessOrEqual(const pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnIsGreaterOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Double): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pColumnName: string;
+      pComparisonValue: Double): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreaterOrEqual(const pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnIsGreater(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pColumnName: string;
+      pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pColumnName: string;
+      pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: Double): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pColumnName: string;
+      pComparisonValue: Double): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsGreater(const pColumnName: string;
+      pComparisonValue: TDate): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnLike(const pSourceIdentifier, pColumnName: string;
+      pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnLike(const pColumnName: string;
+      pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnLike(const pSourceIdentifier, pColumnName: string;
+      pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnLike(const pColumnName: string;
+      pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function AndColumnIsNull(const pSourceIdentifier, pColumnName: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function AndColumnIsNull(const pColumnName: string): IAqDBSQLComposedConditionDescriptor; overload;
 
     function OrColumnEquals(const pSourceIdentifier, pColumnName: string;
       pComparisonValue: IAqDBSQLValue): IAqDBSQLComposedConditionDescriptor; overload;
@@ -844,11 +981,22 @@ type
       pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
     function OrColumnEquals(const pColumnName: string;
       pComparisonValue: Int64): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pSourceIdentifier, pColumnName: string;
+      pComparisonValue: String): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnEquals(const pColumnName: string;
+      pComparisonValue: String): IAqDBSQLComposedConditionDescriptor; overload;
 
-    function AndColumnLike(
-      const pColumnName: string; pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
-    function AndColumnLike(
-      const pColumnName: string; pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnLike(const pSourceIdentifier, pColumnName: string;
+      pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnLike(const pColumnName: string;
+      pLikeValue: IAqDBSQLTextConstant): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnLike(const pSourceIdentifier, pColumnName: string;
+      pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnLike(const pColumnName: string;
+      pLikeValue: string): IAqDBSQLComposedConditionDescriptor; overload;
+
+    function OrColumnIsNull(const pSourceIdentifier, pColumnName: string): IAqDBSQLComposedConditionDescriptor; overload;
+    function OrColumnIsNull(const pColumnName: string): IAqDBSQLComposedConditionDescriptor; overload;
 
     property Count: Int32 read GetCount;
     property Items[const pIndex: Int32]: IAqDBSQLConditionDescriptor read GetItem; default;
@@ -919,15 +1067,26 @@ type
 
     function GetJoinType: TAqDBSQLJoinType;
     function GetMainSourceJoin: IAqDBSQLJoinParameters;
+    function VerifyIfHasCustomCondition: Boolean;
+    function GetCustomCondition: string;
     function GetMainColumns: TStrings;
     function GetJoinTable: string;
+    function GetJoinTableAlias: string;
     function GetJoinColumns: TStrings;
+
+    function SetJoinTableAlias(const pJoinTableAlias: string): IAqDBSQLJoinParameters;
+
+    procedure UpdateJoinTypeWithHighestPriority(const pJoinType: TAqDBSQLJoinType);
 
     function GetIdentifier: string;
 
     property MainSourceJoin: IAqDBSQLJoinParameters read GetMainSourceJoin;
+    property HasCustomCondition: Boolean read VerifyIfHasCustomCondition;
+    property CustomCondition: string read GetCustomCondition;
     property MainColumns: TStrings read GetMainColumns;
     property JoinTable: string read GetJoinTable;
+    property JoinTableAlias: string read GetJoinTableAlias;
+
     property JoinColumns: TStrings read GetJoinColumns;
 
     property Identifier: string read GetIdentifier;
@@ -986,6 +1145,9 @@ type
 
     procedure TakeSetup(pSetup: IAqDBSQLSelectSetup);
 
+    function GetIsDistinguished: Boolean;
+    function Distinct: IAqDBSQLSelectSetup;
+
     property IsCustomConditionDefied: Boolean read GetIsCustomConditionDefied;
     property CustomCondition: IAqDBSQLComposedCondition read GetCustomCondition;
     property HasJoinsParameters: Boolean read GetHasJoinsParameters;
@@ -994,6 +1156,7 @@ type
     property ConditionDescriptors: IAqDBSQLComposedConditionDescriptor read GetConditionDescriptors;
     property HasOrderBy: Boolean read GetHasOrderby;
     property OrderByList: IAqReadableList<IAqDBSQLOrderByDescriptor> read GetOrderByList;
+    property IsDistinguished: Boolean read GetIsDistinguished;
   end;
 
   IAqDBSQLSelect = interface(IAqDBSQLSource)
@@ -1020,6 +1183,15 @@ type
     procedure SetOffset(const pValue: UInt32);
     procedure ClearOffset;
 
+    function GetIsDistinguished: Boolean;
+    function Distinct: IAqDBSQLSelect;
+
+    function GetIsGroupByDefined: Boolean;
+    function GetGroupBy: IAqReadableList<IAqDBSQLValue>;
+    function AddGroupBy(pValue: IAqDBSQLValue): Int32; overload;
+    function AddGroupBy(pExpression: string): Int32; overload;
+    function AddGroupBy(pExpression: string; pSource: IAqDBSQLSource): Int32; overload;
+
     function GetIsOrderByDefined: Boolean;
     function GetOrderBy: IAqReadableList<IAqDBSQLOrderByItem>;
     function AddOrderBy(pValue: IAqDBSQLValue; const pAscending: Boolean = True): Int32; overload;
@@ -1038,9 +1210,11 @@ type
 
     function AddJoin(pJoin: IAqDBSQLJoin): Int32; overload;
     function AddJoin(const pType: TAqDBSQLJoinType; pSource: IAqDBSQLSource;
-      pCondition: IAqDBSQLCondition): IAqDBSQLJoin; overload;
-    function InnerJoin(const pTableName: string): IAqDBSQLJoin;
-    function LeftJoin(const pTableName: string): IAqDBSQLJoin;
+      pCondition: IAqDBSQLCondition): IAqDBSQLJoinWithComposedCondition; overload;
+    function InnerJoin(const pTableName: string): IAqDBSQLJoinWithComposedCondition; Overload;
+    function InnerJoin(const pTableName, pAlias: string): IAqDBSQLJoinWithComposedCondition; Overload;
+    function LeftJoin(const pTableName: string): IAqDBSQLJoinWithComposedCondition; Overload;
+    function LeftJoin(const pTableName, pAlias: string): IAqDBSQLJoinWithComposedCondition; Overload;
 
     procedure TakeSetup(pSetup: IAqDBSQLSelectSetup);
 
@@ -1063,6 +1237,11 @@ type
 
     property IsOrderByDefined: Boolean read GetIsOrderByDefined;
     property OrderBy: IAqReadableList<IAqDBSQLOrderByItem> read GetOrderBy;
+
+    property IsGroupByDefined: Boolean read GetIsGroupByDefined;
+    property GroupBy: IAqReadableList<IAqDBSQLValue> read GetGroupBy;
+
+    property IsDistinguished: Boolean read GetIsDistinguished;
   end;
 
   IAqDBSQLAssignment = interface

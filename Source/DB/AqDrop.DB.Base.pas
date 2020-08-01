@@ -4,16 +4,20 @@ interface
 
 uses
   System.SysUtils,
+  System.TypInfo,
   System.Classes,
   AqDrop.Core.Types,
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Collections.Intf,
   AqDrop.Core.Collections,
+  AqDrop.Core.Observers.Intf,
+  AqDrop.Core.Cache.Intf,
+  AqDrop.Core.Cache.Monitor,
   AqDrop.DB.Types,
-  AqDrop.DB.Connection,
-  AqDrop.DB.ORM.Manager,
   AqDrop.DB.SQL.Intf,
-  AqDrop.DB.ORM.Attributes;
+  AqDrop.DB.Connection,
+  AqDrop.DB.ORM.Attributes,
+  AqDrop.DB.ORM.Manager;
 
 type
   TAqDBObjectCacheType = (octNone, octOwnsObjects, octCloned);
@@ -55,10 +59,15 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    property ORMManager: TAqDBORMManager read GetORMManager;
+    procedure LoadDetails(const pRecursive: Boolean = True);
 
+
+    property ORMManager: TAqDBORMManager read GetORMManager;
     property ID: TAqEntityID read GetID;
   end;
+
+
+  TAqDBObjectClass = class of TAqDBObject;
 
   TAqDBObject = class(TAqDBBaseObject)
   strict private
@@ -103,38 +112,36 @@ type
     procedure SetID(const pID: TAqEntityID);
   end;
 
-  TAqDBBaseComplementaryCache<Value> = class
+  TAqDBBaseComplementaryCache = class
   public
-    procedure Add(const pObject: Value); virtual; abstract;
-    procedure Replace(const pOld, pNew: Value); virtual; abstract;
-    procedure Remove(const pObject: Value); virtual; abstract;
+    procedure Add(const pObject: TAqDBObject); virtual; abstract;
+    procedure Replace(const pOld, pNew: TAqDBObject); virtual; abstract;
+    procedure Remove(const pObject: TAqDBObject); virtual; abstract;
   end;
 
-  TAqDBComplementaryCache<Key; Value> = class(TAqDBBaseComplementaryCache<Value>)
+  TAqDBComplementaryCache<Key> = class(TAqDBBaseComplementaryCache)
   strict private
-    FCache: IAqDictionary<Key, Value>;
-    FKeyGetter: TFunc<Value, Key>;
+    FCache: IAqDictionary<Key, TAqDBObject>;
+    FKeyGetter: TFunc<TAqDBObject, Key>;
   public
-    constructor Create(const pKeyGetter: TFunc<Value, Key>);
+    constructor Create(const pKeyGetter: TFunc<TAqDBObject, Key>);
 
-    procedure Add(const pObject: Value); override;
-    procedure Replace(const pOld, pNew: Value); override;
-    procedure Remove(const pObject: Value); override;
-    function Get(const pKey: Key; out pObject: Value): Boolean;
+    procedure Add(const pObject: TAqDBObject); override;
+    procedure Replace(const pOld, pNew: TAqDBObject); override;
+    procedure Remove(const pObject: TAqDBObject); override;
+    function Get(const pKey: Key; out pObject: TAqDBObject): Boolean;
   end;
 
-  TAqDBComplementaryCacheIndex = type Int32;
-
-  TAqDBObjectCacheContainer<T: TAqDBObject> = class
+  TAqDBObjectCacheContainer = class
   strict private
-    FObject: T;
+    FObject: TAqDBObject;
     FLastAccess: TAqUnixDateTime;
   public
-    constructor Create(const pObject: T);
+    constructor Create(const pObject: TAqDBObject);
     destructor Destroy; override;
 
-    function GetObject: T;
-    procedure Change(const pObject: T);
+    function GetObject: TAqDBObject;
+    procedure Change(const pObject: TAqDBObject);
 
     procedure RenewLastAccess;
 
@@ -143,56 +150,93 @@ type
     property LastAccess: TAqUnixDateTime read FLastAccess;
   end;
 
-  TAqDBObjectCache<T: TAqDBObject, constructor> = class
-  strict private type
-    TMonitorThread = class(TThread)
-    strict private
-      FCache: IAqDictionary<TAqEntityID, TAqDBObjectCacheContainer<T>>;
-      FReleaser: TProc<T>;
-      FTimeOut: TTime;
+  IAqDBObjectCache = interface(IAqMonitorableCache)
+    ['{0F300649-B16F-44F9-A9BE-6BDE8CD928B8}']
+  end;
 
-      procedure SetTimeOut(const pTimeOut: TTime);
-    protected
-      procedure Execute; override;
-    public
-      constructor Create(const pCache: IAqDictionary<TAqEntityID, TAqDBObjectCacheContainer<T>>;
-        const pReleaser: TProc<T>; const pTimeOut: TTime);
+  IAqDBCustomCacheMonitor = interface
+    ['{0AA34C3A-3D1F-4726-AC7A-95E5951A999A}']
 
-      property TimeOut: TTime read FTimeOut write SetTimeOut;
-    end;
+    procedure Monitor(const pCaches: TAqCaches<IAqDBObjectCache>);
+    function GetTimeBetweenCicles: TTime;
+
+    procedure NotifyCacheAsInvalid(const pTypeNames: TArray<string>; const pID: TAqEntityID);
+  end;
+
+  TAqDBObjectCache = class(TAqInterfacedObject, IAqDBObjectCache)
   strict private
+    FClass: TAqDBObjectClass;
     FType: TAqDBObjectCacheType;
-    FObjects: IAqDictionary<TAqEntityID, TAqDBObjectCacheContainer<T>>;
-    FComplementaryCaches: IAqList<TAqDBBaseComplementaryCache<T>>;
+    FObjects: IAqDictionary<TAqEntityID, TAqDBObjectCacheContainer>;
+    FComplementaryCaches: IAqList<TAqDBBaseComplementaryCache>;
     FTimeOut: TTime;
-    FMonitorThread: TMonitorThread;
+    FMonitoringID: TAqID;
+    FLinkedTypes: IAqList<string>;
+    FOnDataChanged: IAqObservable<TAqEntityID>;
 
-    procedure FreeMonitorThread;
+    procedure LinkToType(const pType: PTypeInfo);
+    function GetLinkedTypesNames: IAqReadableList<string>;
+    procedure DoRelease(const pObject: TAqDBObject);
+    procedure DiscardCache(const pID: TAqEntityID);
+    procedure DiscardExpiredItems;
+
     procedure SetTimeOut(const pTimeOut: TTime);
+
+    function GetOnDataChanged: IAqObservable<TAqEntityID>;
+    procedure NotifyOnDataChanged(const pID: TAqEntityID);
   public
-    constructor Create(const pType: TAqDBObjectCacheType);
+    constructor Create(const pClass: TAqDBObjectClass; const pType: TAqDBObjectCacheType; const pTypeLinkerCallback: TProc<TProc<PTypeInfo>>);
     destructor Destroy; override;
 
-    procedure Keep(const pObject: T);
-    procedure Release(const pObject: T);
+    procedure Store(const pObject: TAqDBObject);
+    procedure Update(const pObject: TAqDBObject);
+    procedure Release(const pObject: TAqDBObject);
+    procedure Delete(const pObject: TAqDBObject);
 
-    function Keeps(const pObject: T): Boolean;
-    function Get(const pID: TAqEntityID; out pObject: T): Boolean;
+    function Keeps(const pObject: TAqDBObject): Boolean;
+    function Get(const pID: TAqEntityID; out pObject: TAqDBObject): Boolean;
 
-    function AddComplementaryCache<Key>(const pKeyGetter: TFunc<T, Key>): TAqDBComplementaryCacheIndex;
+    function AddComplementaryCache<Key>(const pKeyGetter: TFunc<TAqDBObject, Key>): Int32;
 
-    function GetFromComplementaryCache<Key>(const pCacheIndex: TAqDBComplementaryCacheIndex;
-      const pKey: Key; out pObject: T): Boolean;
+    function GetFromComplementaryCache<Key>(const pCacheIndex: Int32; const pKey: Key; out pObject: TAqDBObject): Boolean;
 
     property &Type: TAqDBObjectCacheType read FType;
     property TimeOut: TTime read FTimeOut write SetTimeOut;
+    property OnDataChanged: IAqObservable<TAqEntityID> read GetOnDataChanged;
+  end;
+
+  {TODO: hoje existe uma instância geral para TAqDBCacheMonitor, em um segundo momento precisamos ter múltiplas instâncias, associadas a cada ORM Manager (é uma possibilidade), de forma a, genericamente, recuperarmos qual o monitor que precisamos registrar uma cache, e o custom monitor }
+  TAqDBCacheMonitor = class(TAqCacheMonitor<IAqDBObjectCache>)
+  strict private
+    FCustomMonitor: IAqDBCustomCacheMonitor;
+    FCustomMonitorThread: TThread;
+
+    procedure ReleaseCustomMonitorThread;
+
+    class var FInstance: TAqDBCacheMonitor;
+    class function GetInstance: TAqDBCacheMonitor; static;
+  private
+    class function IsAlive: Boolean;
+    class procedure ReleaseInstance;
+  public
+    destructor Destroy; override;
+
+    procedure SetCustomMonitor(pCustomMonitor: IAqDBCustomCacheMonitor);
+    procedure NotifyCacheAsInvalid(const pTypeNames: TArray<string>; const pID: TAqEntityID); overload;
+    procedure NotifyCacheAsInvalid(const pSenderID: TAqID; const pTypeNames: TArray<string>;
+      const pID: TAqEntityID); overload;
+
+    class procedure InitializeInstance;
+
+    class property Instance: TAqDBCacheMonitor read GetInstance;
   end;
 
   TAqDBObjectManager<T: TAqDBObject, constructor> = class(TAqDBGenericObjectsManager)
   strict private
-    FCache: TAqDBObjectCache<T>;
+    FCache: TAqDBObjectCache;
 
     procedure AssertObjectInheritance(const pDBObject: TObject);
+    function DiscardCache(const pDBObject: TAqDBBaseObject; const pDeleted: Boolean): Boolean;
   strict protected
     function DoGet(const pID: TAqEntityID): TAqDBBaseObject; override;
     function DoNew: TAqDBBaseObject; override;
@@ -200,12 +244,16 @@ type
     function DoDelete(const pDBObject: TAqDBBaseObject): Boolean; override;
     function DoDiscard(const pDBObject: TAqDBBaseObject): Boolean; override;
 
-    procedure AddObject(const pObject: T); virtual;
+    procedure StoreInCache(const pObject: T);
+    procedure UpdateCache(const pObject: T);
 
     procedure InitializeCache; virtual;
+    procedure LinkTypesToCache(const pTypeLinkerMethod: TProc<PTypeInfo>); virtual;
     procedure ConfigureComplementaryCaches; virtual;
 
-    property Cache: TAqDBObjectCache<T> read FCache;
+    function GetOnDataChanged: IAqObservable<TAqEntityID>;
+
+    property Cache: TAqDBObjectCache read FCache;
   public
     constructor Create(const pORMManager: TAqDBORMManager); override;
     destructor Destroy; override;
@@ -225,6 +273,8 @@ type
       const pOnReadData: TProc<IAqDBReader> = nil): IAqResultList<T>; overload;
 
     function New: T;
+
+    property OnDataChanged: IAqObservable<TAqEntityID> read GetOnDataChanged;
   end;
 
 implementation
@@ -234,7 +284,11 @@ uses
   System.DateUtils,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Helpers,
+  AqDrop.Core.Helpers.Rtti,
   AqDrop.Core.Helpers.TObject,
+  AqDrop.Core.Helpers.TThread,
+  AqDrop.Core.Observers,
+  AqDrop.Core.ResourcesControl,
   AqDrop.DB.SQL,
   AqDrop.DB.ORM.Reader,
   AqDrop.DB.Base.Exceptions;
@@ -248,9 +302,9 @@ end;
 
 constructor TAqDBObject.Create(const pObjectsManager: TAqDBGenericObjectsManager);
 begin
-  inherited Create;
-
   FObjectsManager := pObjectsManager;
+
+  inherited Create;
 end;
 
 class function TAqDBObject.CreateNew(const pObjectsManager: TAqDBGenericObjectsManager): TAqDBObject;
@@ -302,11 +356,19 @@ end;
 
 { TAqDBObjectManager<T> }
 
-procedure TAqDBObjectManager<T>.AddObject(const pObject: T);
+procedure TAqDBObjectManager<T>.StoreInCache(const pObject: T);
 begin
   if Assigned(FCache) then
   begin
-    FCache.Keep(pObject);
+    FCache.Store(pObject);
+  end;
+end;
+
+procedure TAqDBObjectManager<T>.UpdateCache(const pObject: T);
+begin
+  if Assigned(FCache) then
+  begin
+    FCache.Update(pObject);
   end;
 end;
 
@@ -327,7 +389,11 @@ begin
 
   if pType in octActiveCacheTypes then
   begin
-    FCache := TAqDBObjectCache<T>.Create(pType);
+    FCache := TAqDBObjectCache.Create(T, pType,
+      procedure(pTypeLinkerMethod: TProc<PTypeInfo>)
+      begin
+        LinkTypesToCache(pTypeLinkerMethod);
+      end);
     FCache.TimeOut := pTimeOut;
 
     ConfigureComplementaryCaches;
@@ -353,13 +419,7 @@ begin
   inherited;
 end;
 
-function TAqDBObjectManager<T>.DoDelete(const pDBObject: TAqDBBaseObject): Boolean;
-begin
-  ORMManager.Delete(pDBObject, False);
-  Result := DoDiscard(pDBObject);
-end;
-
-function TAqDBObjectManager<T>.DoDiscard(const pDBObject: TAqDBBaseObject): Boolean;
+function TAqDBObjectManager<T>.DiscardCache(const pDBObject: TAqDBBaseObject; const pDeleted: Boolean): Boolean;
 var
   lDBObject: T;
 begin
@@ -371,9 +431,26 @@ begin
 
   if Result then
   begin
-    FCache.Release(lDBObject);
+    if pDeleted then
+    begin
+      FCache.Delete(lDBObject);
+    end else
+    begin
+      FCache.Release(lDBObject);
+    end;
     Result := FCache.&Type = TAqDBObjectCacheType.octOwnsObjects;
   end;
+end;
+
+function TAqDBObjectManager<T>.DoDelete(const pDBObject: TAqDBBaseObject): Boolean;
+begin
+  ORMManager.Delete(pDBObject, False);
+  Result := DiscardCache(pDBObject, True);
+end;
+
+function TAqDBObjectManager<T>.DoDiscard(const pDBObject: TAqDBBaseObject): Boolean;
+begin
+  Result := DiscardCache(pDBObject, False);
 end;
 
 function TAqDBObjectManager<T>.DoGet(const pID: TAqEntityID): TAqDBBaseObject;
@@ -392,7 +469,7 @@ begin
 
   ORMManager.Post(pDBObject);
 
-  AddObject(T(pDBObject));
+  UpdateCache(T(pDBObject));
 end;
 
 function TAqDBObjectManager<T>.Get(out pResultList: IAqResultList<T>): Boolean;
@@ -417,9 +494,22 @@ begin
   end;
 end;
 
+function TAqDBObjectManager<T>.GetOnDataChanged: IAqObservable<TAqEntityID>;
+begin
+  if not Assigned(FCache) then
+    raise Exception.Create('Inactive cache for class');
+
+  Result := FCache.OnDataChanged;
+end;
+
 procedure TAqDBObjectManager<T>.InitializeCache;
 begin
   ConfigureCache(TaqDBObjectCacheType.octOwnsObjects, TTime.EncodeTime(0, 10, 0, 0))
+end;
+
+procedure TAqDBObjectManager<T>.LinkTypesToCache(const pTypeLinkerMethod: TProc<PTypeInfo>);
+begin
+  pTypeLinkerMethod(TypeInfo(T));
 end;
 
 function TAqDBObjectManager<T>.Get(out pObject: T; const pErrorIfMultipleResults: Boolean): Boolean;
@@ -451,16 +541,23 @@ begin
     end;
 
     pObject := lList.Extract;
+  end else
+  begin
+    pObject := nil;
   end;
 end;
 
 function TAqDBObjectManager<T>.Get(const pID: TAqEntityID; out pObject: T): Boolean;
 var
   lList: IAqResultList<T>;
+  lCacheObject: TAqDBObject;
 begin
-  Result := Assigned(FCache) and FCache.Get(pID, pObject);
+  Result := Assigned(FCache) and FCache.Get(pID, lCacheObject);
 
-  if not Result then
+  if Result then
+  begin
+    pObject := T(lCacheObject);
+  end else
   begin
     Result := Get(
       procedure(pSelect: IAqDBSQLSelect)
@@ -490,7 +587,7 @@ begin
     begin
       Result := T(lNew);
     end else begin
-      raise EAqInternal.Create('Incomptible type when creatin a new Object Manager: ' + lNew.QualifiedClassName +
+      raise EAqInternal.Create('Incompatible type when creating a new Object Manager: ' + lNew.QualifiedClassName +
         ' x ' + T.QualifiedClassName);
     end;
   except
@@ -514,7 +611,7 @@ begin
   begin
     for lObject in pResultList do
     begin
-      AddObject(lObject);
+      StoreInCache(lObject);
     end;
 
     pResultList.OnwsResults := not Assigned(FCache) or (FCache.&Type <> TAqDBObjectCacheType.octOwnsObjects);
@@ -565,9 +662,9 @@ begin
   DoSave(pDBObject);
 end;
 
-{ TAqDBObjectCacheContainer<T> }
+{ TAqDBObjectCacheContainer }
 
-procedure TAqDBObjectCacheContainer<T>.Change(const pObject: T);
+procedure TAqDBObjectCacheContainer.Change(const pObject: TAqDBObject);
 begin
   if FObject <> pObject then
   begin
@@ -579,75 +676,146 @@ begin
   RenewLastAccess;
 end;
 
-constructor TAqDBObjectCacheContainer<T>.Create(const pObject: T);
+constructor TAqDBObjectCacheContainer.Create(const pObject: TAqDBObject);
 begin
   Change(pObject);
 end;
 
-destructor TAqDBObjectCacheContainer<T>.Destroy;
+destructor TAqDBObjectCacheContainer.Destroy;
 begin
   FObject.Free;
 
   inherited;
 end;
 
-function TAqDBObjectCacheContainer<T>.GetObject: T;
+function TAqDBObjectCacheContainer.GetObject: TAqDBObject;
 begin
   Result := FObject;
   RenewLastAccess;
 end;
 
-function TAqDBObjectCacheContainer<T>.IsExpired(const pTimeOut: TTime): Boolean;
+function TAqDBObjectCacheContainer.IsExpired(const pTimeOut: TTime): Boolean;
 begin
   Result := (pTimeOut > 0) and ((Now - FLastAccess.ToDateTime) >= pTimeOut);
 end;
 
-procedure TAqDBObjectCacheContainer<T>.RenewLastAccess;
+procedure TAqDBObjectCacheContainer.RenewLastAccess;
 begin
   FLastAccess := TAqUnixDateTime.Now;
 end;
 
-{ TAqDBObjectCache<T> }
+{ TAqDBObjectCache }
 
-function TAqDBObjectCache<T>.AddComplementaryCache<Key>(const pKeyGetter: TFunc<T, Key>): TAqDBComplementaryCacheIndex;
+function TAqDBObjectCache.AddComplementaryCache<Key>(const pKeyGetter: TFunc<TAqDBObject, Key>): Int32;
 begin
-  Result := FComplementaryCaches.Add(TAqDBComplementaryCache<Key, T>.Create(pKeyGetter));
+  Result := FComplementaryCaches.Add(TAqDBComplementaryCache<Key>.Create(pKeyGetter));
 end;
 
-constructor TAqDBObjectCache<T>.Create(const pType: TAqDBObjectCacheType);
+procedure TAqDBObjectCache.Update(const pObject: TAqDBObject);
 begin
+  Store(pObject);
+
+  NotifyOnDataChanged(pObject.ID);
+
+  TAqDBCacheMonitor.Instance.NotifyCacheAsInvalid(FMonitoringID, FLinkedTypes.ToArray, pObject.ID);
+end;
+
+constructor TAqDBObjectCache.Create(const pClass: TAqDBObjectClass; const pType: TAqDBObjectCacheType;
+  const pTypeLinkerCallback: TProc<TProc<PTypeInfo>>);
+begin
+  if not Assigned(pClass) then
+  begin
+    raise EAqInternal.Create('Class type needed to create a ' + Self.ClassName + '.');
+  end;
+
   if not(pType in octActiveCacheTypes) then
   begin
     raise EAqInternal.Create('Invalid cache type.');
   end;
 
+  FClass := pClass;
   FType := pType;
-  FObjects := TAqDictionary<TAqEntityID, TAqDBObjectCacheContainer<T>>.Create(
+  FObjects := TAqDictionary<TAqEntityID, TAqDBObjectCacheContainer>.Create(
     [TAqKeyValueOwnership.kvoValue],
-    TAqLockerType.lktMultiReadeExclusiveWriter);
-  FComplementaryCaches := TAqList<TAqDBBaseComplementaryCache<T>>.Create(True);
+    TAqLockerType.lktMultiReaderExclusiveWriter);
+  FComplementaryCaches := TAqList<TAqDBBaseComplementaryCache>.Create(True);
+
+  FLinkedTypes := TAqList<string>.Create;
+  FMonitoringID := TAqDBCacheMonitor.Instance.RegisterCache(Self, pTypeLinkerCallback);
 end;
 
-destructor TAqDBObjectCache<T>.Destroy;
+procedure TAqDBObjectCache.Delete(const pObject: TAqDBObject);
 begin
-  FreeMonitorThread;
+  DoRelease(pObject);
+
+  TAqDBCacheMonitor.Instance.NotifyCacheAsInvalid(FMonitoringID, FLinkedTypes.ToArray, pObject.ID);
+  NotifyOnDataChanged(pObject.ID);
+end;
+
+destructor TAqDBObjectCache.Destroy;
+begin
+  if TAqDBCacheMonitor.IsAlive then
+  begin
+    TAqDBCacheMonitor.Instance.UnregisterCache(FMonitoringID);
+  end;
 
   inherited;
 end;
 
-procedure TAqDBObjectCache<T>.FreeMonitorThread;
+procedure TAqDBObjectCache.DiscardCache(const pID: TAqEntityID);
 begin
-  if Assigned(FMonitorThread) then
-  begin
-    FMonitorThread.Terminate;
-    FMonitorThread.WaitFor;
-    FreeAndNil(FMonitorThread);
+  NotifyOnDataChanged(pID);
+
+  FObjects.ExecuteLockedForWriting(
+    procedure
+    var
+      lContainer: TAqDBObjectCacheContainer;
+    begin
+      if FObjects.TryGetValue(pID, lContainer) then
+      begin
+        DoRelease(lContainer.GetObject);
+      end;
+    end);
+end;
+
+procedure TAqDBObjectCache.DiscardExpiredItems;
+begin
+  FObjects.ExecuteLockedForWriting(
+    procedure
+    var
+      lContainer: TAqDBObjectCacheContainer;
+    begin
+      for lContainer in FObjects.Values.ToArray do
+      begin
+        if lContainer.IsExpired(FTimeOut) then
+        begin
+          DoRelease(lContainer.GetObject);
+        end;
+      end;
+    end);
+end;
+
+procedure TAqDBObjectCache.DoRelease(const pObject: TAqDBObject);
+var
+  lCache: TAqDBBaseComplementaryCache;
+begin
+  FObjects.BeginWrite;
+
+  try
+    for lCache in FComplementaryCaches do
+    begin
+      lCache.Remove(pObject);
+    end;
+
+    FObjects.Remove(pObject.ID);
+  finally
+    FObjects.EndWrite;
   end;
 end;
 
-function TAqDBObjectCache<T>.Get(const pID: TAqEntityID; out pObject: T): Boolean;
+function TAqDBObjectCache.Get(const pID: TAqEntityID; out pObject: TAqDBObject): Boolean;
 var
-  lContainer: TAqDBObjectCacheContainer<T>;
+  lContainer: TAqDBObjectCacheContainer;
 begin
   FObjects.BeginRead;
 
@@ -660,7 +828,7 @@ begin
         octOwnsObjects:
           pObject := lContainer.GetObject;
         octCloned:
-          pObject := T(lContainer.GetObject.CloneTo(T.CreateNew(nil)));
+          pObject := TAqDBObject(lContainer.GetObject.CloneTo(FClass.CreateNew(nil)));
       end;
     end;
   finally
@@ -668,22 +836,21 @@ begin
   end;
 end;
 
-function TAqDBObjectCache<T>.GetFromComplementaryCache<Key>(const pCacheIndex: TAqDBComplementaryCacheIndex;
-  const pKey: Key; out pObject: T): Boolean;
+function TAqDBObjectCache.GetFromComplementaryCache<Key>(const pCacheIndex: Int32; const pKey: Key; out pObject: TAqDBObject): Boolean;
 var
-  lCache: TAqDBBaseComplementaryCache<T>;
-  lCachedObject: T;
+  lCache: TAqDBBaseComplementaryCache;
+  lCachedObject: TAqDBObject;
 begin
   FObjects.BeginRead;
 
   try
     lCache := FComplementaryCaches[pCacheIndex];
 
-    Result := lCache is TAqDBComplementaryCache<Key, T>;
+    Result := lCache is TAqDBComplementaryCache<Key>;
 
     if Result then
     begin
-      Result := TAqDBComplementaryCache<Key, T>(lCache).Get(pKey, lCachedObject);
+      Result := TAqDBComplementaryCache<Key>(lCache).Get(pKey, lCachedObject);
 
       if Result then
       begin
@@ -691,7 +858,7 @@ begin
           octOwnsObjects:
             pObject := lCachedObject;
           octCloned:
-            pObject := T(lCachedObject.CloneTo(T.CreateNew(nil)));
+            pObject := TAqDBObject(lCachedObject.CloneTo(FClass.CreateNew(nil)));
         end;
 
         FObjects.Items[pObject.ID].RenewLastAccess;
@@ -702,13 +869,61 @@ begin
   end;
 end;
 
-procedure TAqDBObjectCache<T>.Keep(const pObject: T);
+function TAqDBObjectCache.GetLinkedTypesNames: IAqReadableList<string>;
+begin
+  Result := FLinkedTypes.GetReadOnlyList;
+end;
+
+function TAqDBObjectCache.GetOnDataChanged: IAqObservable<TAqEntityID>;
+begin
+  Result := TAqResourcesControl.CreateIfNotExists<IAqObservable<TAqEntityID>>(FOnDataChanged,
+    function: IAqObservable<TAqEntityID>
+    begin
+      Result := TAqObservationChannel<TAqEntityID>.Create;
+    end);
+end;
+
+function TAqDBObjectCache.Keeps(const pObject: TAqDBObject): Boolean;
+begin
+  FObjects.BeginRead;
+  try
+    Result := FObjects.ContainsKey(pObject.ID);
+  finally
+    FObjects.EndRead;
+  end;
+end;
+
+procedure TAqDBObjectCache.LinkToType(const pType: PTypeInfo);
+begin
+  FLinkedTypes.Add(TAqRtti.&Implementation.GetType(pType).QualifiedName);
+end;
+
+procedure TAqDBObjectCache.NotifyOnDataChanged(const pID: TAqEntityID);
+begin
+  TAqResourcesControl.ExecuteIfExists<IAqObservable<TAqEntityID>>(FOnDataChanged,
+    procedure
+    begin
+      FOnDataChanged.Notify(pID);
+    end);
+end;
+
+procedure TAqDBObjectCache.Release(const pObject: TAqDBObject);
+begin
+  DoRelease(pObject);
+end;
+
+procedure TAqDBObjectCache.SetTimeOut(const pTimeOut: TTime);
+begin
+  FTimeOut := pTimeOut;
+end;
+
+procedure TAqDBObjectCache.Store(const pObject: TAqDBObject);
 begin
   FObjects.ExecuteLockedForWriting(
     procedure
     var
-      lObjectToKeep: T;
-      lCache: TAqDBBaseComplementaryCache<T>;
+      lObjectToKeep: TAqDBObject;
+      lCache: TAqDBBaseComplementaryCache;
       lNewObject: Boolean;
     begin
       lObjectToKeep := nil;
@@ -717,7 +932,7 @@ begin
         octOwnsObjects:
           lObjectToKeep := pObject;
         octCloned:
-          lObjectToKeep := T(pObject.CloneTo(T.CreateNew(nil)));
+          lObjectToKeep := TAqDBObject(pObject.CloneTo(FClass.CreateNew(nil)));
       end;
 
       lNewObject := not FObjects.ContainsKey(pObject.ID);
@@ -734,7 +949,7 @@ begin
 
       if lNewObject then
       begin
-        FObjects.Add(pObject.ID, TAqDBObjectCacheContainer<T>.Create(lObjectToKeep));
+        FObjects.Add(pObject.ID, TAqDBObjectCacheContainer.Create(lObjectToKeep));
       end else
       begin
         FObjects[pObject.ID].Change(lObjectToKeep);
@@ -742,126 +957,30 @@ begin
     end);
 end;
 
-function TAqDBObjectCache<T>.Keeps(const pObject: T): Boolean;
-begin
-  FObjects.BeginRead;
+{ TAqDBComplementaryCache<Key> }
 
-  try
-    Result := FObjects.ContainsKey(pObject.ID);
-  finally
-    FObjects.EndRead;
-  end;
-end;
-
-procedure TAqDBObjectCache<T>.Release(const pObject: T);
-var
-  lCache: TAqDBBaseComplementaryCache<T>;
-begin
-  FObjects.BeginWrite;
-
-  try
-    for lCache in FComplementaryCaches do
-    begin
-      lCache.Remove(pObject);
-    end;
-
-    FObjects.Remove(pObject.ID);
-  finally
-    FObjects.EndWrite;
-  end;
-end;
-
-procedure TAqDBObjectCache<T>.SetTimeOut(const pTimeOut: TTime);
-begin
-  FTimeOut := pTimeOut;
-
-  if Assigned(FMonitorThread) and (FTimeOut = 0) then
-  begin
-    if FTimeOut = 0 then
-    begin
-      FreeMonitorThread;
-    end else begin
-      FMonitorThread.TimeOut := pTimeOut;
-    end;
-  end else if FTimeOut <> 0 then
-  begin
-    FMonitorThread := TMonitorThread.Create(FObjects,
-      procedure(pObject: T)
-      begin
-        Release(pObject);
-      end, FTimeOut);
-  end;
-end;
-
-{ TAqDBObjectCache<T>.TMonitorThread }
-
-constructor TAqDBObjectCache<T>.TMonitorThread.Create(
-  const pCache: IAqDictionary<TAqEntityID, TAqDBObjectCacheContainer<T>>; const pReleaser: TProc<T>; const pTimeOut: TTime);
-begin
-  inherited Create;
-
-  FCache := pCache;
-  FReleaser := pReleaser;
-  FTimeOut := pTimeOut;
-end;
-
-procedure TAqDBObjectCache<T>.TMonitorThread.Execute;
-begin
-  inherited;
-
-  while not Terminated do
-  begin
-    FCache.ExecuteLockedForWriting(
-      procedure
-      var
-        lContainer: TAqDBObjectCacheContainer<T>;
-      begin
-        for lContainer in FCache.Values do
-        begin
-          if lContainer.IsExpired(FTimeOut) then
-          begin
-            FReleaser(lContainer.GetObject);
-          end;
-        end;
-      end);
-
-    Sleep(1000);
-  end;
-end;
-
-procedure TAqDBObjectCache<T>.TMonitorThread.SetTimeOut(const pTimeOut: TTime);
-begin
-  FCache.ExecuteLockedForWriting(
-    procedure
-    begin
-      FTimeOut := pTimeOut;
-    end);
-end;
-
-{ TAqDBComplementaryCache<Key, Value> }
-
-procedure TAqDBComplementaryCache<Key, Value>.Add(const pObject: Value);
+procedure TAqDBComplementaryCache<Key>.Add(const pObject: TAqDBObject);
 begin
   FCache.Add(FKeyGetter(pObject), pObject);
 end;
 
-constructor TAqDBComplementaryCache<Key, Value>.Create(const pKeyGetter: TFunc<Value, Key>);
+constructor TAqDBComplementaryCache<Key>.Create(const pKeyGetter: TFunc<TAqDBObject, Key>);
 begin
-  FCache := TAqDictionary<Key, Value>.Create;
+  FCache := TAqDictionary<Key, TAqDBObject>.Create;
   FKeyGetter := pKeyGetter;
 end;
 
-function TAqDBComplementaryCache<Key, Value>.Get(const pKey: Key; out pObject: Value): Boolean;
+function TAqDBComplementaryCache<Key>.Get(const pKey: Key; out pObject: TAqDBObject): Boolean;
 begin
   Result := FCache.TryGetValue(pKey, pObject);
 end;
 
-procedure TAqDBComplementaryCache<Key, Value>.Remove(const pObject: Value);
+procedure TAqDBComplementaryCache<Key>.Remove(const pObject: TAqDBObject);
 begin
   FCache.Remove(FKeyGetter(pObject));
 end;
 
-procedure TAqDBComplementaryCache<Key, Value>.Replace(const pOld, pNew: Value);
+procedure TAqDBComplementaryCache<Key>.Replace(const pOld, pNew: TAqDBObject);
 var
   lOldKey: Key;
   lNewKey: Key;
@@ -899,6 +1018,32 @@ begin
   Result := ORMManager.GetClient<T>;
 end;
 
+procedure TAqDBBaseObject.LoadDetails(const pRecursive: Boolean);
+var
+  lORM: TAqDBORM;
+  lDetail: IAqDBORMDetail;
+  lDetailItems: IAqReadableList<TObject>;
+  lDetailItem: TObject;
+begin
+  lORM := TAqDBORMReader.Instance.GetORM(Self.ClassType);
+
+  if lORM.HasDetails then
+  begin
+    for lDetail in lORM.Details do
+    begin
+      lDetailItems := lDetail.GetItems(Self);
+
+      if pRecursive and (lDetail.ORM.ORMClass.InheritsFrom(TAqDBBaseObject)) then
+      begin
+        for lDetailItem in lDetailItems do
+        begin
+          TAqDBBaseObject(lDetailItem).LoadDetails;
+        end;
+      end;
+    end;
+  end;
+end;
+
 procedure TAqDBBaseObject.InitializeObject;
 begin
 
@@ -909,5 +1054,112 @@ begin
   // virtual method to be overwritten in order to validate the object's data (or delegate the validation )
   // before it being saved.
 end;
+
+{ TAqDBCacheMonitor }
+
+procedure TAqDBCacheMonitor.NotifyCacheAsInvalid(const pSenderID: TAqID; const pTypeNames: TArray<string>;
+  const pID: TAqEntityID);
+begin
+  Caches.DiscardCacheByTypeNames(pSenderID, pTypeNames, pID);
+
+  if Assigned(FCustomMonitor) then
+  begin
+    FCustomMonitor.NotifyCacheAsInvalid(pTypeNames, pID);
+  end;
+end;
+
+destructor TAqDBCacheMonitor.Destroy;
+begin
+  ReleaseCustomMonitorThread;
+
+  inherited;
+end;
+
+class function TAqDBCacheMonitor.GetInstance: TAqDBCacheMonitor;
+begin
+  InitializeInstance;
+
+  Result := FInstance;
+end;
+
+class procedure TAqDBCacheMonitor.InitializeInstance;
+begin
+  if not Assigned(FInstance) then
+  begin
+    TThread.RunOnMainThread(
+      procedure
+      begin
+        FInstance := TAqDBCacheMonitor.Create;
+      end,
+      procedure
+      begin
+        TAqDBCacheMonitor.InitializeInstance;
+      end);
+  end;
+end;
+
+class function TAqDBCacheMonitor.IsAlive: Boolean;
+begin
+  Result := Assigned(FInstance);
+end;
+
+procedure TAqDBCacheMonitor.NotifyCacheAsInvalid(const pTypeNames: TArray<string>; const pID: TAqEntityID);
+begin
+  NotifyCacheAsInvalid(TAqIDGenerator.GetEmpty, pTypeNames, pID);
+end;
+
+procedure TAqDBCacheMonitor.ReleaseCustomMonitorThread;
+begin
+  if Assigned(FCustomMonitorThread) then
+  begin
+    FCustomMonitorThread.Terminate;
+    FCustomMonitorThread.WaitFor;
+    FreeAndNil(FCustomMonitorThread);
+  end;
+end;
+
+class procedure TAqDBCacheMonitor.ReleaseInstance;
+begin
+  TThread.RunOnMainThread(
+    procedure
+    begin
+      FreeAndNil(FInstance);
+    end);
+end;
+
+procedure TAqDBCacheMonitor.SetCustomMonitor(pCustomMonitor: IAqDBCustomCacheMonitor);
+begin
+  ReleaseCustomMonitorThread;
+
+  FCustomMonitor := pCustomMonitor;
+
+  if Assigned(FCustomMonitor) then
+  begin
+    FCustomMonitorThread := TThread.CreateAnonymousThread(
+      procedure
+      var
+        lNextCicle: TDateTime;
+      begin
+        while not TThread.CheckTerminated do
+        begin
+          FCustomMonitor.Monitor(Caches);
+
+          lNextCicle := Now + FCustomMonitor.GetTimeBetweenCicles;
+
+          while not TThread.CheckTerminated and (Now < lNextCicle) do
+          begin
+            Sleep(100);
+          end;
+        end;
+      end);
+    FCustomMonitorThread.FreeOnTerminate := False;
+    FCustomMonitorThread.Start;
+  end;
+end;
+
+initialization
+
+finalization
+  TAqDBCacheMonitor.ReleaseInstance;
 
 end.

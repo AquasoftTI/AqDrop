@@ -4,7 +4,7 @@ interface
 
 type
 {TODO 3 -oTatu -cIncompleto: adicionar todos os tipos de headers}
-  TAqHTTPHeaderType = (hhtContentType, hhtAuthorization);
+  TAqHTTPHeaderType = (hhtContentType, hhtAuthorization, hhtXContext);
 
 {TODO 3 -oTatu -cIncompleto: adicionar todos os tipos de content type}
   TAqHTTPHeaderContentType = (hctApplicationJSON);
@@ -33,6 +33,8 @@ begin
       Result := 'Content-Type';
     hhtAuthorization:
       Result := 'Authorization';
+    hhtXContext:
+      Result := 'X-Context';
   else
     raise EAqInternal.CreateFmt('Invalid HTTP Header type (%d).', [Int32(Self)]);
   end;

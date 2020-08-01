@@ -31,6 +31,7 @@ type
 
     FAutoConnect: Boolean;
     FTransactionCalls: UInt32;
+    FOnRollbackTasks: IAqIDDictionary<TProc>;
     FAdapter: TAqDBAdapter;
     FReaders: UInt32;
     FOnFirstReaderOpened: TProc<TAqDBConnection>;
@@ -130,6 +131,9 @@ type
     procedure StartTransaction; virtual;
     procedure CommitTransaction; virtual;
     procedure RollbackTransaction; virtual;
+    function RegisterDoOnRollback(const pMethod: TProc): TAqID; virtual;
+    procedure UnregisterDoOnRollback(const pID: TAqID); virtual;
+    procedure RollbackAllCalls; virtual;
 
     function PrepareCommand(const pSQL: string;
       const pParametersInitializer: TAqDBParametersHandlerMethod = nil): TAqID; overload; virtual;
@@ -301,6 +305,9 @@ type
     procedure StartTransaction; override;
     procedure CommitTransaction; override;
     procedure RollbackTransaction; override;
+    function RegisterDoOnRollback(const pMethod: TProc): TAqID; override;
+    procedure UnregisterDoOnRollback(const pID: TAqID); override;
+    procedure RollbackAllCalls; override;
 
     property ActiveConnections: Int32 read GetActiveConnections;
     property AutoFlushContextsTime: UInt32 read GetAutoFlushContextsTime write SetAutoFlushContextsTime;
@@ -415,6 +422,11 @@ begin
     if FTransactionCalls = 0 then
     begin
       DoCommitTransaction;
+
+      if Assigned(FOnRollbackTasks) then
+      begin
+        FOnRollbackTasks.Clear;
+      end;
     end;
   except
     on E: Exception do
@@ -464,6 +476,14 @@ begin
   DoUnprepareCommand(pCommandID);
 end;
 
+procedure TAqDBConnection.UnregisterDoOnRollback(const pID: TAqID);
+begin
+  if Assigned(FOnRollbackTasks) then
+  begin
+    FOnRollbackTasks.Remove(pID);
+  end;
+end;
+
 class procedure TAqDBConnection._Finalize;
 begin
 {$IFNDEF AUTOREFCOUNT}
@@ -476,7 +496,7 @@ end;
 
 class procedure TAqDBConnection._Initialize;
 begin
-  FConnections := TAqList<TAqDBConnection>.Create(TAqLockerType.lktMultiReadeExclusiveWriter);
+  FConnections := TAqList<TAqDBConnection>.Create(TAqLockerType.lktMultiReaderExclusiveWriter);
 end;
 
 procedure TAqDBConnection.DecrementReaders;
@@ -637,7 +657,17 @@ begin
     end);
 end;
 
+procedure TAqDBConnection.RollbackAllCalls;
+begin
+  while FTransactionCalls > 0 do
+  begin
+    RollbackTransaction;
+  end;
+end;
+
 procedure TAqDBConnection.RollbackTransaction;
+var
+  lTask: TProc;
 begin
   try
     CheckConnectionActive;
@@ -651,6 +681,16 @@ begin
 
     if FTransactionCalls = 0 then
     begin
+      if Assigned(FOnRollbackTasks) and (FOnRollbackTasks.Count > 0) then
+      begin
+        for lTask in FOnRollbackTasks.Values do
+        begin
+          lTask();
+        end;
+
+        FOnRollbackTasks.Clear;
+      end;
+
       DoRollbackTransaction;
     end;
   except
@@ -730,6 +770,16 @@ begin
 end;
 
 
+function TAqDBConnection.RegisterDoOnRollback(const pMethod: TProc): TAqID;
+begin
+  if not Assigned(FOnRollbackTasks) then
+  begin
+    FOnRollbackTasks := TAqIDDictionary<TProc>.Create;
+  end;
+
+  Result := FOnRollbackTasks.Add(pMethod);
+end;
+
 { TAqDBConnectionPool<TBaseConnection> }
 
 procedure TAqDBConnectionPool<TBaseConnection>.CommitTransaction;
@@ -748,7 +798,7 @@ begin
   FConnectionBuilder := pConnectionBuilder;
 
   FPreparedQueries := TAqIDDictionary<TAqDBPreparedQuery>.Create(True);
-  FPool := TAqList<TAqDBPooledConnection<TBaseConnection>>.Create(True, TAqLockerType.lktMultiReadeExclusiveWriter);
+  FPool := TAqList<TAqDBPooledConnection<TBaseConnection>>.Create(True, TAqLockerType.lktMultiReaderExclusiveWriter);
 
   inherited Create;
 
@@ -806,6 +856,15 @@ end;
 class function TAqDBConnectionPool<TBaseConnection>.GetDefaultAdapter: TAqDBAdapterClass;
 begin
   Result := nil;
+end;
+
+procedure TAqDBConnectionPool<TBaseConnection>.RollbackAllCalls;
+begin
+  SolvePoolAndExecute(
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
+    begin
+      pContext.Connection.RollbackAllCalls;
+    end);
 end;
 
 procedure TAqDBConnectionPool<TBaseConnection>.RollbackTransaction;
@@ -869,6 +928,19 @@ begin
     procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       lResult := pContext.Connection.OpenQuery(pSQLCommand, pTratadorParametros);
+    end);
+
+  Result := lResult;
+end;
+
+function TAqDBConnectionPool<TBaseConnection>.RegisterDoOnRollback(const pMethod: TProc): TAqID;
+var
+  lResult: TAqID;
+begin
+  SolvePoolAndExecute(
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
+    begin
+      lResult :=  pContext.Connection.RegisterDoOnRollback(pMethod);
     end);
 
   Result := lResult;
@@ -1094,6 +1166,15 @@ begin
     procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
     begin
       pContext.Connection.StartTransaction;
+    end);
+end;
+
+procedure TAqDBConnectionPool<TBaseConnection>.UnregisterDoOnRollback(const pID: TAqID);
+begin
+  SolvePoolAndExecute(
+    procedure(pContext: TAqDBPooledConnection<TBaseConnection>)
+    begin
+      pContext.Connection.UnregisterDoOnRollback(pID);
     end);
 end;
 

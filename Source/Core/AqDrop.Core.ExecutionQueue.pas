@@ -40,6 +40,9 @@ type
     FTasks: IAqIDDictionary<TAqTask>;
     FTasksOrder: IAqList<TAqID>;
     FNextTaskIndex: Int32;
+
+    {TODO: trocar essa lista por um canal de observação, mas é necessário criar uma sobrecarga que tenha um parâmetro que diga se o observador deseja continuar na lista}
+    FStatusChangedNotifications: IAqList<TFunc<TAqCustomExecutionQueue, TAqExecutionQueueStatus, Boolean>>;
   strict protected
     function IsLockerNeeded: Boolean; virtual; abstract;
 
@@ -68,6 +71,9 @@ type
     procedure Finish;
 
     procedure Execute; virtual;
+
+    procedure AddStatusChangedNotification(
+      const pMethod: TFunc<TAqCustomExecutionQueue, TAqExecutionQueueStatus, Boolean>);
   end;
 
   TAqExecutionQueue = class(TAqCustomExecutionQueue)
@@ -118,6 +124,19 @@ begin
   Result := DoAdd(pTask);
 end;
 
+procedure TAqCustomExecutionQueue.AddStatusChangedNotification(
+  const pMethod: TFunc<TAqCustomExecutionQueue, TAqExecutionQueueStatus, Boolean>);
+begin
+  ExecuteLockedForWriting(
+    procedure
+    begin
+      if pMethod(Self, FStatus) then
+      begin
+        FStatusChangedNotifications.Add(pMethod);
+      end;
+    end);
+end;
+
 procedure TAqCustomExecutionQueue.Clear;
 begin
   DoClear;
@@ -129,7 +148,7 @@ var
 begin
   if IsLockerNeeded then
   begin
-    lLockerType := TAqLockerType.lktMultiReadeExclusiveWriter;
+    lLockerType := TAqLockerType.lktMultiReaderExclusiveWriter;
   end else
   begin
     lLockerType := TAqLockerType.lktNone;
@@ -137,6 +156,8 @@ begin
 
   FTasks := TAqIDDictionary<TAqTask>.Create(True, lLockerType);
   FTasksOrder := TAqList<TAqID>.Create;
+
+  FStatusChangedNotifications := TAqList<TFunc<TAqCustomExecutionQueue, TAqExecutionQueueStatus, Boolean>>.Create;
 end;
 
 function TAqCustomExecutionQueue.DoAdd(const pTask: TAqTask): TAqID;
@@ -317,8 +338,26 @@ procedure TAqCustomExecutionQueue.SetStatus(const pNewStatus: TAqExecutionQueueS
 begin
   ExecuteLockedForWriting(
     procedure
+    var
+      lI: Int32;
     begin
-      FStatus := pNewStatus;
+      if FStatus <> pNewStatus then
+      begin
+        FStatus := pNewStatus;
+
+        lI := 0;
+
+        while lI < FStatusChangedNotifications.Count do
+        begin
+          if FStatusChangedNotifications[lI](Self, FStatus) then
+          begin
+            Inc(lI);
+          end else
+          begin
+            FStatusChangedNotifications.Delete(lI);
+          end;
+        end;
+      end;
     end);
 end;
 

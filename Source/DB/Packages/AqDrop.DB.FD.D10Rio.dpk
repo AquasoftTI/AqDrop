@@ -1,0 +1,58 @@
+package AqDrop.DB.FD.D10Rio;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'Aquasoft DROP - DB - FireDAC Layer'}
+{$RUNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  AqDrop.Core.D10Rio,
+  AqDrop.DB.D10Rio,
+  FireDAC,
+  FireDACSqliteDriver,
+  FireDACCommonDriver,
+  FireDACCommon,
+  FireDACPgDriver,
+  FireDACCommonODBC,
+  FireDACIBDriver,
+  FireDACMySQLDriver,
+  FireDACMSSQLDriver,
+  FireDACOracleDriver;
+
+contains
+  AqDrop.DB.FD.FB in '..\AqDrop.DB.FD.FB.pas',
+  AqDrop.DB.FD.IB in '..\AqDrop.DB.FD.IB.pas',
+  AqDrop.DB.FD.MSSQL in '..\AqDrop.DB.FD.MSSQL.pas',
+  AqDrop.DB.FD.MySQL in '..\AqDrop.DB.FD.MySQL.pas',
+  AqDrop.DB.FD.Ora in '..\AqDrop.DB.FD.Ora.pas',
+  AqDrop.DB.FD in '..\AqDrop.DB.FD.pas',
+  AqDrop.DB.FD.PG in '..\AqDrop.DB.FD.PG.pas',
+  AqDrop.DB.FD.SQLite in '..\AqDrop.DB.FD.SQLite.pas',
+  AqDrop.DB.FD.TypeMapping in '..\AqDrop.DB.FD.TypeMapping.pas';
+
+end.

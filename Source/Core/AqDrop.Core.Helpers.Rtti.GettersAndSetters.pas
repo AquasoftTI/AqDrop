@@ -85,7 +85,7 @@ uses
 
 constructor TAqRttiRegisteredsValueGetter.Create;
 begin
-  FRegisteredGetters := TAqDictionary<string, IAqRttiValueGetter>.Create(TAqLockerType.lktMultiReadeExclusiveWriter);
+  FRegisteredGetters := TAqDictionary<string, IAqRttiValueGetter>.Create(TAqLockerType.lktMultiReaderExclusiveWriter);
 end;
 
 class function TAqRttiRegisteredsValueGetter.GetDefaultInstance: TAqRttiRegisteredsValueGetter;

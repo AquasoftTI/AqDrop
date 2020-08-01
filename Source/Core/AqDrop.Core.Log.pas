@@ -109,7 +109,7 @@ begin
   inherited Create(True);
 
   FDefaultFormatMesssage := 'hh:mm:ss:zzz ''' + TAqLogMessage.THREAD_ID_PLACE_HOLDER + ''' ''%s''';
-  FExecutionLevels := TAqDictionary<TThreadID, UInt32>.Create(TAqLockerType.lktMultiReadeExclusiveWriter);
+  FExecutionLevels := TAqDictionary<TThreadID, UInt32>.Create(TAqLockerType.lktMultiReaderExclusiveWriter);
 end;
 
 procedure TAqLog.DecrementExecutionLevel;

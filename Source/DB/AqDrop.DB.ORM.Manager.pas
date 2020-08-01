@@ -43,12 +43,17 @@ type
     function GetAdapter: TAqDBAdapter;
     function GetSQLSolver: TAqDBSQLSolver;
 
-    procedure OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: IAqDBSQLSelect;
-      const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader> = nil); overload;
-    procedure OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: string;
-      const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader> = nil); overload;
+    procedure OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: IAqDBSQLSelect; const pNewObjectFunction: TFunc<TObject>;
+      const pOnReadData: TProc<IAqDBReader> = nil; const pParametersHandler: TAqDBParametersHandlerMethod = nil); overload;
+    procedure OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: string; const pNewObjectFunction: TFunc<TObject>;
+      const pOnReadData: TProc<IAqDBReader> = nil; const pParametersHandler: TAqDBParametersHandlerMethod = nil); overload;
 
     procedure DoAndSaveDetails(const pMethod: TProc; const pMaster: TObject);
+    procedure DoAdd(pInsert: IAqDBSQLInsert; const pObject: TObject);
+    procedure DoUpdate(pUpdate: IAqDBSQLUpdate; const pObject: TObject);
+    procedure DoPost(const pObject: TObject; const pFreeObject: Boolean = False);
+
+    procedure ReloadObject(const pObject: TObject);
 
     class var FDefault: TAqDBORMManager;
   strict protected
@@ -103,7 +108,7 @@ type
     function Get<T: class, constructor>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
       out pResultList: IAqResultList<T>; const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
     function Get<T: class>(const pCustomizationMethod: TProc<IAqDBSQLSelect>;
-      out pResultList: IAqResultList<T>; const pNewItemMethod: TFunc<T>; 
+      out pResultList: IAqResultList<T>; const pNewItemMethod: TFunc<T>;
       const pOnReadData: TProc<IAqDBReader> = nil): Boolean; overload;
 
     function Get<T: class, constructor>(const pOnReadData: TProc<IAqDBReader> = nil):IAqResultList<T>; overload;
@@ -171,9 +176,12 @@ implementation
 uses
   System.Rtti,
   AqDrop.Core.Types,
+  AqDrop.Core.RequirementTests,
   AqDrop.Core.Exceptions,
   AqDrop.Core.Observers,
   AqDrop.Core.Collections,
+  AqDrop.Core.Helpers.Rtti,
+  AqDrop.Core.Helpers.TRttiType,
   AqDrop.DB.ORM.Attributes,
   AqDrop.DB.SQL;
 
@@ -185,7 +193,7 @@ begin
   FConnection.AddDependent(Self);
   FClients := TAqDictionary<string, TAqDBORMManagerClient>.Create(
     [TAqKeyValueOwnership.kvoValue],
-    TAqLockerType.lktMultiReadeExclusiveWriter);
+    TAqLockerType.lktMultiReaderExclusiveWriter);
   FOnNewClient := TAqObservationChannel<TAqDBORMManagerClient>.Create;
 end;
 
@@ -252,6 +260,88 @@ begin
   inherited;
 end;
 
+procedure TAqDBORMManager.DoAdd(pInsert: IAqDBSQLInsert; const pObject: TObject);
+var
+  lORM: TAqDBORM;
+  lHasAutoIncrementColumn: Boolean;
+  lTable: TAqDBORMTable;
+  lAutoIncrementColumn: TAqDBORMColumn;
+  lGeneratorName: string;
+  lOldIDValue: Int64;
+
+  procedure RegisterRevertIDObservers;
+  var
+    lDestructionObservable: IAqDestructionObservable;
+    [weak] lDestructionObservableClosure: IAqDestructionObservable;
+    lIDOnRollback: TAqID;
+    lIDDestructionObserver: TAqID;
+  begin
+    if Supports(pObject, IAqDestructionObservable, lDestructionObservable) then
+    begin
+      lDestructionObservableClosure := lDestructionObservable;
+      lIDOnRollback := FConnection.RegisterDoOnRollback(
+        procedure
+        begin
+          lDestructionObservableClosure.UnregisterDestructionObserver(lIDDestructionObserver);
+          lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(lOldIDValue));
+        end);
+
+      lIDDestructionObserver := lDestructionObservableClosure.RegisterDestructionObserver(
+        procedure(pSender: TObject)
+        begin
+          FConnection.UnregisterDoOnRollback(lIDOnRollback);
+        end);
+    end;
+  end;
+begin
+  lOldIDValue := 0;
+
+  lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
+
+  lHasAutoIncrementColumn := lORM.GetTable(pInsert.Table.Name, lTable) and
+    lTable.HasAutoIncrementColumn(lAutoIncrementColumn);
+
+  FConnection.StartTransaction;
+
+  try
+    if lHasAutoIncrementColumn then
+    begin
+      lOldIDValue := lAutoIncrementColumn.GetValue(pObject).AsInt64;
+
+      if Adapter.AutoIncrementType = TAqDBAutoIncrementType.aiGenerator then
+      begin
+        if Assigned(lAutoIncrementColumn.Attribute) and (lAutoIncrementColumn.Attribute is AqAutoIncrementColumn) and
+          AqAutoIncrementColumn(lAutoIncrementColumn.Attribute).IsGeneratorDefined then
+        begin
+          lGeneratorName := AqAutoIncrementColumn(lAutoIncrementColumn.Attribute).GeneratorName;
+        end else begin
+          lGeneratorName := SQLSolver.SolveGeneratorName(lTable.Name, lAutoIncrementColumn.Name);
+        end;
+
+        RegisterRevertIDObservers;
+
+        lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(
+          FConnection.GetAutoIncrementValue(lGeneratorName)));
+      end;
+    end;
+
+    ExecuteWithObject(SQLSolver.SolveInsert(pInsert), pObject);
+
+    if lHasAutoIncrementColumn and (Adapter.AutoIncrementType = TAqDBAutoIncrementType.aiAutoIncrement) then
+    begin
+      RegisterRevertIDObservers;
+
+      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(
+        FConnection.GetAutoIncrementValue));
+    end;
+
+    FConnection.CommitTransaction;
+  except
+    FConnection.RollbackTransaction;
+    raise;
+  end;
+end;
+
 procedure TAqDBORMManager.DoAndSaveDetails(const pMethod: TProc; const pMaster: TObject);
 var
   lORM: TAqDBORM;
@@ -307,7 +397,7 @@ begin
               lDetailKeys[lI].SetObjectValue(lObject, lMasterKeys[lI].GetValue(pMaster));
             end;
 
-            Post(lObject, False);
+            DoPost(lObject, False);
           end;
 
           if not lDetail.ManagedDeletedItens then
@@ -368,6 +458,94 @@ begin
       raise;
     end;
   end;
+end;
+
+procedure TAqDBORMManager.DoPost(const pObject: TObject; const pFreeObject: Boolean);
+begin
+  DoAndSaveDetails(
+    procedure
+    var
+      lInserts: IAqResultList<IAqDBSQLInsert>;
+      lUpdates: IAqResultList<IAqDBSQLUpdate>;
+      lI: Int32;
+      lSelect: IAqDBSQLSelect;
+      lReader: IAqDBReader;
+      lORM: TAqDBORM;
+      lSpecialization: TAqDBORMTable<AqSpecialization>;
+      lLink: TAqDBLink;
+      lTableName: string;
+      lMasterKey: TAqDBORMColumn;
+      lForeignKey: TAqDBORMColumn;
+    begin
+{$IFNDEF AUTOREFCOUNT}
+      try
+{$ENDIF}
+        lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
+
+        lInserts := BuildInserts(pObject.ClassType);
+        lUpdates := BuildUpdates(pObject.ClassType);
+
+        if lInserts.Count <> lUpdates.Count then
+        begin
+          raise EAqInternal.Create('Count of Inserts and Updates of ' + pObject.ClassName + ' doesn''t match.');
+        end;
+
+        FConnection.StartTransaction;
+
+        try
+          for lI := 0 to lUpdates.Count - 1 do
+          begin
+            lSelect := TAqDBSQLSelect.Create(lUpdates[lI].Table.Name);
+            lSelect.AddColumn(TAqDBSQLIntConstant.Create(1));
+            lSelect.Condition := lUpdates[lI].Condition;
+            lSelect.Limit := 1;
+
+            lReader := FConnection.OpenQuery(lSelect,
+              procedure(pParameters: IAqDBParameters)
+              begin
+                FillParametersWithObjectValues(pParameters, pObject);
+              end);
+
+            if lReader.Next then
+            begin
+              DoUpdate(lUpdates[lI], pObject);
+            end else begin
+              DoAdd(lInserts[lI], pObject);
+
+              lTableName := lInserts[lI].Table.Name;
+              if lORM.GetSpecializationUnderTable(lTableName, lSpecialization) then
+              begin
+                for lLink in lSpecialization.Attribute.Links do
+                begin
+                  if lORM.GetColumn(lTableName, lLink.MasterKey, lMasterKey) and
+                    lORM.GetColumn(lSpecialization.Name, lLink.ForeignKey, lForeignKey) then
+                  begin
+                    lForeignKey.SetObjectValue(pObject, lMasterKey.GetValue(pObject));
+                  end;
+                end;
+              end;
+            end;
+          end;
+
+          FConnection.CommitTransaction;
+        except
+          FConnection.RollbackTransaction;
+          raise;
+        end;
+{$IFNDEF AUTOREFCOUNT}
+      finally
+        if pFreeObject then
+        begin
+          pObject.Free;
+        end;
+      end;
+{$ENDIF}
+    end, pObject);
+end;
+
+procedure TAqDBORMManager.DoUpdate(pUpdate: IAqDBSQLUpdate; const pObject: TObject);
+begin
+  ExecuteWithObject(SQLSolver.SolveUpdate(pUpdate), pObject);
 end;
 
 procedure TAqDBORMManager.Delete(const pObject: TObject; const pFreeObject: Boolean);
@@ -484,85 +662,51 @@ end;
 
 procedure TAqDBORMManager.Post(const pObject: TObject; const pFreeObject: Boolean = False);
 begin
-  DoAndSaveDetails(
-    procedure
-    var
-      lInserts: IAqResultList<IAqDBSQLInsert>;
-      lUpdates: IAqResultList<IAqDBSQLUpdate>;
-      lI: Int32;
-      lSelect: IAqDBSQLSelect;
-      lReader: IAqDBReader;
-      lORM: TAqDBORM;
-      lSpecialization: TAqDBORMTable<AqSpecialization>;
-      lLink: TAqDBLink;
-      lTableName: string;
-      lMasterKey: TAqDBORMColumn;
-      lForeignKey: TAqDBORMColumn;
+  DoPost(pObject, pFreeObject);
+
+  if not pFreeObject then
+  begin
+    ReloadObject(pObject);
+  end;
+end;
+
+procedure TAqDBORMManager.ReloadObject(const pObject: TObject);
+var
+  lClassType: TRttiType;
+  lORM: TAqDBORM;
+  lDeletes: IAqResultList<IAqDBSQLDelete>;
+  lSelect: IAqDBSQLSelect;
+  lDetail: IAqDBORMDetail;
+begin
+  lClassType := TAqRtti.&Implementation.GetType(pObject.ClassType);
+
+  if lClassType.HasAttributeInTheHierarchy<AqAutoReload> then
+  begin
+    lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
+    if lORM.HasDetails then
     begin
-{$IFNDEF AUTOREFCOUNT}
-      try
-{$ENDIF}
-        lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
-
-        lInserts := BuildInserts(pObject.ClassType);
-        lUpdates := BuildUpdates(pObject.ClassType);
-
-        if lInserts.Count <> lUpdates.Count then
-        begin
-          raise EAqInternal.Create('Count of Inserts and Updates of ' + pObject.ClassName + ' doesn''t match.');
-        end;
-
-        FConnection.StartTransaction;
-
-        try
-          for lI := 0 to lUpdates.Count - 1 do
-          begin
-            lSelect := TAqDBSQLSelect.Create(lUpdates[lI].Table.Name);
-            lSelect.AddColumn(TAqDBSQLIntConstant.Create(1));
-            lSelect.Condition := lUpdates[lI].Condition;
-            lSelect.Limit := 1;
-
-            lReader := FConnection.OpenQuery(lSelect,
-              procedure(pParameters: IAqDBParameters)
-              begin
-                FillParametersWithObjectValues(pParameters, pObject);
-              end);
-
-            if lReader.Next then
-            begin
-              Update(lUpdates[lI], pObject);
-            end else begin
-              Add(lInserts[lI], pObject);
-
-              lTableName := lInserts[lI].Table.Name;
-              if lORM.GetSpecializationUnderTable(lTableName, lSpecialization) then
-              begin
-                for lLink in lSpecialization.Attribute.Links do
-                begin
-                  if lORM.GetColumn(lTableName, lLink.MasterKey, lMasterKey) and
-                    lORM.GetColumn(lSpecialization.Name, lLink.ForeignKey, lForeignKey) then
-                  begin
-                    lForeignKey.SetObjectValue(pObject, lMasterKey.GetValue(pObject));
-                  end;
-                end;
-              end;
-            end;
-          end;
-
-          FConnection.CommitTransaction;
-        except
-          FConnection.RollbackTransaction;
-          raise;
-        end;
-{$IFNDEF AUTOREFCOUNT}
-      finally
-        if pFreeObject then
-        begin
-          pObject.Free;
-        end;
+      for lDetail in lORM.Details do
+      begin
+        lDetail.Unload(pObject);
       end;
-{$ENDIF}
-    end, pObject);
+    end;
+
+    lDeletes := BuildDeletes(pObject.ClassType);
+    TAqRequirement.Test(Assigned(lDeletes) and (lDeletes.Count > 0), 'Impossible to reload the object.');
+
+    lSelect := BuildSelect(lORM);
+    lSelect.CustomizeCondition(lDeletes.Last.Condition);
+
+    OpenAndMapObjects(lORM, lSelect,
+      function: TObject
+      begin
+        Result := pObject;
+      end, nil,
+      procedure(pParameters: IAqDBParameters)
+      begin
+        FillParametersWithObjectValues(pParameters, pObject);
+      end);
+  end;
 end;
 
 procedure TAqDBORMManager.Update(const pUpdates: IAqReadableList<IAqDBSQLUpdate>; const pObject: TObject);
@@ -581,11 +725,14 @@ begin
     FConnection.RollbackTransaction;
     raise;
   end;
+
+  ReloadObject(pObject);
 end;
 
 procedure TAqDBORMManager.Update(const pUpdate: IAqDBSQLUpdate; const pObject: TObject);
 begin
-  ExecuteWithObject(SQLSolver.SolveUpdate(pUpdate), pObject);
+  DoUpdate(pUpdate, pObject);
+  ReloadObject(pObject);
 end;
 
 procedure TAqDBORMManager.Update<T>(const pCustomizationMethod: TProc<IAqDBSQLUpdate>);
@@ -626,48 +773,9 @@ begin
 end;
 
 procedure TAqDBORMManager.Add(const pInsert: IAqDBSQLInsert; const pObject: TObject);
-var
-  lORM: TAqDBORM;
-  lHasAutoIncrementColumn: Boolean;
-  lTable: TAqDBORMTable;
-  lAutoIncrementColumn: TAqDBORMColumn;
-  lGeneratorName: string;
 begin
-  lORM := TAqDBORMReader.Instance.GetORM(pObject.ClassType);
-
-  lHasAutoIncrementColumn := lORM.GetTable(pInsert.Table.Name, lTable) and
-    lTable.HasAutoIncrementColumn(lAutoIncrementColumn);
-
-  FConnection.StartTransaction;
-
-  try
-    if lHasAutoIncrementColumn and (Adapter.AutoIncrementType = TAqDBAutoIncrementType.aiGenerator) then
-    begin
-      if Assigned(lAutoIncrementColumn.Attribute) and (lAutoIncrementColumn.Attribute is AqAutoIncrementColumn) and
-        AqAutoIncrementColumn(lAutoIncrementColumn.Attribute).IsGeneratorDefined then
-      begin
-        lGeneratorName := AqAutoIncrementColumn(lAutoIncrementColumn.Attribute).GeneratorName;
-      end else begin
-        lGeneratorName := SQLSolver.SolveGeneratorName(lTable.Name, lAutoIncrementColumn.Name);
-      end;
-
-      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(
-        FConnection.GetAutoIncrementValue(lGeneratorName)));
-    end;
-
-    ExecuteWithObject(SQLSolver.SolveInsert(pInsert), pObject);
-
-    if lHasAutoIncrementColumn and (Adapter.AutoIncrementType = TAqDBAutoIncrementType.aiAutoIncrement) then
-    begin
-      lAutoIncrementColumn.SetObjectValue(pObject, TValue.From<Int64>(
-        FConnection.GetAutoIncrementValue));
-    end;
-
-    FConnection.CommitTransaction;
-  except
-    FConnection.RollbackTransaction;
-    raise;
-  end;
+  DoAdd(pInsert, pObject);
+  ReloadObject(pObject);
 end;
 
 procedure TAqDBORMManager.Add<T>(const pCustomizationMethod: TProc<IAqDBSQLInsert>);
@@ -707,6 +815,8 @@ begin
     FConnection.RollbackTransaction;
     raise;
   end;
+
+  ReloadObject(pObject);
 end;
 
 function TAqDBORMManager.BuildBaseDeletes(const pORM: TAqDBORM): IAqResultList<IAqDBSQLDelete>;
@@ -863,24 +973,24 @@ var
   lFirstCondition: TAqDBSQLComparisonCondition;
   lComposedCondition: TAqDBSQLComposedCondition;
 
-  function CreateCondition(const pColumnName: string): TAqDBSQLComparisonCondition;
+  function CreateCondition(const pColumnName: string; pSourceTable: IAqDBSQLTable): TAqDBSQLComparisonCondition;
   begin
-    Result := TAqDBSQLComparisonCondition.Create(TAqDBSQLColumn.Create(pColumnName),
+    Result := TAqDBSQLComparisonCondition.Create(TAqDBSQLColumn.Create(pColumnName, pSourceTable),
       TAqDBSQLComparison.cpEqual, TAqDBSQLParameter.Create(pColumnName));
   end;
 
-  procedure AddCondition(const pColumnName: string);
+  procedure AddCondition(const pColumnName: string; pSourceTable: IAqDBSQLTable);
   begin
     if not Assigned(lFirstCondition) then
     begin
-      lFirstCondition := CreateCondition(pColumnName);
+      lFirstCondition := CreateCondition(pColumnName, pSourceTable);
     end else begin
       if not Assigned(lComposedCondition) then
       begin
         lComposedCondition := TAqDBSQLComposedCondition.Create(lFirstCondition);
       end;
 
-      lComposedCondition.AddCondition(TAqDBSQLBooleanOperator.boAnd, CreateCondition(pColumnName));
+      lComposedCondition.AddCondition(TAqDBSQLBooleanOperator.boAnd, CreateCondition(pColumnName, pSourceTable));
     end;
   end;
 
@@ -898,7 +1008,7 @@ var
     begin
       for lColumn in lPKs do
       begin
-        AddCondition(lColumn.Name);
+        AddCondition(lColumn.Name, lDelete.Table);
       end;
     end;
 
@@ -906,7 +1016,7 @@ var
     begin
       if Assigned(lColumn.Attribute) and (lColumn.Attribute.PrimaryKey) then
       begin
-        AddCondition(lColumn.Name);
+        AddCondition(lColumn.Name, lDelete.Table);
         lPKs.Add(lColumn);
       end;
     end;
@@ -1266,13 +1376,13 @@ begin
 end;
 
 procedure TAqDBORMManager.OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: IAqDBSQLSelect;
-  const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader>);
+  const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader>; const pParametersHandler: TAqDBParametersHandlerMethod);
 begin
-  OpenAndMapObjects(pORM, SQLSolver.SolveSelect(pSelect), pNewObjectFunction, pOnReadData);
+  OpenAndMapObjects(pORM, SQLSolver.SolveSelect(pSelect), pNewObjectFunction, pOnReadData, pParametersHandler);
 end;
 
 procedure TAqDBORMManager.OpenAndMapObjects(const pORM: TAqDBORM; const pSelect: string;
-  const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader>);
+  const pNewObjectFunction: TFunc<TObject>; const pOnReadData: TProc<IAqDBReader>; const pParametersHandler: TAqDBParametersHandlerMethod);
 var
   lReader: IAqDBReader;
   lObject: TObject;
@@ -1280,7 +1390,7 @@ var
   lColumn: TAqDBORMColumn;
   lDetail: IAqDBORMDetail;
 begin
-  lReader := FConnection.OpenQuery(pSelect);
+  lReader := FConnection.OpenQuery(pSelect, pParametersHandler);
 
   while lReader.Next do
   begin
@@ -1290,7 +1400,14 @@ begin
     begin
       if pORM.GetColumn(lReader[lI].Name, lColumn) then
       begin
-        lColumn.SetObjectValue(lObject, lReader[lI]);
+        try
+          lColumn.SetObjectValue(lObject, lReader[lI]);
+        except
+          on E: Exception do
+          begin
+            E.RaiseOuterException(EAqInternal.Create('The ' + lColumn.Name + ' column could not be loaded.'));
+          end;
+        end;
       end;
     end;
 

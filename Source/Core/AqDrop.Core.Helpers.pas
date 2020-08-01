@@ -123,6 +123,9 @@ type
     function IncSecond(const pCount: Int32 = 1): TDateTime; inline;
     function IncMilliSecond(const pCount: Int32 = 1): TDateTime; inline;
 
+    function FirstDayOfMonth: TDate; inline;
+    function LastDayOfMonth: TDate; inline;
+
     procedure DecodeDate(out pYear: UInt16; out pMonth: UInt8; out pDay: UInt8);
 
     function ToISO8601(const pIsUTC: Boolean = True): string;
@@ -170,6 +173,7 @@ type
       const pMillisecond: UInt16): TDateTime; static;
 
     class function FromISO8601(const pText: string; const pReturnUTC: Boolean = True): TTime; static; inline;
+    class function FromString(const pText: string): TTime; static; inline;
   end;
 
   TAqBcdHelper = record helper for TBcd
@@ -181,6 +185,8 @@ type
   end;
 
   TAqCurrencyHelper = record helper for Currency
+  strict private
+    const MOST_SIGNIFICANT_BYTE_OFFSET = SizeOf(Currency) - 1;
   public
     function ToBcd: TBcd; inline;
     function ToString: string; overload; inline;
@@ -190,6 +196,9 @@ type
     function Frac: Currency; inline;
     function Format(const pMask: string): string; overload; inline;
     function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+
+    class function Low: Currency; static;
+    class function High: Currency; static;
   end;
 
   TAqStringHelper = record helper for string
@@ -199,8 +208,6 @@ type
 
     function GetChar(Index: Int32): Char;
     function GetLength: Int32;
-  private
-    function CompareTo(pString2: string; const pCaseSensitive: Boolean): Int32;
   public
     const Empty = '';
     const LineBreak = sLineBreak;
@@ -226,7 +233,8 @@ type
     function ToUpper: string; overload; inline;
     function Trim: string;
     procedure Clear; inline;
-    function Replace(const pOldValue, pNewValue: string; const pFlags: TReplaceFlags): string;
+    function Replace(const pOldValue, pNewValue: string; const pFlags: TReplaceFlags): string; overload;
+    function Replace(const pOldValue, pNewValue: string): string; overload;
     function Split(const pSeparator: string): TArray<string>; overload;
     function Split(const pSeparators: TArray<string>): TArray<string>; overload;
     function SplitInTwo(const pSeparator: string; out pLeftSide, pRightSide: string): Boolean; overload;
@@ -243,7 +251,9 @@ type
     function TryToInt64(out pInt64: Int64): Boolean; inline;
     function TryToUInt64(out pUInt64: UInt64): Boolean;
 
-    function TryToDouble(out pDouble: Double): Boolean; inline;
+    function TryToDouble(out pDouble: Double): Boolean; overload; inline;
+    {TODO -oMelhoria: Criar as sobrecargas de TryToXXXXX para os outros tipos, com parâmetro de settings}
+    function TryToDouble(const pSettings: TFormatSettings; out pDouble: Double): Boolean; overload; inline;
     function TryToCurrency(out pCurrency: Currency): Boolean; inline;
 
     function TryToBoolean(out pBoolean: Boolean): Boolean; inline;
@@ -288,8 +298,13 @@ type
 
     function GetOnlyNumbers: string;
 
+    function CompareTo(pString2: string; const pCaseSensitive: Boolean): Int32;
     function SameText(const pText: string): Boolean; overload; inline;
     class function SameText(const pText1, pText2: string): Boolean; overload; static; inline;
+    class function Concat(const pStrings: TArray<string>): string; overload; static; inline;
+    class function Concat(const pStrings: TArray<string>; const pSeparator: string): string; overload; static;
+    class function Concat(const pStrings: array of string): string; overload; static;
+    class function Concat(const pStrings: array of string; const pSeparator: string): string; overload; static;
 
     property Chars[Index: Int32]: Char read GetChar;
     property Length: Int32 read GetLength;
@@ -312,6 +327,9 @@ type
     function ToString: string; inline;
     function Trunc: Int64; inline;
     function Frac: Single; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: Single): Single; inline;
   end;
 
   TAqInt8Helper = record helper for Int8
@@ -319,6 +337,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: Int8): Int8; inline;
 
     class function High: Int8; static; inline;
     class function Low: Int8; static; inline;
@@ -329,6 +352,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: UInt8): UInt8; inline;
 
     class function High: UInt8; static; inline;
     class function Low: UInt8; static; inline;
@@ -339,6 +367,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: Int16): Int16; inline;
 
     class function High: Int16; static; inline;
     class function Low: Int16; static; inline;
@@ -349,6 +382,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: UInt16): UInt16; inline;
 
     class function High: UInt16; static; inline;
     class function Low: UInt16; static; inline;
@@ -359,6 +397,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: Int32): Int32; inline;
 
     class function High: Int32; static; inline;
     class function Low: Int32; static; inline;
@@ -369,6 +412,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: UInt32): UInt32; inline;
 
     class function High: UInt32; static; inline;
     class function Low: UInt32; static; inline;
@@ -379,6 +427,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: Int64): Int64; inline;
 
     class function High: Int64; static; inline;
     class function Low: Int64; static; inline;
@@ -389,6 +442,11 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function ToHex(const pDigits: UInt8): string; overload; inline;
+    function ToHex: string; overload; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: UInt64): UInt64; inline;
 
     class function High: UInt64; static; inline;
     class function Low: UInt64; static; inline;
@@ -398,6 +456,9 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: NativeInt): NativeInt; inline;
 
     class function High: NativeInt; static; inline;
     class function Low: NativeInt; static; inline;
@@ -407,6 +468,9 @@ type
     function ToString: string; inline;
     function ToStringEmptyIfZero: string; inline;
     function ToBoolean: Boolean; inline;
+    function Format(const pMask: string): string; overload; inline;
+    function Format(const pMask: string; const pSettings: TFormatSettings): string; overload; inline;
+    function Compare(const pValue2: NativeUInt): NativeUInt; inline;
 
     class function High: NativeUInt; static; inline;
     class function Low: NativeUInt; static; inline;
@@ -414,8 +478,8 @@ type
 
   TAqUnixDateTimeHelper = record helper for TAqUnixDateTime
   public
-    class function FromDateTime(const pDateTime: TDateTime): TAqUnixDateTime; static; inline;
-    class function Now: TAqUnixDateTime; static; inline;
+    class function FromDateTime(const pDateTime: TDateTime): TAqUnixDateTime; static; {$IFNDEF DEBUG} inline; {$ENDIF}
+    class function Now: TAqUnixDateTime; static; {$IFNDEF DEBUG} inline; {$ENDIF}
     function ToDateTime: TDateTime;
   end;
 
@@ -423,6 +487,17 @@ type
   public
     function ToString: string;
     function ToBoolean: Boolean;
+  end;
+
+  TAqGUIDFunctions = class
+  const
+    EMPTY_GUID: TGUID = '{00000000-0000-0000-0000-000000000000}';
+  public
+    class function ToRawString(const pGUID: TGUID): string; overload; inline;
+    class function ToRawString(const pGUID: string): string; overload; inline;
+    class function FromRawString(const pRawStringGUID: string): TGUID; inline;
+
+    class function IsEmpty(const pGUID: TGUID): Boolean; inline;
   end;
 
 implementation
@@ -774,9 +849,20 @@ begin
   Result := TDateTime.EncodeDate(pYear, pMonth, pDay);
 end;
 
+function TAqDateHelper.FirstDayOfMonth: TDate;
+begin
+  Result := TDate.EncodeDate(Self.YearOf, Self.MonthOf, 1);
+end;
+
 function TAqDateHelper.Format(const pMask: string): string;
 begin
-  Result := Self.ToDateTime.Format(pMask);
+  if (Self.ToDateTime > 0) then
+  begin
+    Result := Self.ToDateTime.Format(pMask);
+  end else
+  begin
+    Result := string.Empty;
+  end;
 end;
 
 class function TAqDateHelper.FromISO8601(const pText: string; const pReturnUTC: Boolean): TDate;
@@ -904,6 +990,11 @@ begin
   result := System.DateUtils.SameDate(Self, AValue);
 end;
 
+function TAqDateHelper.LastDayOfMonth: TDate;
+begin
+  Result := TDate.EncodeDate(Self.YearOf, Self.MonthOf, Self.DaysInMonth);
+end;
+
 { TAqTimeHelper }
 
 procedure TAqTimeHelper.DecodeTime(out pHour, pMinute, pSecond: UInt8; out pMillisecond: UInt16);
@@ -924,6 +1015,11 @@ end;
 class function TAqTimeHelper.FromISO8601(const pText: string; const pReturnUTC: Boolean = True): TTime;
 begin
   Result := TDateTime.FromISO8601(pText, pReturnUTC).TimeOf;
+end;
+
+class function TAqTimeHelper.FromString(const pText: string): TTime;
+begin
+  Result := System.SysUtils.StrToTime(pText);
 end;
 
 function TAqTimeHelper.GetHoursBetween(const pFromTime: TTime): Int32;
@@ -1018,7 +1114,7 @@ end;
 
 function TAqTimeHelper.ToString: string;
 begin
-  Result := TimeToStr(Self);
+  Result := System.SysUtils.TimeToStr(Self);
 end;
 
 { TAqBcdHelper }
@@ -1062,6 +1158,31 @@ end;
 function TAqCurrencyHelper.Frac: Currency;
 begin
   Result := System.Frac(Self);
+end;
+
+class function TAqCurrencyHelper.High: Currency;
+var
+  lPByte: PByte;
+  lI: Integer;
+begin
+  lPByte := @Result;
+  for lI := 0 to MOST_SIGNIFICANT_BYTE_OFFSET - 1 do
+  begin
+    lPByte^ := $FF;
+    Inc(lPByte);
+  end;
+
+  lPByte^ := $7F;
+end;
+
+class function TAqCurrencyHelper.Low: Currency;
+var
+  lPByte: PByte;
+begin
+  Result := 0;
+  lPByte := @Result;
+  Inc(lPByte, MOST_SIGNIFICANT_BYTE_OFFSET);
+  lPByte^ := $80;
 end;
 
 function TAqCurrencyHelper.ToBcd: TBcd;
@@ -1114,6 +1235,31 @@ var
   lIndex: Int32;
 begin
   Result :=  Contains([pValue], lIndex, pIndexOf, pCaseSensitive);
+end;
+
+class function TAqStringHelper.Concat(const pStrings: TArray<string>; const pSeparator: string): string;
+var
+  lLength: Int32;
+  lI: Int32;
+begin
+  Result := '';
+
+  lLength := System.Length(pStrings);
+
+  for lI := lLength - 1 downto 0 do
+  begin
+    Result := pStrings[lI] + Result;
+
+    if (lI > 0) and not pSeparator.IsEmpty then
+    begin
+      Result := pSeparator + Result;
+    end;
+  end;
+end;
+
+class function TAqStringHelper.Concat(const pStrings: TArray<string>): string;
+begin
+  Result := Concat(pStrings, string.Empty);
 end;
 
 function TAqStringHelper.Contains(const pAnyOf: TArray<string>; out pItemFoundIndex: Int32; out pIndexOf: Int32;
@@ -1202,6 +1348,11 @@ begin
   raise EAqInternal.Create('Invalid conversion of string ' + Self.Quote + ' to an integer type.');
 end;
 
+function TAqStringHelper.Replace(const pOldValue, pNewValue: string): string;
+begin
+  Result := Self.Replace(pOldValue, pNewValue, []);
+end;
+
 function TAqStringHelper.Replace(const pOldValue, pNewValue: string; const pFlags: TReplaceFlags): string;
 begin
   Result := System.SysUtils.StringReplace(Self, pOldValue, pNewValue, pFlags);
@@ -1255,7 +1406,7 @@ begin
   while lText.Contains(pSeparators, lItemFoundIndex, lIndexOf, True) do
   begin
     AddResult(lText.LeftFromPosition(lIndexOf));
-    lText := lText.RightFromPosition(lIndexOf + pSeparators[lItemFoundIndex].Length);
+    lText := lText.RightFromPosition(lIndexOf + pSeparators[lItemFoundIndex].Length - 1);
   end;
 
   AddResult(lText);
@@ -1610,22 +1761,43 @@ function TAqStringHelper.TryToDate(out pDate: TDate): Boolean;
 var
   lDateTime: TDateTime;
 begin
-  Result := TryStrToDate(Self, lDateTime);
+  Result := Self.IsEmpty;
 
   if Result then
   begin
-    pDate := lDateTime.DateOf;
+    pDate := 0;
+  end else
+  begin
+    Result := System.SysUtils.TryStrToDate(Self, lDateTime);
+
+    if Result then
+    begin
+      pDate := lDateTime.DateOf;
+    end;
   end;
 end;
 
 function TAqStringHelper.TryToDateTime(out pDateTime: TDateTime): Boolean;
 begin
-  Result := TryStrToDateTime(Self, pDateTime);
+  Result := Self.IsEmpty;
+
+  if Result then
+  begin
+    pDateTime := 0;
+  end else
+  begin
+    Result := System.SysUtils.TryStrToDateTime(Self, pDateTime);
+  end;
+end;
+
+function TAqStringHelper.TryToDouble(const pSettings: TFormatSettings; out pDouble: Double): Boolean;
+begin
+  Result := System.SysUtils.TryStrToFloat(Self, pDouble, pSettings);
 end;
 
 function TAqStringHelper.TryToDouble(out pDouble: Double): Boolean;
 begin
-  Result := TryStrToFloat(Self, pDouble);
+  Result := TryToDouble(System.SysUtils.FormatSettings, pDouble);
 end;
 
 function TAqStringHelper.TryToInt16(out pInt16: Int16): Boolean;
@@ -1668,11 +1840,19 @@ function TAqStringHelper.TryToTime(out pTime: TTime): Boolean;
 var
   lDateTime: TDateTime;
 begin
-  Result := TryStrToDate(Self, lDateTime);
+  Result := Self.IsEmpty;
 
   if Result then
   begin
-    pTime := lDateTime.TimeOf;
+    pTime := 0;
+  end else
+  begin
+    Result := System.SysUtils.TryStrToTime(Self, lDateTime);
+
+    if Result then
+    begin
+      pTime := lDateTime.TimeOf;
+    end;
   end;
 end;
 
@@ -1780,7 +1960,7 @@ end;
 
 function TAqDoubleHelper.Format(const pMask: string; const pSettings: TFormatSettings): string;
 begin
-  Result := System.SysUtils.FormatCurr(pMask, Self, pSettings);
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
 end;
 
 function TAqDoubleHelper.Frac: Double;
@@ -1810,6 +1990,21 @@ end;
 
 { TAqSingleHelper }
 
+function TAqSingleHelper.Compare(const pValue2: Single): Single;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqSingleHelper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqSingleHelper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
+
 function TAqSingleHelper.Frac: Single;
 begin
   Result := System.Frac(Self);
@@ -1827,6 +2022,21 @@ end;
 
 { TAqUInt32Helper }
 
+function TAqUInt32Helper.Compare(const pValue2: UInt32): UInt32;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqUInt32Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqUInt32Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
+
 class function TAqUInt32Helper.High: UInt32;
 begin
   Result := System.High(UInt32);
@@ -1840,6 +2050,16 @@ end;
 function TAqUInt32Helper.ToBoolean: Boolean;
 begin
   Result := Self <> 0;
+end;
+
+function TAqUInt32Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqUInt32Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
 end;
 
 function TAqUInt32Helper.ToString: string;
@@ -1859,6 +2079,21 @@ begin
   Result := System.StrUtils.IfThen(Self <> 0, Self.ToString);
 end;
 
+function TAqUInt64Helper.Compare(const pValue2: UInt64): UInt64;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqUInt64Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqUInt64Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
+
 class function TAqUInt64Helper.High: UInt64;
 begin
   Result := System.High(UInt64);
@@ -1874,6 +2109,16 @@ begin
   Result := Self <> 0;
 end;
 
+function TAqUInt64Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqUInt64Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
+end;
+
 function TAqUInt64Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
@@ -1884,6 +2129,21 @@ end;
 function TAqNativeUIntHelper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
+end;
+
+function TAqNativeUIntHelper.Compare(const pValue2: NativeUInt): NativeUInt;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqNativeUIntHelper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqNativeUIntHelper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
 end;
 
 class function TAqNativeUIntHelper.High: NativeUInt;
@@ -1908,6 +2168,21 @@ end;
 
 { TAqInt16Helper }
 
+function TAqInt16Helper.Compare(const pValue2: Int16): Int16;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqInt16Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqInt16Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
+
 class function TAqInt16Helper.High: Int16;
 begin
   Result := System.High(Int16);
@@ -1923,6 +2198,16 @@ begin
   Result := Self <> 0;
 end;
 
+function TAqInt16Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqInt16Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
+end;
+
 function TAqInt16Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
@@ -1934,6 +2219,21 @@ begin
 end;
 
 { TAqUInt16Helper }
+
+function TAqUInt16Helper.Compare(const pValue2: UInt16): UInt16;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqUInt16Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqUInt16Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
 
 class function TAqUInt16Helper.High: UInt16;
 begin
@@ -1950,6 +2250,16 @@ begin
   Result := Self <> 0;
 end;
 
+function TAqUInt16Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqUInt16Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
+end;
+
 function TAqUInt16Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
@@ -1961,6 +2271,21 @@ begin
 end;
 
 { TAqInt32Helper }
+
+function TAqInt32Helper.Compare(const pValue2: Int32): Int32;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqInt32Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqInt32Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
 
 class function TAqInt32Helper.High: Int32;
 begin
@@ -1977,6 +2302,16 @@ begin
   Result := Self <> 0;
 end;
 
+function TAqInt32Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqInt32Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
+end;
+
 function TAqInt32Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
@@ -1988,6 +2323,21 @@ begin
 end;
 
 { TAqInt64Helper }
+
+function TAqInt64Helper.Compare(const pValue2: Int64): Int64;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqInt64Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
+
+function TAqInt64Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
 
 class function TAqInt64Helper.High: Int64;
 begin
@@ -2004,6 +2354,16 @@ begin
   Result := Self <> 0;
 end;
 
+function TAqInt64Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqInt64Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
+end;
+
 function TAqInt64Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
@@ -2015,6 +2375,22 @@ begin
 end;
 
 { TAqInt8Helper }
+
+function TAqInt8Helper.Compare(const pValue2: Int8): Int8;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqInt8Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqInt8Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+
+end;
 
 class function TAqInt8Helper.High: Int8;
 begin
@@ -2031,6 +2407,16 @@ begin
   Result := Self <> 0;
 end;
 
+function TAqInt8Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqInt8Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
+end;
+
 function TAqInt8Helper.ToString: string;
 begin
   Result := System.SysUtils.IntToStr(Self);
@@ -2042,6 +2428,21 @@ begin
 end;
 
 { TAqUInt8Helper }
+
+function TAqUInt8Helper.Compare(const pValue2: UInt8): UInt8;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqUInt8Helper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqUInt8Helper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
 
 class function TAqUInt8Helper.High: UInt8;
 begin
@@ -2056,6 +2457,16 @@ end;
 function TAqUInt8Helper.ToBoolean: Boolean;
 begin
   Result := Self <> 0;
+end;
+
+function TAqUInt8Helper.ToHex: string;
+begin
+  Result := Self.ToHex(0);
+end;
+
+function TAqUInt8Helper.ToHex(const pDigits: UInt8): string;
+begin
+  Result := System.SysUtils.IntToHex(Self, pDigits);
 end;
 
 function TAqUInt8Helper.ToString: string;
@@ -2085,10 +2496,25 @@ var
   lDoubleValue: Double;
 begin
   lDoubleValue := Self / 1000;
-  Result := UnixToDateTime(lDoubleValue.Trunc) + TDateTime.EncodeTime(0, 0, 0, Self mod 1000);
+  Result := System.DateUtils.UnixToDateTime(lDoubleValue.Trunc, False) + TDateTime.EncodeTime(0, 0, 0, Self mod 1000);
 end;
 
 { TAqNativeIntHelper }
+
+function TAqNativeIntHelper.Compare(const pValue2: NativeInt): NativeInt;
+begin
+  result := Self - pValue2;
+end;
+
+function TAqNativeIntHelper.Format(const pMask: string; const pSettings: TFormatSettings): string;
+begin
+  Result := System.SysUtils.FormatFloat(pMask, Self, pSettings);
+end;
+
+function TAqNativeIntHelper.Format(const pMask: string): string;
+begin
+  Result := Self.Format(pMask, System.SysUtils.FormatSettings);
+end;
 
 class function TAqNativeIntHelper.High: NativeInt;
 begin
@@ -2125,6 +2551,59 @@ end;
 function TAqEntityIDHelper.ToString: string;
 begin
   Result := System.StrUtils.IfThen(Self > 0, System.SysUtils.IntToStr(Self));
+end;
+
+class function TAqStringHelper.Concat(const pStrings: array of string; const pSeparator: string): string;
+var
+  lLength: Int32;
+  lI: Int32;
+begin
+  Result := '';
+
+  lLength := System.Length(pStrings);
+
+  for lI := lLength - 1 downto 0 do
+  begin
+    Result := pStrings[lI] + Result;
+
+    if (lI > 0) and not pSeparator.IsEmpty then
+    begin
+      Result := pSeparator + Result;
+    end;
+  end;
+end;
+
+class function TAqStringHelper.Concat(const pStrings: array of string): string;
+begin
+  Result := Concat(pStrings, string.Empty);
+end;
+
+{ TAqGUIDFunctions }
+
+class function TAqGUIDFunctions.FromRawString(const pRawStringGUID: string): TGUID;
+begin
+  Result := TGUID.Create('{' + pRawStringGUID.Substring(0, 8) + '-' + pRawStringGUID.Substring(8, 4) + '-' + pRawStringGUID.Substring(12, 4) + '-' +
+    pRawStringGUID.Substring(16, 4) + '-' + pRawStringGUID.Substring(20, 12) + '}');
+end;
+
+class function TAqGUIDFunctions.ToRawString(const pGUID: TGUID): string;
+begin
+  Result := ToRawString(pGUID.ToString);
+end;
+
+class function TAqGUIDFunctions.IsEmpty(const pGUID: TGUID): Boolean;
+begin
+  Result := pGUID = EMPTY_GUID;
+end;
+
+class function TAqGUIDFunctions.ToRawString(const pGUID: string): string;
+begin
+  if pGUID.Length <> 38 then
+  begin
+    raise EAqInternal.Create('Invalid GUID size to create a raw string.');
+  end;
+
+  Result := pGUID.Substring(1, 8) + pGUID.Substring(10, 4) + pGUID.Substring(15, 4) + pGUID.Substring(20, 4) + pGUID.Substring(25, 12);
 end;
 
 end.

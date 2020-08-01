@@ -17,6 +17,7 @@ type
   strict protected
     procedure DoSetData(pData: IAqReadableList<T>); virtual; abstract;
     procedure DoAddData(pData: IAqReadableList<T>); virtual; abstract;
+    function  DoGetData: IAqReadableList<T>; virtual; abstract;
     procedure DoSetCurrentIndex(const pNewIndex: Int32); virtual;
 
     procedure SetCurrentIndex(const pNewIndex: Int32); virtual;
@@ -38,6 +39,7 @@ type
     procedure AfterAddData;
     procedure SetData(pData: IAqReadableList<T>);
     procedure AddData(pData: IAqReadableList<T>);
+    function  GetData: IAqReadableList<T>;
   public
     constructor Create;
 
@@ -67,6 +69,7 @@ type
   strict protected
     procedure DoSetData(pData: IAqReadableList<T>); override;
     procedure DoAddData(pData: IAqReadableList<T>); override;
+    function  DoGetData: IAqReadableList<T>; override;
     function DoGetItem(const pIndex: Integer): T; override;
     function GetCount: Int32; override;
   public
@@ -159,6 +162,11 @@ begin
   end;
 
   Result := GetItem(FCurrentIndex);
+end;
+
+function TAqBaseDataCursor<T>.GetData: IAqReadableList<T>;
+begin
+  Result := DoGetData;
 end;
 
 function TAqBaseDataCursor<T>.GetItem(const pIndex: Integer): T;
@@ -289,6 +297,11 @@ begin
   begin
     FItems.Add(lItem);
   end;
+end;
+
+function TAqDataCursor<T>.DoGetData: IAqReadableList<T>;
+begin
+  Result := FItems;
 end;
 
 function TAqDataCursor<T>.DoGetItem(const pIndex: Integer): T;

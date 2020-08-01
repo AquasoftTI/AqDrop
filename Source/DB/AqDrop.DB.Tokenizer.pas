@@ -40,10 +40,10 @@ type
   TAqBDTokenizer = class(TAqTokenizer<TAqDBTokenizerDictionaryID, TAqDBTokenType>)
   strict private
     class var FInstance: TAqBDTokenizer;
-    constructor Create;
   private
     class procedure _Finalize;
   public
+    constructor Create; override;
     class function GetInstance: TAqBDTokenizer;
   end;
 

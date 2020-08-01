@@ -2,9 +2,6 @@ unit AqDrop.Core.InterfacedObject;
 
 interface
 
-uses
-  System.SysUtils;
-
 type
   IAqInterfacedObject = interface
     ['{CC89B6C7-D7AB-4ECD-B12B-A8A597F06153}']
@@ -65,9 +62,6 @@ type
   end;
 
 implementation
-
-uses
-  AqDrop.Core.Helpers;
 
 { TAqInterfacedObject }
 

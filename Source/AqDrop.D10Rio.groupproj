@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{318ED654-5ACB-446D-B91A-916D4DC3DDA7}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Core\Packages\AqDrop.Core.D10Rio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DB\Packages\AqDrop.DB.D10Rio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DB\Packages\AqDrop.DB.FD.D10Rio.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="AqDrop_Core_D10Rio">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.D10Rio.dproj"/>
+    </Target>
+    <Target Name="AqDrop_Core_D10Rio:Clean">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.D10Rio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_Core_D10Rio:Make">
+        <MSBuild Projects="Core\Packages\AqDrop.Core.D10Rio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_DB_D10Rio">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.D10Rio.dproj"/>
+    </Target>
+    <Target Name="AqDrop_DB_D10Rio:Clean">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.D10Rio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_DB_D10Rio:Make">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.D10Rio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AqDrop_DB_FD_D10Rio">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.FD.D10Rio.dproj"/>
+    </Target>
+    <Target Name="AqDrop_DB_FD_D10Rio:Clean">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.FD.D10Rio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AqDrop_DB_FD_D10Rio:Make">
+        <MSBuild Projects="DB\Packages\AqDrop.DB.FD.D10Rio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="AqDrop_Core_D10Rio;AqDrop_DB_D10Rio;AqDrop_DB_FD_D10Rio"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="AqDrop_Core_D10Rio:Clean;AqDrop_DB_D10Rio:Clean;AqDrop_DB_FD_D10Rio:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="AqDrop_Core_D10Rio:Make;AqDrop_DB_D10Rio:Make;AqDrop_DB_FD_D10Rio:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

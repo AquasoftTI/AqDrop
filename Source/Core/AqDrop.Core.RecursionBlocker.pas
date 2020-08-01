@@ -35,6 +35,8 @@ type
   end;
 
   TAqStringRecursionBlocker = class(TAqRecursionBlocker<string>);
+  TAqPointerRecursionBlocker = class(TAqRecursionBlocker<Pointer>);
+  TAqObjectRecursionBlocker = class(TAqRecursionBlocker<TObject>);
   TAqComponentRecursionBlocker = class(TAqRecursionBlocker<TComponent>);
 
 {TODO 3 -oTatu -cMelhoria: fazer herdar de TAqManager - IAqManager}

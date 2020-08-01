@@ -12,6 +12,10 @@ type
   strict private
     function VerifyIfIsDefault: Boolean;
   public
+    function HasConverterTo<T>: Boolean;
+
+    function TryConvertValueTo<T>(out pValue: T): Boolean;
+
     function ConvertValueTo<T>: T; inline;
     function ConvertTo<T>: TValue; overload;
     function ConvertTo(const pTargetType: PTypeInfo): TValue; overload;
@@ -32,7 +36,7 @@ function TAqValueHelper.ConvertTo(const pTargetType: PTypeInfo): TValue;
 begin
   if Self.TypeInfo = pTargetType then
   begin
-    Result :=  Self;
+    Result := Self;
   end else begin
     Result := TAqTypeConverters.Default.Convert(Self, pTargetType);
   end;
@@ -53,6 +57,16 @@ begin
   Result := ConvertTo<T>.AsType<T>;
 end;
 
+function TAqValueHelper.HasConverterTo<T>: Boolean;
+begin
+  Result := TAqTypeConverters.Default.HasConverter<T>(Self);
+end;
+
+function TAqValueHelper.TryConvertValueTo<T>(out pValue: T): Boolean;
+begin
+  Result := TAqTypeConverters.Default.TryConvert<T>(Self, pValue);
+end;
+
 function TAqValueHelper.VerifyIfIsDefault: Boolean;
 var
   lBuffer: TArray<Byte>;
@@ -64,7 +78,7 @@ begin
     SetLength(lBuffer, Self.DataSize);
     Self.ExtractRawDataNoCopy(@lBuffer[0]);
 
-    Result := not TAqArray<Byte>.SearchItem(lBuffer,
+    Result := not TAqArray<Byte>.Find(lBuffer,
       function(pItem: Byte): Boolean
       begin
         Result := pItem <> 0;

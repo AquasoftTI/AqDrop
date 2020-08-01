@@ -26,6 +26,7 @@ uses
   AqDrop.Core.Types,
   AqDrop.Core.InterfacedObject,
   AqDrop.Core.Collections.Intf,
+  AqDrop.Core.Exceptions,
   AqDrop.DB.Types,
   AqDrop.DB.Adapter,
   AqDrop.DB.Connection,
@@ -60,9 +61,23 @@ const
     TFieldType.ftUnknown,           // adtMethod
     TFieldType.ftVariant,           // adtVariant
     TFieldType.ftUnknown,           // adtRecord
-    TFieldType.ftUnknown);          // adtInterface
+    TFieldType.ftUnknown,           // adtInterface
+    TFieldType.ftString);           // adtGUID
 
 type
+  EAqFDUnexpectedFieldType = class(EAqInternal)
+  strict private
+    FFieldType: TFieldType;
+    FTargetType: PTypeInfo;
+    FFieldName: string;
+  public
+    constructor Create(const pFieldType: TFieldType; const pTargetType: PTypeInfo; const pFieldName: string);
+
+    property FieldType: TFieldType read FFieldType;
+    property TargetType: PTypeInfo read FTargetType;
+    property FieldName: string read FFieldName;
+  end;
+
   TAqFDDataConverter = class
   public
     function ParamToString(const pParameter: TAqFDMappedParam): string; virtual;
@@ -85,6 +100,7 @@ type
     function ParamToSingle(const pParameter: TAqFDMappedParam): Single; virtual;
     function ParamToDouble(const pParameter: TAqFDMappedParam): Double; virtual;
     function ParamToCurrency(const pParameter: TAqFDMappedParam): Currency; virtual;
+    function ParamToGUID(const pParameter: TAqFDMappedParam): TGUID; virtual;
 
     function FieldToString(const pField: TField): string; virtual;
 {$IFNDEF AQMOBILE}
@@ -106,6 +122,7 @@ type
     function FieldToSingle(const pField: TField): Single; virtual;
     function FieldToDouble(const pField: TField): Double; virtual;
     function FieldToCurrency(const pField: TField): Currency; virtual;
+    function FieldToGUID(const pField: TField): TGUID; virtual;
 
     procedure StringToParam(const pParameter: TAqFDMappedParam; const pValue: string); virtual;
 {$IFNDEF AQMOBILE}
@@ -127,6 +144,7 @@ type
     procedure SingleToParam(const pParameter: TAqFDMappedParam; const pValue: Single); virtual;
     procedure DoubleToParam(const pParameter: TAqFDMappedParam; const pValue: Double); virtual;
     procedure CurrencyToParam(const pParameter: TAqFDMappedParam; const pValue: Currency); virtual;
+    procedure GUIDToParam(const pParameter: TAqFDMappedParam; const pValue: TGUID); virtual;
 
     function AqDataTypeToFieldType(const pDataType: TAqDataType): TFieldType; virtual;
   end;
@@ -190,6 +208,7 @@ type
     function GetAsSingle: Single;
     function GetAsDouble: Double;
     function GetAsCurrency: Currency;
+    function GetAsGUID: TGUID;
     function GetAsTValue(const pAsType: PTypeInfo): TValue;
 
     procedure SetAsString(const pValue: string);
@@ -214,6 +233,7 @@ type
     procedure SetAsSingle(const pValue: Single);
     procedure SetAsDouble(const pValue: Double);
     procedure SetAsCurrency(const pValue: Currency);
+    procedure SetAsGUID(const pValue: TGUID);
 
     procedure SetNull(const pDataType: TAqDataType = TAqDataType.adtUnknown);
   end;
@@ -268,6 +288,7 @@ type
     function GetAsInt64: Int64;
     function GetAsSingle: Single;
     function GetAsDouble: Double;
+    function GetAsGUID: TGUID;
     function GetAsCurrency: Currency;
     function GetAsTValue(const pAsType: PTypeInfo): TValue;
   end;
@@ -356,7 +377,6 @@ implementation
 
 uses
   System.DateUtils,
-  AqDrop.Core.Exceptions,
   AqDrop.Core.Collections,
   AqDrop.Core.Helpers,
   AqDrop.DB.Common;
@@ -671,6 +691,11 @@ begin
   Result := FParameters.Connection.FDAdapter.FDDataConverter.ParamToDouble(FParameter);
 end;
 
+function TAqFDParameter.GetAsGUID: TGUID;
+begin
+  Result := FParameters.Connection.FDAdapter.FDDataConverter.ParamToGUID(FParameter);
+end;
+
 function TAqFDParameter.GetAsInt16: Int16;
 begin
   Result := FParameters.Connection.FDAdapter.FDDataConverter.ParamToInt16(FParameter);
@@ -786,6 +811,11 @@ end;
 procedure TAqFDParameter.SetAsDouble(const pValue: Double);
 begin
   FParameters.Connection.FDAdapter.FDDataConverter.DoubleToParam(FParameter, pValue);
+end;
+
+procedure TAqFDParameter.SetAsGUID(const pValue: TGUID);
+begin
+  FParameters.Connection.FDAdapter.FDDataConverter.GUIDToParam(FParameter, pValue);
 end;
 
 procedure TAqFDParameter.SetAsInt16(const pValue: Int16);
@@ -936,7 +966,7 @@ begin
     ftBCD, ftFMTBcd:
       Result := pField.AsBCD;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a BCD field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(TBcd), pField.FieldName);
   end;
 end;
 
@@ -950,7 +980,7 @@ begin
     ftBoolean:
       Result := pField.AsBoolean;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a boolean field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Boolean), pField.FieldName);
   end;
 end;
 
@@ -965,10 +995,10 @@ begin
       Result := pField.AsBoolean.ToInt8;
     ftFloat, ftExtended, ftSingle:
       Result := pField.AsFloat;
-    ftCurrency, ftBCD:
+    ftCurrency, ftBCD, ftFMTBcd:
       Result := pField.AsCurrency;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a Currency field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Currency), pField.FieldName);
   end;
 end;
 
@@ -987,7 +1017,7 @@ begin
     ftDate, ftTime, ftDateTime, ftTimeStamp:
       Result := pField.AsDateTime;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a datetime field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(TDateTime), pField.FieldName);
   end;
 end;
 
@@ -1005,7 +1035,23 @@ begin
     ftCurrency:
       Result := pField.AsCurrency;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a single field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Double), pField.FieldName);
+  end;
+end;
+
+function TAqFDDataConverter.FieldToGUID(const pField: TField): TGUID;
+begin
+  if pField.IsNull then
+  begin
+    Result := TGUID.Empty;
+  end else
+  begin
+    case pField.DataType of
+      ftString, ftFmtMemo, ftFixedChar, ftWideString, ftFixedWideChar, ftWideMemo:
+        Result := TAqGUIDFunctions.FromRawString(pField.AsString);
+    else
+      raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Currency), pField.FieldName);
+    end;
   end;
 end;
 
@@ -1033,7 +1079,7 @@ begin
     ftCurrency, ftBCD, ftFMTBcd:
       Result := pField.AsBCD.ToDouble.Trunc;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get an integer field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Int64), pField.FieldName);
   end;
 end;
 
@@ -1056,7 +1102,7 @@ begin
     ftCurrency, ftBCD:
       Result := pField.AsCurrency;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a single field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Single), pField.FieldName);
   end;
 end;
 
@@ -1076,7 +1122,7 @@ begin
     ftDate, ftTime, ftDateTime, ftTimeStamp:
       Result := pField.AsDateTime.ToString;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a string field.');
+    raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(string), pField.FieldName);
   end;
 end;
 
@@ -1103,6 +1149,11 @@ end;
 function TAqFDDataConverter.FieldToUInt8(const pField: TField): UInt8;
 begin
   Result := FieldToUInt64(pField);
+end;
+
+procedure TAqFDDataConverter.GUIDToParam(const pParameter: TAqFDMappedParam; const pValue: TGUID);
+begin
+  pParameter.AsString := TAqGUIDFunctions.ToRawString(pValue);
 end;
 
 procedure TAqFDDataConverter.Int16ToParam(const pParameter: TAqFDMappedParam; const pValue: Int16);
@@ -1148,7 +1199,7 @@ begin
     ftBCD, ftFMTBcd:
       Result := pParameter.AsFMTBCD.ToCurrency.ToBcd;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a BCD field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a BCD parameter.');
   end;
 end;
 
@@ -1162,7 +1213,7 @@ begin
     ftBoolean:
       Result := pParameter.AsBoolean;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a boolean field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a boolean parameter.');
   end;
 end;
 
@@ -1182,7 +1233,7 @@ begin
     ftFMTBcd:
       Result := pParameter.AsFMTBCD.ToCurrency;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a Currency field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a Currency parameter.');
   end;
 end;
 
@@ -1201,7 +1252,7 @@ begin
     ftDate, ftTime, ftDateTime, ftTimeStamp:
       Result := pParameter.AsDateTime;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a datetime field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a datetime parameter.');
   end;
 end;
 
@@ -1221,7 +1272,17 @@ begin
     ftFMTBcd:
       Result := pParameter.AsFMTBCD.ToCurrency;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a double field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a double parameter.');
+  end;
+end;
+
+function TAqFDDataConverter.ParamToGUID(const pParameter: TAqFDMappedParam): TGUID;
+begin
+  case pParameter.DataType of
+    ftString, ftFmtMemo, ftFixedChar, ftWideString, ftFixedWideChar, ftWideMemo:
+      Result := TAqGUIDFunctions.FromRawString(pParameter.AsString);
+  else
+    raise EAqInternal.Create('Unexpected type when trying to get a GUID parameter.');
   end;
 end;
 
@@ -1251,7 +1312,7 @@ begin
     ftFMTBcd:
       Result := pParameter.AsFMTBCD.ToString.ToDouble.Trunc;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get an integer field.');
+    raise EAqInternal.Create('Unexpected type when trying to get an integer parameter.');
   end;
 end;
 
@@ -1276,7 +1337,7 @@ begin
     ftFMTBcd:
       Result := pParameter.AsFMTBCD.ToCurrency;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a single field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a single parameter.');
   end;
 end;
 
@@ -1298,7 +1359,7 @@ begin
     ftFMTBcd:
       Result := pParameter.AsFMTBCD.ToString;
   else
-    raise EAqInternal.Create('Unexpected type when trying to get a string field.');
+    raise EAqInternal.Create('Unexpected type when trying to get a string parameter.');
   end;
 end;
 
@@ -1405,6 +1466,11 @@ end;
 function TAqFDField.GetAsDouble: Double;
 begin
   Result := FReader.Connection.FDAdapter.FDDataConverter.FieldToDouble(FField);
+end;
+
+function TAqFDField.GetAsGUID: TGUID;
+begin
+  Result := FReader.Connection.FDAdapter.FDDataConverter.FieldToGUID(FField);
 end;
 
 function TAqFDField.GetAsInt16: Int16;
@@ -1582,6 +1648,19 @@ procedure TAqFDAdapter.SetFDDataConverter(const pDataConverter: TAqFDDataConvert
 begin
   FreeAndNil(FFDDataConverter);
   FFDDataConverter := pDataConverter;
+end;
+
+{ EAqFDUnexpectedFieldType }
+
+constructor EAqFDUnexpectedFieldType.Create(const pFieldType: TFieldType; const pTargetType: PTypeInfo;
+  const pFieldName: string);
+begin
+  FFieldType := pFieldType;
+  FTargetType := pTargetType;
+  FFieldName := pFieldName;
+
+  inherited Create('Unexpected field type (' + GetEnumName(TypeInfo(TFieldType), Integer(FFieldType)) +
+    ') while trying to get a(n) ' + GetTypeName(FTargetType) + ' value (FieldName: ' + FFieldName + ').');
 end;
 
 end.

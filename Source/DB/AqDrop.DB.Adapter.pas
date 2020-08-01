@@ -25,6 +25,7 @@ type
     function SolveTextConstant(pConstant: IAqDBSQLTextConstant): string; virtual;
     function SolveIntConstant(pConstant: IAqDBSQLIntConstant): string; virtual;
     function SolveUIntConstant(pConstant: IAqDBSQLUIntConstant): string; virtual;
+    function SolveGUIDConstant(pConstant: IAqDBSQLGUIDConstant): string; virtual;
     function SolveDoubleConstant(pConstant: IAqDBSQLDoubleConstant): string; virtual;
     function SolveCurrencyConstant(pConstant: IAqDBSQLCurrencyConstant): string; virtual;
     function SolveDateTimeConstant(pConstant: IAqDBSQLDateTimeConstant): string; virtual;
@@ -39,6 +40,7 @@ type
     function SolveSelectBody(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveJoins(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveJoin(pJoin: IAqDBSQLJoin): string; virtual;
+    function SolveGroupBy(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveOrderBy(pSelect: IAqDBSQLSelect): string; virtual;
     function SolveOrderByDesc(const pDesc: Boolean): string; virtual;
     function SolveLimit(pSelect: IAqDBSQLSelect): string; virtual;
@@ -54,6 +56,7 @@ type
     function SolveBetweenCondition(pBetweenCondition: IAqDBSQLBetweenCondition): string; virtual;
     function SolveInCondition(pInCondition: IAqDBSQLInCondition): string; virtual;
     function SolveBooleanOperator(const pBooleanOperator: TAqDBSQLBooleanOperator): string; virtual;
+    function SolveExistsCondition(pExistsCondition: IAqDBSQLExistsCondition): string; virtual;
 
     function Negate(const pConditionText: string): string; virtual;
   public
@@ -110,6 +113,37 @@ begin
   raise EAqInternal.Create('Function not implemented to this DB.');
 end;
 
+function TAqDBSQLSolver.SolveGroupBy(pSelect: IAqDBSQLSelect): string;
+var
+  lValues: TStringList;
+  lItem: IAqDBSQLValue;
+begin
+  if pSelect.IsGroupByDefined then
+  begin
+    lValues := TStringList.Create;
+
+    try
+      for lItem in pSelect.GroupBy do
+      begin
+        lValues.Add(SolveValue(lItem, False));
+      end;
+
+      lValues.StrictDelimiter := True;
+      lValues.Delimiter := ',';
+
+      Result := ' group by ' + lValues.DelimitedText;
+    finally
+      lValues.Free;
+    end;
+  end;
+
+end;
+
+function TAqDBSQLSolver.SolveGUIDConstant(pConstant: IAqDBSQLGUIDConstant): string;
+begin
+  Result := TAqGUIDFunctions.ToRawString(pConstant.Value).Quote;
+end;
+
 function TAqDBSQLSolver.GetAutoIncrementQuery(const pGeneratorName: string): string;
 begin
   Result := '';
@@ -154,7 +188,8 @@ begin
     begin
       Result := '"' + Result + '"';
     end;
-  end else begin
+  end else
+  begin
     Result := '';
   end;
 end;
@@ -170,7 +205,8 @@ begin
   if pConstant.Value then
   begin
     Result := 'True'.Quote;
-  end else begin
+  end else
+  begin
     Result := 'False'.Quote;
   end;
 end;
@@ -231,7 +267,8 @@ begin
     if pColumnsList.Count = 0 then
     begin
       lColumnsText.Add('*');
-    end else begin
+    end else
+    begin
       for lColumn in pColumnsList do
       begin
         lColumnsText.Add(SolveValue(lColumn, True));
@@ -336,6 +373,8 @@ begin
       Result := SolveBetweenCondition(pCondition.GetAsBetween);
     TAqDBSQLConditionType.ctIn:
       Result := SolveInCondition(pCondition.GetAsIn);
+    TAqDBSQLConditionType.ctExists:
+      Result := SolveExistsCondition(pCondition.GetAsExists);
   else
     raise EAqInternal.Create('Unexpected condition type.');
   end;
@@ -367,6 +406,8 @@ begin
       Result := SolveBooleanConstant(pConstant.GetAsBooleanConstant);
     TAqDBSQLConstantValueType.cvUInt:
       Result := SolveUIntConstant(pConstant.GetAsUIntConstant);
+    TAqDBSQLConstantValueType.cvGUID:
+      Result := SolveGUIDConstant(pConstant.GetAsGUIDConstant);
   else
     raise EAqInternal.Create('Constant type not expected.');
   end;
@@ -410,10 +451,12 @@ begin
     end else if pColumn.Source.SourceType = stTable then
     begin
       Result := pColumn.Source.GetAsTable.Name + '.';
-    end else begin
+    end else
+    begin
       raise EAqInternal.Create('Column source doesn''t have a valid disambiguation.');
     end;
-  end else begin
+  end else
+  begin
     Result := '';
   end;
 end;
@@ -424,6 +467,11 @@ var
 begin
   lSettings.DecimalSeparator := '.';
   Result := pConstant.Value.ToString(lSettings);
+end;
+
+function TAqDBSQLSolver.SolveExistsCondition(pExistsCondition: IAqDBSQLExistsCondition): string;
+begin
+  Result := 'exists (' + SolveSelect(pExistsCondition.Select) + ')';
 end;
 
 function TAqDBSQLSolver.SolveFrom(pSource: IAqDBSQLSource): string;
@@ -506,7 +554,14 @@ begin
     raise EAqInternal.Create('Unexpected Join Type.');
   end;
 
-  Result := Result + SolveSource(pJoin.Source) + ' on ' + SolveCondition(pJoin.Condition);
+  Result := Result + SolveSource(pJoin.Source) + ' on ';
+
+  case pJoin.ConditionType of
+    TAqDBSQLJoinConditionType.jctComposed:
+      Result := Result + SolveCondition(pJoin.GetAsJoinWithComposedCondition.Condition);
+    TAqDBSQLJoinConditionType.jctCustom:
+      Result := Result + pJoin.GetAsJoinWithCustomCondition.CustomCondition;
+  end;
 end;
 
 function TAqDBSQLSolver.SolveJoins(pSelect: IAqDBSQLSelect): string;
@@ -613,7 +668,8 @@ begin
   if pDesc then
   begin
     Result := ' desc';
-  end else begin
+  end else
+  begin
     Result := '';
   end;
 end;
@@ -642,23 +698,26 @@ end;
 
 function TAqDBSQLSolver.SolveSelectBody(pSelect: IAqDBSQLSelect): string;
 begin
-  Result := SolveColumns(pSelect.Columns) + ' ' + SolveFrom(pSelect.Source) + SolveJoins(pSelect);
+  if pSelect.IsDistinguished then
+  begin
+    Result := 'distinct ';
+  end else
+  begin
+    Result := '';
+  end;
+
+  Result := Result + SolveColumns(pSelect.Columns) + ' ' + SolveFrom(pSelect.Source) + SolveJoins(pSelect);
 
   if pSelect.IsConditionDefined then
   begin
     Result := Result + ' where ' + SolveCondition(pSelect.Condition);
   end;
 
-  Result := Result + SolveOrderBy(pSelect);
+  Result := Result + SolveGroupBy(pSelect) + SolveOrderBy(pSelect);
 end;
 
 function TAqDBSQLSolver.SolveSubselect(pSelect: IAqDBSQLSelect): string;
 begin
-  if not pSelect.IsAliasDefined then
-  begin
-    raise EAqInternal.Create('It''s not possible to generate a Subselect without an alias.');
-  end;
-
   Result := '(' + SolveSelect(pSelect) + ') ' + SolveAlias(pSelect, False);
 end;
 

@@ -75,6 +75,8 @@ begin
 {$ENDIF}
     TAqDataType.adtString, TAqDataType.adtWideString:
       Result := TValue.From<string>(pValue.AsString);
+    TAqDataType.adtGUID:
+      Result := TValue.From<TGUID>(pValue.AsGUID);
   else
     raise EAqInternal.CreateFmt('Unexpected type while converting IAqDBReadValue to TValue (%s).',
       [lDROPType.ToString]);

@@ -9,8 +9,7 @@ uses
   System.Rtti,
   Data.SqlTimSt,
   Data.FmtBcd,
-  AqDrop.Core.Types,
-  AqDrop.Core.Collections;
+  AqDrop.Core.Types;
 
 type
   IAqDBReadValue = interface
@@ -42,6 +41,7 @@ type
     function GetAsSingle: Single;
     function GetAsDouble: Double;
     function GetAsCurrency: Currency;
+    function GetAsGUID: TGUID;
     function GetAsTValue(const pAsType: PTypeInfo): TValue;
 
     property Name: string read GetName write SetName;
@@ -68,6 +68,7 @@ type
     property AsSingle: Single read GetAsSingle;
     property AsDouble: Double read GetAsDouble;
     property AsCurrency: Currency read GetAsCurrency;
+    property AsGUID: TGUID read GetAsGUID;
     property IsNull: Boolean read GetIsNull;
   end;
 
@@ -97,6 +98,7 @@ type
     procedure SetAsSingle(const pValue: Single);
     procedure SetAsDouble(const pValue: Double);
     procedure SetAsCurrency(const pValue: Currency);
+    procedure SetAsGUID(const pValue: TGUID);
 
     procedure SetNull(const pDataType: TAqDataType = TAqDataType.adtUnknown);
 
@@ -122,6 +124,7 @@ type
     property AsSingle: Single read GetAsSingle write SetAsSingle;
     property AsDouble: Double read GetAsDouble write SetAsDouble;
     property AsCurrency: Currency read GetAsCurrency write SetAsCurrency;
+    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
   end;
 
   IAqDBValues<I: IAqDBReadValue> = interface

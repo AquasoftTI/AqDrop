@@ -146,7 +146,7 @@ begin
     lLockerType := TAqLockerType.lktNone;
   end else
   begin
-    lLockerType := TAqLockerType.lktMultiReadeExclusiveWriter;
+    lLockerType := TAqLockerType.lktMultiReaderExclusiveWriter;
   end;
 
   FObservers := TAqIDDictionary<IAqObserver<T>>.Create(False, lLockerType);

@@ -15,6 +15,8 @@ type
   public
     function GetDataType: TAqDataType;
 
+    function HasAttributeInTheHierarchy<T: TCustomAttribute>: Boolean;
+
     function GetGenericName: string;
     function GetGenericTypeNames: TArray<string>;
 
@@ -55,6 +57,7 @@ uses
   AqDrop.Core.Collections,
   AqDrop.Core.Helpers.TArray,
   AqDrop.Core.Helpers,
+  AqDrop.Core.Helpers.TRttiObject,
   AqDrop.Core.Helpers.TRttiTypeName;
 
 { TAqRttiTypeHelper }
@@ -79,7 +82,7 @@ begin
   begin
     lFields := GetFields;
 
-    Result := TAqArray<TRttiField>.SearchItem(lFields,
+    Result := TAqArray<TRttiField>.Find(lFields,
       function(pItem: TRttiField): Boolean
       begin
         Result := (pItem.Offset = pOffset);
@@ -117,7 +120,7 @@ begin
   end;
 
   lMethods := GetMethods;
-  Result := TAqArray<TRttiMethod>.SearchItem(lMethods,
+  Result := TAqArray<TRttiMethod>.Find(lMethods,
     function(pItem: TRttiMethod): Boolean
     begin
       Result := pItem.IsConstructor and (Length(pItem.GetParameters) = 0);
@@ -126,6 +129,24 @@ begin
   if Result then
   begin
     pConstructor := lMethods[lIndex];
+  end;
+end;
+
+function TAqRttiTypeHelper.HasAttributeInTheHierarchy<T>: Boolean;
+var
+  lType: TRttiType;
+begin
+  Result := False;
+  lType := Self;
+
+  while not Result and Assigned(lType) do
+  begin
+    Result := lType.HasAttribute<T>;
+
+    if not Result then
+    begin
+      lType := lType.BaseType;
+    end;
   end;
 end;
 
@@ -152,8 +173,7 @@ end;
 
 constructor TAqRttiTypeHelperCache.Create;
 begin
-  FFieldsByOffset := TAqDictionary<TFieldByOffsetIndexKey, TRttiField>.Create(
-    TAqLockerType.lktMultiReadeExclusiveWriter);
+  FFieldsByOffset := TAqDictionary<TFieldByOffsetIndexKey, TRttiField>.Create(TAqLockerType.lktMultiReaderExclusiveWriter);
 end;
 
 function TAqRttiTypeHelperCache.GetFieldByOffset(const pKey: TFieldByOffsetIndexKey;

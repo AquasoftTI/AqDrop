@@ -14,6 +14,8 @@ type
 
   AqORMOff = class(TAqDBAttribute);
 
+  AqAutoReload = class(TAqDBAttribute);
+
   AqTable = class(TAqDBAttribute)
   strict private
     FName: string;
@@ -40,6 +42,9 @@ type
     property ForeignKey: string read FForeignKey;
   end;
 
+{TODO: fazer com que a criação de especializações com "inherit pks" não precise informar links, o objetivo do inherit pks é fazer com que o field
+  de PK não tenha que ser declarado na classe especializada, desde que as PKs da tabela base e especializada tenham o mesmo nome,
+  e se tem o mesmo nome, por que declarar os links?}
   AqSpecialization = class(AqTable)
   strict private
     FLinks: IAqList<TAqDBLink>;
@@ -54,6 +59,7 @@ type
     property Links: IAqReadableList<TAqDBLink> read GetLinks;
   end;
 
+  {TODO: verificar possibilidade de concentrar marcador de campo nullable em um só atributo, independentemente do tipo}
   TAqDBColumnAttribute = (caPrimaryKey, caAutoIncrement, caNullIfZero, caNullIfEmpty, caDetailKey);
   TAqDBColumnAttributes = set of TAqDBColumnAttribute;
 
@@ -124,6 +130,10 @@ type
   end;
 
   AqDetail = class(TAqDBAttribute);
+
+  {TODO 3 -oTatu -cMelhoria: criar suporte a subtipos, e depois de pronto refatorar a nova tabela de balança}
+  AqSubtype = class(TAqDBAttribute);
+
 
 implementation
 
