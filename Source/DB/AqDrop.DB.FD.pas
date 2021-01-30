@@ -1049,6 +1049,7 @@ begin
     case pField.DataType of
       ftString, ftFmtMemo, ftFixedChar, ftWideString, ftFixedWideChar, ftWideMemo:
         Result := TAqGUIDFunctions.FromRawString(pField.AsString);
+      ftGuid: Result := pField.AsGuid;
     else
       raise EAqFDUnexpectedFieldType.Create(pField.DataType, TypeInfo(Currency), pField.FieldName);
     end;
